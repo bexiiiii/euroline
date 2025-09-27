@@ -1,0 +1,5 @@
+ALTER TABLE top_ups
+    ADD COLUMN IF NOT EXISTS payment_method VARCHAR(64);
+
+ALTER TABLE top_ups
+    ADD COLUMN IF NOT EXISTS admin_comment VARCHAR(1024);

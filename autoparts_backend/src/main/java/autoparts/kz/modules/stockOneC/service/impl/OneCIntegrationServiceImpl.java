@@ -1,0 +1,212 @@
+package autoparts.kz.modules.stockOneC.service.impl;
+
+import autoparts.kz.modules.stockOneC.service.OneCIntegrationService;
+import autoparts.kz.modules.order.entity.Order;
+import autoparts.kz.modules.order.orderStatus.OrderStatus;
+import autoparts.kz.modules.order.repository.OrderRepository;
+import autoparts.kz.modules.stockOneC.service.InventoryOnDemandRefresher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+
+/**
+ * Реализация сервиса интеграции с 1С
+ */
+@Service
+public class OneCIntegrationServiceImpl implements OneCIntegrationService {
+    
+    private static final Logger logger = LoggerFactory.getLogger(OneCIntegrationServiceImpl.class);
+    
+    @Value("${oneC.api.url:http://localhost:8081/api/1c}")
+    private String oneCApiUrl;
+    
+    @Value("${oneC.api.username:admin}")
+    private String oneCUsername;
+    
+    @Value("${oneC.api.password:password}")
+    private String oneCPassword;
+    
+    @Value("${oneC.connection.timeout:10000}")
+    private int connectionTimeout;
+    
+    @Autowired
+    private RestTemplate restTemplate;
+    
+    @Autowired
+    private OrderRepository orderRepository;
+    
+    @Autowired
+    private InventoryOnDemandRefresher inventoryRefresher;
+    
+    private String lastSyncMessage = "Не синхронизировалось";
+    private String lastSyncTime = "Никогда";
+    
+    @Override
+    public boolean testConnection() {
+        try {
+            HttpHeaders headers = createHeaders();
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            ResponseEntity<String> response = restTemplate.exchange(
+                oneCApiUrl + "/ping",
+                HttpMethod.GET,
+                entity,
+                String.class
+            );
+            
+            boolean isConnected = response.getStatusCode() == HttpStatus.OK;
+            logger.info("1C connection test result: {}", isConnected);
+            return isConnected;
+            
+        } catch (Exception e) {
+            logger.error("Failed to connect to 1C: {}", e.getMessage());
+            return false;
+        }
+    }
+    
+    @Override
+    public void syncCatalog() {
+        try {
+            logger.info("Starting catalog sync from 1C");
+            updateSyncStatus("CATALOG", "IN_PROGRESS", "Синхронизация каталога...");
+            
+            HttpHeaders headers = createHeaders();
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+            
+            ResponseEntity<String> response = restTemplate.exchange(
+                oneCApiUrl + "/catalog/sync",
+                HttpMethod.POST,
+                entity,
+                String.class
+            );
+            
+            if (response.getStatusCode() == HttpStatus.OK) {
+                // Запускаем обновление inventory через Kafka
+                try {
+                    inventoryRefresher.refreshSkus(List.of()); // Пустой список означает обновить все SKU
+                } catch (Exception e) {
+                    logger.warn("Failed to trigger inventory refresh: {}", e.getMessage());
+                }
+                updateSyncStatus("CATALOG", "SUCCESS", "Каталог успешно синхронизирован");
+                logger.info("Catalog sync completed successfully");
+            } else {
+                updateSyncStatus("CATALOG", "ERROR", "Ошибка синхронизации каталога");
+                logger.error("Catalog sync failed with status: {}", response.getStatusCode());
+            }
+            
+        } catch (Exception e) {
+            updateSyncStatus("CATALOG", "ERROR", "Ошибка: " + e.getMessage());
+            logger.error("Error during catalog sync: {}", e.getMessage(), e);
+            throw new RuntimeException("Ошибка синхронизации каталога: " + e.getMessage());
+        }
+    }
+    
+    @Override
+    public void sendOrderToOneC(Long orderId) {
+        try {
+            logger.info("Sending order {} to 1C", orderId);
+            updateSyncStatus("ORDER", "IN_PROGRESS", "Отправка заказа #" + orderId);
+            
+            Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Заказ не найден: " + orderId));
+            
+            HttpHeaders headers = createHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            
+            HttpEntity<Order> entity = new HttpEntity<>(order, headers);
+            
+            ResponseEntity<String> response = restTemplate.exchange(
+                oneCApiUrl + "/orders",
+                HttpMethod.POST,
+                entity,
+                String.class
+            );
+            
+            if (response.getStatusCode() == HttpStatus.OK) {
+                updateSyncStatus("ORDER", "SUCCESS", "Заказ #" + orderId + " успешно отправлен");
+                logger.info("Order {} sent to 1C successfully", orderId);
+            } else {
+                updateSyncStatus("ORDER", "ERROR", "Ошибка отправки заказа #" + orderId);
+                logger.error("Failed to send order {} to 1C, status: {}", orderId, response.getStatusCode());
+            }
+            
+        } catch (Exception e) {
+            updateSyncStatus("ORDER", "ERROR", "Ошибка отправки заказа: " + e.getMessage());
+            logger.error("Error sending order {} to 1C: {}", orderId, e.getMessage(), e);
+            throw new RuntimeException("Ошибка отправки заказа в 1С: " + e.getMessage());
+        }
+    }
+    
+    @Override
+    public void sendPendingOrdersToOneC() {
+        try {
+            logger.info("Sending pending orders to 1C");
+            updateSyncStatus("BATCH_ORDER", "IN_PROGRESS", "Отправка ожидающих заказов");
+            
+            // Находим заказы со статусом PENDING или CONFIRMED
+            List<Order> pendingOrders = orderRepository.findAll().stream()
+                .filter(order -> 
+                    order.getStatus() == OrderStatus.PENDING || 
+                    order.getStatus() == OrderStatus.CONFIRMED
+                )
+                .toList();
+            
+            if (pendingOrders.isEmpty()) {
+                updateSyncStatus("BATCH_ORDER", "SUCCESS", "Нет ожидающих заказов для отправки");
+                return;
+            }
+            
+            int successCount = 0;
+            int errorCount = 0;
+            
+            for (Order order : pendingOrders) {
+                try {
+                    sendOrderToOneC(order.getId());
+                    successCount++;
+                } catch (Exception e) {
+                    errorCount++;
+                    logger.error("Failed to send order {} to 1C: {}", order.getId(), e.getMessage());
+                }
+            }
+            
+            String message = String.format("Отправлено: %d, Ошибок: %d из %d заказов", 
+                successCount, errorCount, pendingOrders.size());
+            updateSyncStatus("BATCH_ORDER", errorCount == 0 ? "SUCCESS" : "PARTIAL", message);
+            
+            logger.info("Pending orders sync completed. Success: {}, Errors: {}", successCount, errorCount);
+            
+        } catch (Exception e) {
+            updateSyncStatus("BATCH_ORDER", "ERROR", "Ошибка массовой отправки: " + e.getMessage());
+            logger.error("Error sending pending orders to 1C: {}", e.getMessage(), e);
+            throw new RuntimeException("Ошибка отправки ожидающих заказов в 1С: " + e.getMessage());
+        }
+    }
+    
+    @Override
+    public SyncStatus getLastSyncStatus() {
+        return new SyncStatus("GENERAL", "SUCCESS", lastSyncTime, lastSyncMessage);
+    }
+    
+    private HttpHeaders createHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        String auth = oneCUsername + ":" + oneCPassword;
+        String encodedAuth = java.util.Base64.getEncoder().encodeToString(auth.getBytes());
+        headers.set("Authorization", "Basic " + encodedAuth);
+        headers.set("Accept", "application/json");
+        return headers;
+    }
+    
+    private void updateSyncStatus(String type, String status, String message) {
+        this.lastSyncMessage = message;
+        this.lastSyncTime = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        logger.debug("Sync status updated: type={}, status={}, message={}", type, status, message);
+    }
+}
