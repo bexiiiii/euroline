@@ -11,7 +11,6 @@ import java.util.Objects;
 @Setter
 @NoArgsConstructor
 @Entity
-@ToString
 
 @Table(name = "user_profile")
 @Data

@@ -10,6 +10,7 @@ import Badge from "@/components/ui/badge/Badge";
 import PreviewBannerModal from "@/components/marketing/PreviewBannerModal";
 import { useProductBanners } from "@/lib/hooks/useProductBanners";
 import { Banner, CreateBannerRequest } from "@/lib/api/promotions";
+import { API_URL } from "@/lib/api";
 
 const PAGE_SIZE = 10;
 
@@ -282,11 +283,27 @@ const handleFormDataChange = useCallback(
                           <div className="h-14 w-24 overflow-hidden rounded-lg border border-gray-100 bg-gray-100 dark:border-white/[0.06] dark:bg-white/[0.03]">
                             {banner.imageUrl ? (
                               <img
-                                src={banner.imageUrl}
+                                src={banner.imageUrl.startsWith('http') ? banner.imageUrl : `${API_URL}${banner.imageUrl}`}
                                 alt={banner.title}
                                 className="h-full w-full object-cover"
                                 onError={(event) => {
-                                  (event.target as HTMLImageElement).style.opacity = "0.4";
+                                  const target = event.target as HTMLImageElement;
+                                  console.error('Ошибка загрузки изображения баннера:', target.src);
+                                  // Try with sanitized filename
+                                  if (!target.src.includes('fallback')) {
+                                    const baseUrl = banner.imageUrl.startsWith('http') ? '' : API_URL;
+                                    const imagePath = banner.imageUrl.startsWith('http') ? 
+                                      banner.imageUrl.split('/files/')[1] : 
+                                      banner.imageUrl.replace('/files/', '');
+                                    
+                                    const sanitizedPath = imagePath
+                                      .replace(/[^a-zA-Z0-9._-]/g, '_')
+                                      .replace(/_+/g, '_');
+                                    
+                                    target.src = `${baseUrl}/files/${sanitizedPath}?fallback=1`;
+                                  } else {
+                                    target.style.opacity = "0.4";
+                                  }
                                 }}
                               />
                             ) : (
@@ -554,7 +571,6 @@ const BannerFormModal: React.FC<BannerFormModalProps> = ({
                   className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-white/[0.05] dark:bg-white/[0.02]"
                 />
                 <Button
-                  type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => onChange({ ...data, file: null })}

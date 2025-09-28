@@ -20,7 +20,7 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     // Enable CORS for admin/frontend apps
-    @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:3001,http://localhost:5173}")
+    @Value("${app.cors.allowed-origins:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173}")
     private String allowedOrigins;
 
     @Bean

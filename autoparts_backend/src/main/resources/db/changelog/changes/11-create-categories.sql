@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS categories (
 );
 
 ALTER TABLE categories
+    DROP CONSTRAINT IF EXISTS fk_categories_parent;
+
+ALTER TABLE categories
     ADD CONSTRAINT fk_categories_parent
     FOREIGN KEY (parent_id)
     REFERENCES categories (id)
@@ -25,6 +28,9 @@ CREATE INDEX IF NOT EXISTS idx_categories_sort_order ON categories (sort_order);
 
 ALTER TABLE products
     ADD COLUMN IF NOT EXISTS category_id BIGINT;
+
+ALTER TABLE products
+    DROP CONSTRAINT IF EXISTS fk_products_category;
 
 ALTER TABLE products
     ADD CONSTRAINT fk_products_category

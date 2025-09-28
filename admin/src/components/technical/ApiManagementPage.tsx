@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ComponentCard from "../common/ComponentCard";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
@@ -7,169 +7,129 @@ import { Modal } from "../ui/modal";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
-import Select from "../form/Select";
-
-interface ApiEndpoint {
-  id: number;
-  method: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-  path: string;
-  name: string;
-  description: string;
-  status: "active" | "inactive" | "deprecated";
-  version: string;
-  rateLimit: number;
-  authentication: "none" | "api_key" | "bearer" | "basic";
-  lastCalled: string;
-  callCount: number;
-  averageResponseTime: number;
-  errorRate: number;
-  category: string;
-}
+import { logPageView, logUserAction } from "@/lib/eventLogger";
 
 interface ApiKey {
   id: number;
   name: string;
-  key: string;
-  status: "active" | "inactive" | "revoked";
-  permissions: string[];
-  rateLimit: number;
-  createdAt: string;
-  lastUsed: string;
-  expiresAt: string;
-  usageCount: number;
-  owner: string;
+  active: boolean;
+  createdAt?: string;
+  lastUsed?: string;
 }
 
 const ApiManagementPage = () => {
-  const [activeTab, setActiveTab] = useState("endpoints");
+  const [activeTab, setActiveTab] = useState("keys");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<"endpoint" | "key">("endpoint");
-  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [newKeyName, setNewKeyName] = useState("");
+  const [createdKey, setCreatedKey] = useState<{id: string, apiKey: string} | null>(null);
 
-  const [endpoints] = useState<ApiEndpoint[]>([
-    {
-      id: 1,
-      method: "GET",
-      path: "/api/v1/products",
-      name: "Получить список товаров",
-      description: "Возвращает список всех товаров с пагинацией и фильтрами",
-      status: "active",
-      version: "v1",
-      rateLimit: 1000,
-      authentication: "api_key",
-      lastCalled: "2024-12-15T14:30:00Z",
-      callCount: 15420,
-      averageResponseTime: 145,
-      errorRate: 0.5,
-      category: "products"
-    },
-    {
-      id: 2,
-      method: "POST",
-      path: "/api/v1/orders",
-      name: "Создать заказ",
-      description: "Создает новый заказ на основе переданных данных",
-      status: "active",
-      version: "v1",
-      rateLimit: 100,
-      authentication: "bearer",
-      lastCalled: "2024-12-15T14:25:00Z",
-      callCount: 3210,
-      averageResponseTime: 320,
-      errorRate: 2.1,
-      category: "orders"
-    },
-    {
-      id: 3,
-      method: "GET",
-      path: "/api/v1/categories",
-      name: "Получить категории",
-      description: "Возвращает дерево категорий товаров",
-      status: "active",
-      version: "v1",
-      rateLimit: 500,
-      authentication: "none",
-      lastCalled: "2024-12-15T14:20:00Z",
-      callCount: 8500,
-      averageResponseTime: 85,
-      errorRate: 0.1,
-      category: "categories"
-    },
-    {
-      id: 4,
-      method: "PUT",
-      path: "/api/v1/products/{id}",
-      name: "Обновить товар",
-      description: "Обновляет информацию о товаре",
-      status: "active",
-      version: "v1",
-      rateLimit: 200,
-      authentication: "api_key",
-      lastCalled: "2024-12-15T13:45:00Z",
-      callCount: 890,
-      averageResponseTime: 210,
-      errorRate: 1.2,
-      category: "products"
-    },
-    {
-      id: 5,
-      method: "GET",
-      path: "/api/v0/legacy/products",
-      name: "Получить товары (устаревший)",
-      description: "Устаревший метод получения товаров",
-      status: "deprecated",
-      version: "v0",
-      rateLimit: 50,
-      authentication: "basic",
-      lastCalled: "2024-12-10T10:00:00Z",
-      callCount: 150,
-      averageResponseTime: 500,
-      errorRate: 5.0,
-      category: "products"
-    }
-  ]);
+  useEffect(() => {
+    const fetchApiKeys = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('http://localhost:8080/api/admin/api/keys', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setApiKeys(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch API keys:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const [apiKeys] = useState<ApiKey[]>([
-    {
-      id: 1,
-      name: "Mobile App Key",
-      key: "ak_live_51H8B...***...XYZ9",
-      status: "active",
-      permissions: ["products:read", "categories:read", "orders:create"],
-      rateLimit: 1000,
-      createdAt: "2024-11-01T10:00:00Z",
-      lastUsed: "2024-12-15T14:30:00Z",
-      expiresAt: "2025-11-01T10:00:00Z",
-      usageCount: 45230,
-      owner: "mobile-team@autoparts.ru"
-    },
-    {
-      id: 2,
-      name: "Admin Dashboard",
-      key: "ak_live_52J9C...***...ABC1",
-      status: "active",
-      permissions: ["*"],
-      rateLimit: 5000,
-      createdAt: "2024-10-15T09:00:00Z",
-      lastUsed: "2024-12-15T14:25:00Z",
-      expiresAt: "2025-10-15T09:00:00Z",
-      usageCount: 128450,
-      owner: "admin@autoparts.ru"
-    },
-    {
-      id: 3,
-      name: "Third Party Integration",
-      key: "ak_test_53K0D...***...DEF2",
-      status: "inactive",
-      permissions: ["products:read", "categories:read"],
-      rateLimit: 100,
-      createdAt: "2024-12-01T15:00:00Z",
-      lastUsed: "2024-12-05T12:00:00Z",
-      expiresAt: "2024-12-31T23:59:59Z",
-      usageCount: 25,
-      owner: "partner@example.com"
+    fetchApiKeys();
+    // Log page view
+    logPageView('Управление API', '/api-management');
+  }, []);
+
+  const createApiKey = async () => {
+    if (!newKeyName.trim()) {
+      alert('Пожалуйста, введите название ключа');
+      return;
     }
-  ]);
+
+    try {
+      const response = await fetch('http://localhost:8080/api/admin/api/keys', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `name=${encodeURIComponent(newKeyName)}`
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setCreatedKey(result);
+        setNewKeyName('');
+        
+        // Log user action
+        logUserAction(`Создан API ключ: ${newKeyName}`, `ID: ${result.id}`);
+        
+        const keysResponse = await fetch('http://localhost:8080/api/admin/api/keys', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (keysResponse.ok) {
+          const keysData = await keysResponse.json();
+          setApiKeys(keysData);
+        }
+      } else {
+        alert('Ошибка создания ключа');
+      }
+    } catch (error) {
+      console.error('Failed to create API key:', error);
+      alert('Ошибка создания ключа');
+    }
+  };
+
+  const revokeApiKey = async (keyId: number) => {
+    if (!confirm('Вы уверены, что хотите отозвать этот ключ?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:8080/api/admin/api/keys/${keyId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const keysResponse = await fetch('http://localhost:8080/api/admin/api/keys', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (keysResponse.ok) {
+          const keysData = await keysResponse.json();
+          setApiKeys(keysData);
+        }
+      } else {
+        alert('Ошибка отзыва ключа');
+      }
+    } catch (error) {
+      console.error('Failed to revoke API key:', error);
+      alert('Ошибка отзыва ключа');
+    }
+  };
 
   const formatDateTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleString('ru-RU', {
@@ -181,363 +141,402 @@ const ApiManagementPage = () => {
     });
   };
 
-  const getMethodColor = (method: string) => {
-    switch (method) {
-      case "GET":
-        return "success";
-      case "POST":
-        return "primary";
-      case "PUT":
-        return "warning";
-      case "DELETE":
-        return "error";
-      case "PATCH":
-        return "info";
-      default:
-        return "light";
-    }
+  const getStatusBadge = (active: boolean) => {
+    return active 
+      ? <Badge color="success" size="sm">Активен</Badge>
+      : <Badge color="error" size="sm">Неактивен</Badge>;
   };
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Badge color="success" size="sm">Активен</Badge>;
-      case "inactive":
-        return <Badge color="warning" size="sm">Неактивен</Badge>;
-      case "deprecated":
-        return <Badge color="error" size="sm">Устарел</Badge>;
-      case "revoked":
-        return <Badge color="error" size="sm">Отозван</Badge>;
-      default:
-        return <Badge color="light" size="sm">{status}</Badge>;
-    }
-  };
-
-  const getAuthBadge = (auth: string) => {
-    switch (auth) {
-      case "none":
-        return <Badge color="light" size="sm">Без авторизации</Badge>;
-      case "api_key":
-        return <Badge color="primary" size="sm">API Ключ</Badge>;
-      case "bearer":
-        return <Badge color="info" size="sm">Bearer Token</Badge>;
-      case "basic":
-        return <Badge color="warning" size="sm">Basic Auth</Badge>;
-      default:
-        return <Badge color="light" size="sm">{auth}</Badge>;
-    }
-  };
-
-  const openModal = (type: "endpoint" | "key", item?: any) => {
-    setModalType(type);
-    setSelectedItem(item || null);
-    setIsModalOpen(true);
-  };
-
-  const getApiStats = () => {
-    const totalEndpoints = endpoints.length;
-    const activeEndpoints = endpoints.filter(e => e.status === "active").length;
-    const totalCalls = endpoints.reduce((sum, e) => sum + e.callCount, 0);
-    const avgResponseTime = endpoints.reduce((sum, e) => sum + e.averageResponseTime, 0) / endpoints.length;
-    const totalKeys = apiKeys.length;
-    const activeKeys = apiKeys.filter(k => k.status === "active").length;
-    
-    return {
-      totalEndpoints,
-      activeEndpoints,
-      totalCalls,
-      avgResponseTime: Math.round(avgResponseTime),
-      totalKeys,
-      activeKeys
-    };
-  };
-
-  const stats = getApiStats();
 
   return (
     <div className="space-y-6">
-      {/* Статистика */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">API Endpoints</h3>
-          <div className="mt-2 flex items-baseline">
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.activeEndpoints}</p>
-            <div className="ml-2 flex items-center text-sm font-medium text-gray-500">
-              <span>из {stats.totalEndpoints}</span>
-            </div>
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-gray-500 dark:text-gray-400">
+            <p className="text-lg font-medium">Загрузка API данных...</p>
           </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">активных endpoints</p>
         </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Всего вызовов</h3>
-          <div className="mt-2 flex items-baseline">
-            <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-              {stats.totalCalls.toLocaleString('ru-RU')}
-            </p>
-          </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">запросов к API</p>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">Время ответа</h3>
-          <div className="mt-2 flex items-baseline">
-            <p className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.avgResponseTime}</p>
-            <div className="ml-2 flex items-center text-sm font-medium text-green-600">
-              <span>мс</span>
-            </div>
-          </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">среднее время</p>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">API Ключи</h3>
-          <div className="mt-2 flex items-baseline">
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.activeKeys}</p>
-            <div className="ml-2 flex items-center text-sm font-medium text-gray-500">
-              <span>из {stats.totalKeys}</span>
-            </div>
-          </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">активных ключей</p>
-        </div>
-      </div>
-
-      {/* Основной контент */}
-      <ComponentCard
-        title="Управление API"
-        description="Настройка endpoints, API ключей и мониторинг использования"
-        action={
-          <div className="flex space-x-2">
-            <Button size="sm" variant="outline">Документация</Button>
-            <Button size="sm" onClick={() => openModal(activeTab === "endpoints" ? "endpoint" : "key")}>
-              {activeTab === "endpoints" ? "Добавить Endpoint" : "Создать ключ"}
-            </Button>
-          </div>
-        }
-      >
-        {/* Табы */}
-        <div className="border-b border-gray-200 dark:border-gray-700 -mx-6 px-6">
-          <nav className="flex space-x-8" aria-label="Tabs">
-            <button
-              onClick={() => setActiveTab("endpoints")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "endpoints"
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-              }`}
-            >
-              API Endpoints
-            </button>
-            <button
-              onClick={() => setActiveTab("keys")}
-              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === "keys"
-                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-              }`}
-            >
-              API Ключи
-            </button>
-          </nav>
-        </div>
-
-        {/* Контент табов */}
-        <div className="mt-6">
-          {activeTab === "endpoints" && (
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-              <div className="max-w-full overflow-x-auto">
-                <div className="min-w-[1400px]">
-                  <Table>
-                    <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                      <TableRow>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Endpoint</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Статус</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Авторизация</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Лимит запросов</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Статистика</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Последний вызов</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Действия</TableCell>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                      {endpoints.map((endpoint) => (
-                        <TableRow key={endpoint.id}>
-                          <TableCell className="px-5 py-4 sm:px-6 text-start">
-                            <div>
-                              <div className="flex items-center space-x-2">
-                                <Badge color={getMethodColor(endpoint.method) as any} size="sm">
-                                  {endpoint.method}
-                                </Badge>
-                                <span className="font-mono text-gray-800 text-theme-sm dark:text-white/90">
-                                  {endpoint.path}
-                                </span>
-                              </div>
-                              <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90 mt-1">
-                                {endpoint.name}
-                              </div>
-                              <div className="text-gray-500 text-theme-xs dark:text-gray-400 mt-1">
-                                {endpoint.description}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start text-theme-sm">
-                            {getStatusBadge(endpoint.status)}
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start text-theme-sm">
-                            {getAuthBadge(endpoint.authentication)}
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start text-theme-sm">
-                            <div className="text-gray-700 dark:text-gray-300">
-                              {endpoint.rateLimit.toLocaleString('ru-RU')}/час
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start text-theme-sm">
-                            <div>
-                              <div className="text-gray-700 dark:text-gray-300">
-                                {endpoint.callCount.toLocaleString('ru-RU')} вызовов
-                              </div>
-                              <div className="text-gray-500 text-theme-xs dark:text-gray-400">
-                                ~{endpoint.averageResponseTime}мс • {endpoint.errorRate}% ошибок
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start text-theme-sm">
-                            <div className="text-gray-700 dark:text-gray-300">
-                              {formatDateTime(endpoint.lastCalled)}
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openModal("endpoint", endpoint)}
-                            >
-                              Настроить
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+      ) : (
+        <>
+          {/* Overview Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">API Ключи</h3>
+              <div className="mt-2 flex items-baseline">
+                <p className="text-3xl font-bold text-gray-900 dark:text-white">{apiKeys.filter(k => k.active).length}</p>
+                <div className="ml-2 flex items-center text-sm font-medium text-gray-500">
+                  <span>из {apiKeys.length}</span>
                 </div>
               </div>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">активных ключей</p>
             </div>
-          )}
 
-          {activeTab === "keys" && (
-            <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-              <div className="max-w-full overflow-x-auto">
-                <div className="min-w-[1200px]">
-                  <Table>
-                    <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                      <TableRow>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Ключ</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Статус</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Разрешения</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Использование</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Истекает</TableCell>
-                        <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Действия</TableCell>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                      {apiKeys.map((key) => (
-                        <TableRow key={key.id}>
-                          <TableCell className="px-5 py-4 sm:px-6 text-start">
-                            <div>
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Запросы сегодня</h3>
+              <div className="mt-2 flex items-baseline">
+                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">1,247</p>
+              </div>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">API вызовов</p>
+            </div>
+
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Статус API</h3>
+              <div className="mt-2 flex items-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
+                <p className="text-lg font-medium text-green-600">Работает</p>
+              </div>
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">99.9% uptime</p>
+            </div>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="border-b border-gray-200 dark:border-gray-700">
+              <nav className="flex space-x-8 px-6" aria-label="Tabs">
+                {[
+                  { id: "keys", name: "API Ключи" },
+                  { id: "docs", name: "Документация" },
+                  { id: "usage", name: "Использование" }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                      activeTab === tab.id
+                        ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                        : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                    }`}
+                  >
+                    {tab.name}
+                  </button>
+                ))}
+              </nav>
+            </div>
+
+            <div className="p-6">
+              {activeTab === "keys" && (
+                <ComponentCard
+                  title="Управление API ключами"
+                  description="Создание и управление API ключами для внешних интеграций"
+                  action={
+                    <Button size="sm" onClick={() => setIsModalOpen(true)}>
+                      Создать ключ
+                    </Button>
+                  }
+                >
+                  <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+                    <Table>
+                      <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
+                        <TableRow>
+                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Название</TableCell>
+                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Статус</TableCell>
+                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Создан</TableCell>
+                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Последнее использование</TableCell>
+                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Действия</TableCell>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                        {apiKeys.map((key) => (
+                          <TableRow key={key.id}>
+                            <TableCell className="px-5 py-4 sm:px-6 text-start">
                               <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
                                 {key.name}
                               </div>
                               <div className="font-mono text-gray-500 text-theme-xs dark:text-gray-400 mt-1">
-                                {key.key}
+                                ID: {key.id}
                               </div>
-                              <div className="text-gray-500 text-theme-xs dark:text-gray-400 mt-1">
-                                Владелец: {key.owner}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start text-theme-sm">
-                            {getStatusBadge(key.status)}
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start text-theme-sm">
-                            <div className="max-w-xs">
-                              {key.permissions.slice(0, 2).map((perm, idx) => (
-                                <span key={idx} className="mr-1 mb-1 inline-block">
-                                  <Badge color="light" size="sm">
-                                    {perm}
-                                  </Badge>
-                                </span>
-                              ))}
-                              {key.permissions.length > 2 && (
-                                <span className="text-gray-500 text-theme-xs">
-                                  +{key.permissions.length - 2} еще
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start text-theme-sm">
-                            <div>
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-start text-theme-sm">
+                              {getStatusBadge(key.active)}
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-start text-theme-sm">
                               <div className="text-gray-700 dark:text-gray-300">
-                                {key.usageCount.toLocaleString('ru-RU')} вызовов
+                                {key.createdAt ? formatDateTime(key.createdAt) : 'Не указано'}
                               </div>
-                              <div className="text-gray-500 text-theme-xs dark:text-gray-400">
-                                Лимит: {key.rateLimit.toLocaleString('ru-RU')}/час
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-start text-theme-sm">
+                              <div className="text-gray-700 dark:text-gray-300">
+                                {key.lastUsed ? formatDateTime(key.lastUsed) : 'Никогда'}
                               </div>
-                              <div className="text-gray-500 text-theme-xs dark:text-gray-400">
-                                Последний: {formatDateTime(key.lastUsed)}
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start text-theme-sm">
-                            <div className="text-gray-700 dark:text-gray-300">
-                              {formatDateTime(key.expiresAt)}
-                            </div>
-                          </TableCell>
-                          <TableCell className="px-4 py-3 text-start">
-                            <div className="flex items-center space-x-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => openModal("key", key)}
-                              >
-                                Настроить
-                              </Button>
-                              {key.status === "active" && (
+                            </TableCell>
+                            <TableCell className="px-4 py-3 text-start">
+                              {key.active && (
                                 <Button
                                   size="sm"
                                   variant="outline"
+                                  onClick={() => revokeApiKey(key.id)}
                                 >
                                   Отозвать
                                 </Button>
                               )}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </ComponentCard>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    
+                    {apiKeys.length === 0 && (
+                      <div className="text-center py-12">
+                        <div className="text-gray-500 dark:text-gray-400">
+                          <p className="text-lg font-medium">API ключи не найдены</p>
+                          <p className="text-sm mt-1">Создайте первый API ключ для начала работы</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </ComponentCard>
+              )}
 
-      {/* Модальное окно */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} size="md">
-        <div className="p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">
-            {modalType === "endpoint" ? "Настройка Endpoint" : "Настройка API ключа"}
-          </h3>
-          <div className="text-gray-600 dark:text-gray-400">
-            Форма настройки будет здесь...
+              {activeTab === "docs" && (
+                <div className="space-y-6">
+                  <ComponentCard
+                    title="API Документация"
+                    description="Руководство по интеграции с нашим API"
+                  >
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Базовый URL</h4>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm">
+                          https://api.autoparts.kz/v1
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Аутентификация</h4>
+                        <p className="text-gray-600 dark:text-gray-400 mb-3">
+                          Все запросы к API должны включать заголовок X-API-Key с вашим API ключом:
+                        </p>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm">
+                          X-API-Key: YOUR_API_KEY_HERE
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Доступные эндпоинты</h4>
+                        <div className="space-y-4">
+                          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Badge color="success" size="sm">GET</Badge>
+                              <code className="text-sm">/external/products</code>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Получить список товаров с возможностью фильтрации
+                            </p>
+                          </div>
+                          
+                          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Badge color="success" size="sm">GET</Badge>
+                              <code className="text-sm">/external/products/&#123;id&#125;</code>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Получить детальную информацию о товаре
+                            </p>
+                          </div>
+                          
+                          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Badge color="info" size="sm">POST</Badge>
+                              <code className="text-sm">/external/orders</code>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Создать новый заказ
+                            </p>
+                          </div>
+                          
+                          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <Badge color="success" size="sm">GET</Badge>
+                              <code className="text-sm">/external/orders/&#123;id&#125;/status</code>
+                            </div>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                              Получить статус заказа
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Формат ответа</h4>
+                        <p className="text-gray-600 dark:text-gray-400 mb-3">
+                          Все ответы API возвращаются в формате JSON:
+                        </p>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm">
+{`{
+  "success": true,
+  "data": {
+    // данные ответа
+  },
+  "message": "Запрос выполнен успешно"
+}`}
+                        </div>
+                      </div>
+                    </div>
+                  </ComponentCard>
+                </div>
+              )}
+
+              {activeTab === "usage" && (
+                <div className="space-y-6">
+                  <ComponentCard
+                    title="Примеры использования"
+                    description="Готовые примеры интеграции на разных языках программирования"
+                  >
+                    <div className="space-y-6">
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">JavaScript (fetch)</h4>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+{`// Получить список товаров
+fetch('https://api.autoparts.kz/v1/external/products', {
+  headers: {
+    'X-API-Key': 'YOUR_API_KEY_HERE',
+    'Content-Type': 'application/json'
+  }
+})
+.then(response => response.json())
+.then(data => console.log(data))
+.catch(error => console.error('Error:', error));`}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">PHP (cURL)</h4>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+{`<?php
+$curl = curl_init();
+
+curl_setopt_array($curl, [
+  CURLOPT_URL => 'https://api.autoparts.kz/v1/external/products',
+  CURLOPT_RETURNTRANSFER => true,
+  CURLOPT_HTTPHEADER => [
+    'X-API-Key: YOUR_API_KEY_HERE',
+    'Content-Type: application/json'
+  ]
+]);
+
+$response = curl_exec($curl);
+$data = json_decode($response, true);
+
+curl_close($curl);
+print_r($data);
+?>`}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Python (requests)</h4>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+{`import requests
+
+headers = {
+    'X-API-Key': 'YOUR_API_KEY_HERE',
+    'Content-Type': 'application/json'
+}
+
+response = requests.get(
+    'https://api.autoparts.kz/v1/external/products',
+    headers=headers
+)
+
+if response.status_code == 200:
+    data = response.json()
+    print(data)
+else:
+    print(f'Error: {response.status_code}')`}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Создание заказа (POST)</h4>
+                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+{`// JavaScript example
+const orderData = {
+  customer: {
+    name: 'Иван Иванов',
+    email: 'ivan@example.com',
+    phone: '+7 (495) 123-45-67'
+  },
+  items: [
+    {
+      productId: 12345,
+      quantity: 2
+    }
+  ],
+  deliveryAddress: {
+    city: 'Москва',
+    address: 'ул. Пример, д. 1'
+  }
+};
+
+fetch('https://api.autoparts.kz/v1/external/orders', {
+  method: 'POST',
+  headers: {
+    'X-API-Key': 'YOUR_API_KEY_HERE',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(orderData)
+})
+.then(response => response.json())
+.then(data => console.log('Order created:', data));`}
+                        </div>
+                      </div>
+                    </div>
+                  </ComponentCard>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="flex justify-end pt-6">
-            <Button onClick={() => setIsModalOpen(false)}>
-              Закрыть
-            </Button>
-          </div>
-        </div>
-      </Modal>
+
+          <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} size="md">
+            <div className="p-6">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">
+                Создание API ключа
+              </h3>
+              
+              {!createdKey ? (
+                <div className="space-y-4">
+                  <div>
+                    <Label>Название ключа</Label>
+                    <Input
+                      type="text"
+                      placeholder="Введите название для API ключа..."
+                      value={newKeyName}
+                      onChange={(e) => setNewKeyName(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex justify-end pt-4 space-x-3">
+                    <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+                      Отмена
+                    </Button>
+                    <Button onClick={createApiKey}>
+                      Создать ключ
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <h4 className="font-medium text-green-800 dark:text-green-300">API ключ создан успешно!</h4>
+                    <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                      Скопируйте этот ключ сейчас. Он больше не будет отображаться.
+                    </p>
+                    <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded font-mono text-sm">
+                      {createdKey.apiKey}
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button onClick={() => {
+                      setCreatedKey(null);
+                      setIsModalOpen(false);
+                    }}>
+                      Закрыть
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Modal>
+        </>
+      )}
     </div>
   );
 };

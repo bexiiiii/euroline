@@ -39,7 +39,7 @@ export interface CartStats {
   }[];
 }
 
-const BASE_URL = '/api/admin';
+const BASE_URL = 'http://localhost:8080/api/admin';
 
 export const cartsApi = {
   getCarts: async (page = 0, size = 10, sort = 'lastUpdated,desc', status?: 'ACTIVE' | 'ABANDONED'): Promise<PageResponse<CustomerCart>> => {

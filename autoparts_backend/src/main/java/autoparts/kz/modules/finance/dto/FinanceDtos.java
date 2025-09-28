@@ -20,4 +20,11 @@ public class FinanceDtos {
     public record PatchStatus(String status, String adminComment, String paymentMethod) {}
     public record BalanceAdjust(BigDecimal delta, String reason) {}
     public record BalanceResponse(Long clientId, BigDecimal balance, Instant updatedAt) {}
+    public record ClientBalanceView(Long clientId,
+                                    BigDecimal balance,
+                                    Instant updatedAt,
+                                    String contactName,
+                                    String establishmentName,
+                                    String email,
+                                    String phone) {}
 }

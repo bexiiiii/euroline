@@ -41,3 +41,9 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/14-update-refund-requests.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/15-update-user-activity-table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/16-update-event-logs-table.sql
+      relativeToChangelogFile: false

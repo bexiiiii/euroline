@@ -1,6 +1,7 @@
 package autoparts.kz.modules.auth.controller;
 
 import autoparts.kz.common.security.JwtUtils;
+import autoparts.kz.modules.admin.Events.service.EventLogService;
 import autoparts.kz.modules.auth.dto.AuthResponse;
 import autoparts.kz.modules.auth.dto.LoginRequest;
 import autoparts.kz.modules.auth.dto.PasswordChangeRequest;
@@ -32,6 +33,7 @@ public class AuthController {
     private final JwtUtils jwtUtils;
     private final AuthService authService;
     private final UserService userService;
+    private final EventLogService eventLogService;
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest authRequest,
@@ -47,6 +49,10 @@ public class AuthController {
         UserDetails user = (UserDetails) authentication.getPrincipal();
         String jwt = jwtUtils.generateToken(user);
         authService.updateLastBrowser(authRequest.getEmail(), request.getHeader("User-Agent"));
+        
+        // Log successful login
+        eventLogService.logUserLogin(null, authRequest.getEmail());
+        
         return ResponseEntity.ok(new AuthResponse(jwt));
     }
     
@@ -56,6 +62,12 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Такой email уже зарегистрирован");
         }
         authService.registerUser(request);
+        
+        // Log user registration
+        eventLogService.logEvent("USER_CREATED", "USER", null, null, 
+                "Зарегистрирован новый пользователь: " + request.getEmail(), 
+                "Регистрация через веб-интерфейс", true, null);
+        
         return ResponseEntity.ok("Пользователь успешно зарегистрирован");
     }
     

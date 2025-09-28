@@ -16,7 +16,7 @@ async function loginFetch(credentials: LoginCredentials): Promise<AuthResponse> 
   console.log(`Выполняем запрос на вход с учетными данными: ${credentials.email}`);
   
   try {
-    const response = await fetch(`${API_URL}/api/auth/login`, {
+    const response = await fetch(`http://localhost:8080/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(credentials),
@@ -94,6 +94,22 @@ export const authApi = {
     localStorage.removeItem('admin_token_source');
     document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
     setTimeout(() => { window.location.href = '/signin'; }, 100);
+  },
+
+  /**
+   * Force clear all tokens (useful when JWT secret changes)
+   */
+  clearTokens: (): void => {
+    console.log('Очищаем все токены...');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_token_source');
+      document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+      // Also clear any other potential auth-related items
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      console.log('Все токены очищены. Перейдите на страницу входа.');
+    }
   },
 
   /**

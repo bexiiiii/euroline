@@ -19,21 +19,18 @@ export default function AdminLayout({
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
   const router = useRouter();
 
-  // Проверяем аутентификацию на основе токена, а не на состоянии пользователя
+  // Check authentication based on token, not user state
   useEffect(() => {
-    // Функция для проверки токена, которая выполняется сразу и затем каждые 5 секунд
+    // Function to check token that runs immediately and then every 5 seconds
     const checkAuth = () => {
-      console.log("Проверяем наличие токена...");
       const isAuth = checkAuthentication();
-      console.log("Результат проверки аутентификации:", isAuth);
       
-      // Обновляем состояние только если оно изменилось
+      // Update state only if it changed
       if (isAuth !== isAuthorized) {
         setIsAuthorized(isAuth);
         
         if (!isAuth) {
-          console.log("Токен не найден, перенаправляем на страницу входа");
-          // Устанавливаем задержку для перенаправления
+          // Set delay for redirect
           setTimeout(() => {
             router.push("/signin");
           }, 100);
@@ -41,33 +38,33 @@ export default function AdminLayout({
       }
     };
     
-    // Выполняем проверку сразу
+    // Perform check immediately
     checkAuth();
     
-    // Настраиваем интервал для периодической проверки токена
+    // Set up interval for periodic token check
     const interval = setInterval(checkAuth, 5000);
     
-    // Очищаем интервал при размонтировании компонента
+    // Clear interval on component unmount
     return () => clearInterval(interval);
   }, [isAuthorized, router]);
 
-  // Если идет проверка аутентификации, показываем загрузчик
+  // If authentication is being checked, show loader
   if (isAuthorized === null) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-16 h-16 border-4 border-gray-300 border-t-brand-500 rounded-full animate-spin"></div>
-        <p className="ml-4 text-lg text-gray-600">Проверка аутентификации...</p>
+        <p className="ml-4 text-lg text-gray-600">Checking authentication...</p>
       </div>
     );
   }
 
-  // Если не аутентифицирован, не показываем содержимое
-  // (редирект уже выполняется в useEffect)
+  // If not authenticated, don't show content
+  // (redirect is already happening in useEffect)
   if (!isAuthorized) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-16 h-16 border-4 border-gray-300 border-t-brand-500 rounded-full animate-spin"></div>
-        <p className="ml-4 text-lg text-gray-600">Перенаправление на страницу входа...</p>
+        <p className="ml-4 text-lg text-gray-600">Redirecting to login page...</p>
       </div>
     );
   }

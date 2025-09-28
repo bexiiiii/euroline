@@ -61,7 +61,7 @@ export interface BulkBalanceUpdateRequest {
   }[];
 }
 
-const BASE_URL = '/api/admin';
+const BASE_URL = 'http://localhost:8080/api/admin';
 
 export const accountBalancesApi = {
   getAccountBalances: async (
@@ -84,7 +84,7 @@ export const accountBalancesApi = {
 
     const response = await fetch(`${BASE_URL}/account-balances?${params}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch account balances');
@@ -94,7 +94,7 @@ export const accountBalancesApi = {
   getAccountBalance: async (userId: number): Promise<AccountBalance> => {
     const response = await fetch(`${BASE_URL}/account-balances/${userId}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch account balance');
@@ -125,7 +125,7 @@ export const accountBalancesApi = {
 
     const response = await fetch(`${BASE_URL}/balance-transactions?${params}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch balance transactions');
@@ -135,7 +135,7 @@ export const accountBalancesApi = {
   getUserBalanceTransactions: async (userId: number, page = 0, size = 20): Promise<PageResponse<BalanceTransaction>> => {
     const response = await fetch(`${BASE_URL}/account-balances/${userId}/transactions?page=${page}&size=${size}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch user balance transactions');
@@ -145,7 +145,7 @@ export const accountBalancesApi = {
   getBalanceStats: async (): Promise<BalanceStats> => {
     const response = await fetch(`${BASE_URL}/account-balances/stats`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch balance statistics');
@@ -157,7 +157,7 @@ export const accountBalancesApi = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
       body: JSON.stringify(request),
     });
@@ -170,7 +170,7 @@ export const accountBalancesApi = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
       body: JSON.stringify({ amount, description, reference }),
     });
@@ -183,7 +183,7 @@ export const accountBalancesApi = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
       body: JSON.stringify({ amount, description, reference }),
     });
@@ -196,7 +196,7 @@ export const accountBalancesApi = {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
       body: JSON.stringify({ creditLimit }),
     });
@@ -208,7 +208,7 @@ export const accountBalancesApi = {
     const response = await fetch(`${BASE_URL}/account-balances/${userId}/freeze`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to freeze account');
@@ -219,7 +219,7 @@ export const accountBalancesApi = {
     const response = await fetch(`${BASE_URL}/account-balances/${userId}/unfreeze`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to unfreeze account');
@@ -231,7 +231,7 @@ export const accountBalancesApi = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
       body: JSON.stringify(request),
     });
@@ -242,7 +242,7 @@ export const accountBalancesApi = {
   exportBalances: async (format: 'CSV' | 'EXCEL' = 'CSV'): Promise<Blob> => {
     const response = await fetch(`${BASE_URL}/account-balances/export?format=${format}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to export account balances');
@@ -263,7 +263,7 @@ export const accountBalancesApi = {
 
     const response = await fetch(`${BASE_URL}/balance-transactions/export?${params}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to export balance transactions');

@@ -7,6 +7,7 @@ import TextArea from "@/components/form/input/TextArea";
 import Input from "@/components/form/input/InputField";
 import Badge from "@/components/ui/badge/Badge";
 import { TopUpResponse } from "@/lib/api/finance";
+import { API_URL } from "@/lib/api";
 
 interface SelectedCustomer {
   id: number;
@@ -88,7 +89,7 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
   const isCreate = mode === "create";
 
   const [selectedCustomer, setSelectedCustomer] = useState<SelectedCustomer | null>(null);
-  const [amount, setAmount] = useState<number>(0);
+  const [amount, setAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<string>(paymentMethods[0]);
   const [status, setStatus] = useState<string>("PENDING");
   const [adminComment, setAdminComment] = useState<string>("");
@@ -101,7 +102,7 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
       setErrors({});
       setServerError(null);
       setSelectedCustomer(null);
-      setAmount(0);
+      setAmount("");
       setPaymentMethod(paymentMethods[0]);
       setStatus("PENDING");
       setAdminComment("");
@@ -111,7 +112,7 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
 
     if (isCreate) {
       setSelectedCustomer(null);
-      setAmount(0);
+      setAmount("");
       setPaymentMethod(paymentMethods[0]);
       setStatus("PENDING");
       setAdminComment("");
@@ -262,7 +263,7 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
                 </label>
                 <Input
                   type="number"
-                  min={1}
+                  min="1"
                   step={1}
                   value={amount}
                   onChange={(event) => {
@@ -317,7 +318,7 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
                 >
                   Отменить
                 </button>
-                <Button type="submit" variant="primary" size="sm" disabled={loading}>
+                <Button variant="primary" size="sm" disabled={loading}>
                   {loading ? "Сохраняем…" : "Создать"}
                 </Button>
               </div>
@@ -389,13 +390,22 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
                   <div className="space-y-3">
                     <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
                       <img
-                        src={topUp.receiptUrl}
+                        src={`${API_URL}${topUp.receiptUrl}`}
                         alt="Квитанция"
                         className="w-full h-64 object-contain bg-gray-100 dark:bg-gray-800"
+                        onError={(e) => {
+                          console.error('Ошибка загрузки изображения:', `${API_URL}${topUp.receiptUrl}`);
+                          // Попробовать резервный вариант с URL кодированием
+                          const target = e.target as HTMLImageElement;
+                          if (!target.src.includes('encodeURIComponent')) {
+                            const encodedPath = encodeURIComponent(topUp.receiptUrl?.replace('/files/', '') || '');
+                            target.src = `${API_URL}/files/${encodedPath}`;
+                          }
+                        }}
                       />
                     </div>
                     <a
-                      href={topUp.receiptUrl}
+                      href={`${API_URL}${topUp.receiptUrl}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
@@ -431,7 +441,7 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
               >
                 Закрыть
               </button>
-              <Button type="submit" variant="primary" size="sm" disabled={loading}>
+              <Button variant="primary" size="sm" disabled={loading}>
                 {loading ? "Сохраняем…" : "Сохранить изменения"}
               </Button>
             </div>

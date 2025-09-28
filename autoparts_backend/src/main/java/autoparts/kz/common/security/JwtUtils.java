@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
+import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
@@ -15,21 +16,29 @@ import java.util.Date;
 @Slf4j
 public class JwtUtils {
 
-    @Value("${security.jwt.secret:change-me-please-change-me-please-change-me-please}")
+    @Value("${security.jwt.secret:change-me-please-this-is-a-very-long-secret-key-for-jwt-signing-that-meets-security-requirements}")
     private String jwtSecret;
 
     @Value("${security.jwt.expiration-ms:86400000}")
     private int jwtExpirationMs;
 
+    private SecretKey getSigningKey() {
+        // Ensure the key is long enough for HS256 algorithm
+        if (jwtSecret.getBytes(StandardCharsets.UTF_8).length < 32) {
+            log.warn("JWT secret is too short, generating a secure key");
+            return Keys.secretKeyFor(SignatureAlgorithm.HS256);
+        }
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
+
     public String generateToken(UserDetails userDetails) {
         log.info("Генерируем JWT токен для пользователя: {}", userDetails.getUsername());
-        log.debug("Используемый секрет (первые 10 символов): {}", jwtSecret.substring(0, Math.min(10, jwtSecret.length())));
         
         String token = Jwts.builder()
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                .signWith(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)), SignatureAlgorithm.HS256)
+                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
                 .compact();
                 
         log.info("JWT токен сгенерирован успешно, длина: {}", token.length());
@@ -42,7 +51,7 @@ public class JwtUtils {
                 jwtSecret.substring(0, Math.min(10, jwtSecret.length())));
             
             String username = Jwts.parserBuilder()
-                    .setSigningKey(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                    .setSigningKey(getSigningKey())
                     .build()
                     .parseClaimsJws(token)
                     .getBody()
@@ -70,7 +79,7 @@ public class JwtUtils {
 
     private boolean isTokenExpired(String token) {
         Date expiration = Jwts.parserBuilder()
-                .setSigningKey(Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8)))
+                .setSigningKey(getSigningKey())
                 .build()
                 .parseClaimsJws(token)
                 .getBody()

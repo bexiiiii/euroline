@@ -18,7 +18,7 @@ export interface EventLog {
   userAgent?: string;
   success: boolean;
   errorMessage?: string;
-  timestamp: string;
+  createdAt: string;
   sessionId?: string;
 }
 
@@ -43,13 +43,13 @@ export interface EventLogStats {
   recentErrorEvents: EventLog[];
 }
 
-const BASE_URL = '/api/admin';
+const BASE_URL = 'http://localhost:8080/api/admin';
 
 export const eventLogApi = {
   getEventLogs: async (
     page = 0, 
     size = 20, 
-    sort = 'timestamp,desc',
+    sort = 'createdAt,desc',
     eventType?: string,
     entityType?: string,
     startDate?: string,
@@ -70,7 +70,7 @@ export const eventLogApi = {
 
     const response = await fetch(`${BASE_URL}/event-logs?${params}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch event logs');
@@ -80,7 +80,7 @@ export const eventLogApi = {
   getEventLog: async (id: number): Promise<EventLog> => {
     const response = await fetch(`${BASE_URL}/event-logs/${id}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch event log');
@@ -90,7 +90,7 @@ export const eventLogApi = {
   getEventLogStats: async (days = 30): Promise<EventLogStats> => {
     const response = await fetch(`${BASE_URL}/event-logs/stats?days=${days}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch event log statistics');
@@ -100,7 +100,7 @@ export const eventLogApi = {
   getUserEventLogs: async (userId: number, page = 0, size = 20): Promise<PageResponse<EventLog>> => {
     const response = await fetch(`${BASE_URL}/event-logs/user/${userId}?page=${page}&size=${size}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch user event logs');
@@ -110,7 +110,7 @@ export const eventLogApi = {
   getEntityEventLogs: async (entityType: string, entityId: number): Promise<EventLog[]> => {
     const response = await fetch(`${BASE_URL}/event-logs/entity/${entityType}/${entityId}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch entity event logs');
@@ -120,7 +120,7 @@ export const eventLogApi = {
   getErrorEventLogs: async (page = 0, size = 20, hours = 24): Promise<PageResponse<EventLog>> => {
     const response = await fetch(`${BASE_URL}/event-logs/errors?page=${page}&size=${size}&hours=${hours}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch error event logs');
@@ -130,7 +130,7 @@ export const eventLogApi = {
   getSecurityEventLogs: async (page = 0, size = 20, hours = 24): Promise<PageResponse<EventLog>> => {
     const response = await fetch(`${BASE_URL}/event-logs/security?page=${page}&size=${size}&hours=${hours}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch security event logs');
@@ -140,7 +140,7 @@ export const eventLogApi = {
   getLoginAttempts: async (page = 0, size = 20, hours = 24): Promise<PageResponse<EventLog>> => {
     const response = await fetch(`${BASE_URL}/event-logs/login-attempts?page=${page}&size=${size}&hours=${hours}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch login attempts');
@@ -152,7 +152,7 @@ export const eventLogApi = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
       body: JSON.stringify(request),
     });
@@ -164,7 +164,7 @@ export const eventLogApi = {
     const response = await fetch(`${BASE_URL}/event-logs/${id}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to delete event log');
@@ -174,7 +174,7 @@ export const eventLogApi = {
     const response = await fetch(`${BASE_URL}/event-logs/cleanup?days=${days}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to delete old event logs');
@@ -195,7 +195,7 @@ export const eventLogApi = {
 
     const response = await fetch(`${BASE_URL}/event-logs/export?${params}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to export event logs');
@@ -205,7 +205,7 @@ export const eventLogApi = {
   getEventTypes: async (): Promise<string[]> => {
     const response = await fetch(`${BASE_URL}/event-logs/event-types`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch event types');

@@ -92,7 +92,7 @@ const navItems: NavItem[] = [
   {
     icon: <PlugInIcon />,
     name: "Технические настройки",
-    subItems: [{ name: "API", path: "/api-integration", pro: false }, { name: "Настройки сайта", path: "/site-settings", pro: false }, { name: "Логи ошибок", path: "/error-logs", pro: false },{ name: "Состояние системы", path: "/system-status", pro: false }, ],
+    subItems: [{ name: "API", path: "/api-management", pro: false }, { name: "Настройки сайта", path: "/site-settings", pro: false }, { name: "Логи ошибок", path: "/error-logs", pro: false },{ name: "Состояние системы", path: "/system-status", pro: false }, ],
   },
   
 

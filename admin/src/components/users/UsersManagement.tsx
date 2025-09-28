@@ -18,6 +18,13 @@ interface User extends ApiUser {
   status: "active" | "inactive" | "blocked";
   lastLogin: string;
   displayName: string;
+  // Дополнительные поля для регистрации
+  country?: string;
+  state?: string;
+  city?: string;
+  officeAddress?: string;
+  type?: string;
+  fathername?: string;
 }
 
 interface UserActivity {
@@ -193,32 +200,10 @@ const UsersManagement = () => {
         </div>
       </div>
 
-      {/* Быстрые действия */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 lg:p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex-1">
-            <h3 className="text-base lg:text-lg font-medium text-gray-900 dark:text-white">Управление пользователями</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Добавляйте новых пользователей, управляйте ролями и отслеживайте активность
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button variant="outline" onClick={() => openModal("role")} className="w-full sm:w-auto">Настроить роли</Button>
-            <Button onClick={() => openModal("user")} className="w-full sm:w-auto">Добавить пользователя</Button>
-          </div>
-        </div>
-      </div>
-
       {/* Основной контент с табами */}
       <ComponentCard
         title="Пользователи системы"
         description="Управление пользователями, ролями и мониторинг активности"
-        action={
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Button size="sm" variant="outline" className="w-full sm:w-auto">Экспорт отчета</Button>
-            <Button size="sm" className="w-full sm:w-auto">Настройки</Button>
-          </div>
-        }
       >
         {/* Табы */}
         <div className="border-b border-gray-200 dark:border-gray-700 -mx-6 px-6">
@@ -348,19 +333,163 @@ const UsersManagement = () => {
       {/* Модальное окно пользователя */}
       <Modal isOpen={isModalOpen && modalType === "user"} onClose={() => setIsModalOpen(false)} size="lg">
         <div className="p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">{selectedUser ? "Редактирование пользователя" : "Добавление нового пользователя"}</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div><Label>Имя</Label><Input placeholder="Введите имя" defaultValue={selectedUser?.name || ""} /></div>
-            <div><Label>Email</Label><Input type="email" placeholder="email@example.com" defaultValue={selectedUser?.email || ""} /></div>
-            <div><Label>Телефон</Label><Input placeholder="+7 (999) 123-45-67" defaultValue={selectedUser?.phone || ""} /></div>
-            <div><Label>Роль</Label><Select options={roleOptions} onChange={() => {}} placeholder="Выберите роль" defaultValue={selectedUser?.role || ""} /></div>
-            <div><Label>Статус</Label><Select options={statusOptions} onChange={() => {}} placeholder="Выберите статус" defaultValue={selectedUser?.status || ""} /></div>
-          </div>
-          <div className="mt-6"><Label>Пароль</Label><Input type="password" placeholder={selectedUser ? "Оставьте пустым для сохранения текущего" : "Введите пароль"} /></div>
-          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto">Отменить</Button>
-            <Button onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto">{selectedUser ? "Сохранить изменения" : "Создать пользователя"}</Button>
-          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">{selectedUser ? "Редактирование пользователя" : "Регистрация нового пользователя"}</h3>
+          
+          {!selectedUser && (
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
+                Электронная торговая площадка (ЭТП) предназначена для работы с ОПТОВЫМИ клиентами. 
+                Если Вы хотите приобретать товары в розницу, то обратитесь за информацией в контакт-центр.
+              </p>
+            </div>
+          )}
+          
+          <form onSubmit={(e) => { e.preventDefault(); setIsModalOpen(false); }}>
+            <div className="space-y-6">
+              {/* Основная информация */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Основная информация</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <Label htmlFor="clientName">Наименование клиента *</Label>
+                    <Input id="clientName" placeholder="Введите наименование организации" defaultValue={selectedUser?.clientName || ""} />
+                  </div>
+                  <div>
+                    <Label htmlFor="country">Страна *</Label>
+                    <Select 
+                      options={[{value: 'KZ', label: 'Kazakhstan'}]} 
+                      onChange={() => {}} 
+                      placeholder="Выберите страну" 
+                      defaultValue="KZ" 
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="state">Территориальная единица</Label>
+                    <Input id="state" placeholder="Область, регион" defaultValue={selectedUser?.state || ""} />
+                  </div>
+                  <div>
+                    <Label htmlFor="city">Местоположение офиса</Label>
+                    <Input id="city" placeholder="Город" defaultValue={selectedUser?.city || ""} />
+                  </div>
+                  <div>
+                    <Label htmlFor="officeAddress">Адрес офиса</Label>
+                    <Input id="officeAddress" placeholder="Улица, дом, офис" defaultValue={selectedUser?.officeAddress || ""} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="type">Вид деятельности</Label>
+                    <Select 
+                      options={[
+                        {value: 'retail', label: 'Розничная торговля'},
+                        {value: 'wholesale', label: 'Оптовая торговля'},
+                        {value: 'service', label: 'Услуги'},
+                        {value: 'manufacturing', label: 'Производство'}
+                      ]} 
+                      onChange={() => {}} 
+                      placeholder="Выберите вид деятельности" 
+                      defaultValue={selectedUser?.type || ''}
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Контактное лицо */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Контактное лицо</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="surname">Фамилия *</Label>
+                    <Input id="surname" placeholder="Введите фамилию" defaultValue={selectedUser?.surname || ""} />
+                  </div>
+                  <div>
+                    <Label htmlFor="name">Имя *</Label>
+                    <Input id="name" placeholder="Введите имя" defaultValue={selectedUser?.name || ""} />
+                  </div>
+                  <div>
+                    <Label htmlFor="fathername">Отчество</Label>
+                    <Input id="fathername" placeholder="Введите отчество" defaultValue={selectedUser?.fathername || ""} />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Контактные данные */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Контактные данные</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="email">E-mail *</Label>
+                    <Input id="email" type="email" placeholder="email@example.com" defaultValue={selectedUser?.email || ""} />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Номер телефона *</Label>
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md dark:bg-gray-600 dark:text-gray-400 dark:border-gray-600">
+                        +7
+                      </span>
+                      <Input id="phone" placeholder="(999) 123-45-67" defaultValue={selectedUser?.phone || ""} className="rounded-l-none" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Системные настройки */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Системные настройки</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="role">Роль *</Label>
+                    <Select 
+                      options={[
+                        {value: 'USER', label: 'Пользователь'},
+                        {value: 'ADMIN', label: 'Администратор'},
+                        {value: 'MANAGER', label: 'Менеджер'}
+                      ]} 
+                      onChange={() => {}} 
+                      placeholder="Выберите роль" 
+                      defaultValue={selectedUser?.role || 'USER'}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-4 pt-6">
+                    <label className="flex items-center">
+                      <input 
+                        type="checkbox" 
+                        defaultChecked={selectedUser?.banned || false}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" 
+                      />
+                      <span className="ml-2 text-sm text-gray-900 dark:text-gray-300">Заблокировать пользователя</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Пароль */}
+              <div>
+                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Безопасность</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="password">Пароль {selectedUser ? '' : '*'}</Label>
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      placeholder={selectedUser ? "Оставьте пустым для сохранения текущего" : "Введите пароль"} 
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="confirmPassword">Подтверждение пароля {selectedUser ? '' : '*'}</Label>
+                    <Input 
+                      id="confirmPassword" 
+                      type="password" 
+                      placeholder={selectedUser ? "Оставьте пустым" : "Подтвердите пароль"} 
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 mt-6 border-t border-gray-200 dark:border-gray-700">
+              <Button variant="outline" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto">Отменить</Button>
+              <Button onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto">{selectedUser ? "Сохранить изменения" : "Создать пользователя"}</Button>
+            </div>
+          </form>
         </div>
       </Modal>
 

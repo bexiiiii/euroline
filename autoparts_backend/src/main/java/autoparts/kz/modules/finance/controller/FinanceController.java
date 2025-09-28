@@ -90,8 +90,14 @@ public class FinanceController {
         }
         java.nio.file.Path dir = java.nio.file.Paths.get("storage/receipts/topups");
         java.nio.file.Files.createDirectories(dir);
+        
+        // Sanitize filename to avoid URL encoding issues
         String original = file.getOriginalFilename()==null?"receipt":file.getOriginalFilename();
-        java.nio.file.Path path = dir.resolve("topup_"+id+"_"+System.currentTimeMillis()+"_"+original);
+        String sanitizedFilename = original
+            .replaceAll("[^a-zA-Z0-9._-]", "_") // Replace special chars with underscore
+            .replaceAll("_+", "_"); // Replace multiple underscores with single
+        
+        java.nio.file.Path path = dir.resolve("topup_"+id+"_"+System.currentTimeMillis()+"_"+sanitizedFilename);
         java.nio.file.Files.copy(file.getInputStream(), path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
         var entity = svc.findTopUpEntity(id);

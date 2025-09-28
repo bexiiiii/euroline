@@ -66,13 +66,13 @@ export interface ApiStats {
   }[];
 }
 
-const BASE_URL = '/api/admin';
+const BASE_URL = 'http://localhost:8080/api/admin';
 
 export const apiManagementApi = {
   getApiKeys: async (page = 0, size = 20, sort = 'createdAt,desc'): Promise<PageResponse<ApiKey>> => {
     const response = await fetch(`${BASE_URL}/api-keys?page=${page}&size=${size}&sort=${sort}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch API keys');
@@ -82,7 +82,7 @@ export const apiManagementApi = {
   getApiKey: async (id: number): Promise<ApiKey> => {
     const response = await fetch(`${BASE_URL}/api-keys/${id}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch API key');
@@ -94,7 +94,7 @@ export const apiManagementApi = {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
       body: JSON.stringify(request),
     });
@@ -107,7 +107,7 @@ export const apiManagementApi = {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
       body: JSON.stringify(request),
     });
@@ -119,7 +119,7 @@ export const apiManagementApi = {
     const response = await fetch(`${BASE_URL}/api-keys/${id}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to delete API key');
@@ -129,7 +129,7 @@ export const apiManagementApi = {
     const response = await fetch(`${BASE_URL}/api-keys/${id}/regenerate`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to regenerate API key');
@@ -140,7 +140,7 @@ export const apiManagementApi = {
     const response = await fetch(`${BASE_URL}/api-keys/${id}/toggle-status`, {
       method: 'PATCH',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to toggle API key status');
@@ -173,7 +173,7 @@ export const apiManagementApi = {
 
     const response = await fetch(`${BASE_URL}/api-requests?${params}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch API requests');
@@ -183,7 +183,7 @@ export const apiManagementApi = {
   getApiKeyRequests: async (apiKeyId: number, page = 0, size = 20): Promise<PageResponse<ApiRequest>> => {
     const response = await fetch(`${BASE_URL}/api-keys/${apiKeyId}/requests?page=${page}&size=${size}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch API key requests');
@@ -193,7 +193,7 @@ export const apiManagementApi = {
   getApiStats: async (days = 30): Promise<ApiStats> => {
     const response = await fetch(`${BASE_URL}/api-stats?days=${days}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch API statistics');
@@ -209,7 +209,7 @@ export const apiManagementApi = {
   }> => {
     const response = await fetch(`${BASE_URL}/api-keys/${apiKeyId}/stats?days=${days}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch API key statistics');
@@ -219,7 +219,7 @@ export const apiManagementApi = {
   getAvailablePermissions: async (): Promise<string[]> => {
     const response = await fetch(`${BASE_URL}/api-permissions`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to fetch available permissions');
@@ -230,7 +230,7 @@ export const apiManagementApi = {
     const response = await fetch(`${BASE_URL}/api-requests/cleanup?days=${days}`, {
       method: 'DELETE',
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to clear API request logs');
@@ -251,7 +251,7 @@ export const apiManagementApi = {
 
     const response = await fetch(`${BASE_URL}/api-requests/export?${params}`, {
       headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
       },
     });
     if (!response.ok) throw new Error('Failed to export API requests');

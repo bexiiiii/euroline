@@ -30,51 +30,49 @@ export interface UpdateCategoryRequest extends CreateCategoryRequest {
   isActive?: boolean;
 }
 
-const BASE_URL = '/api/admin';
-
 export const categoriesApi = {
   getCategories: async (page = 0, size = 10, sort = 'sortOrder,asc'): Promise<PageResponse<Category>> => {
-    return apiFetch<PageResponse<Category>>(`${BASE_URL}/categories?page=${page}&size=${size}&sort=${sort}`);
+    return apiFetch<PageResponse<Category>>(`/api/admin/categories?page=${page}&size=${size}&sort=${sort}`);
   },
 
   getCategory: async (id: number): Promise<Category> => {
-    return apiFetch<Category>(`${BASE_URL}/categories/${id}`);
+    return apiFetch<Category>(`/api/admin/categories/${id}`);
   },
 
   getRootCategories: async (): Promise<Category[]> => {
-    return apiFetch<Category[]>(`${BASE_URL}/categories/root`);
+    return apiFetch<Category[]>(`/api/admin/categories/root`);
   },
 
   getCategoryTree: async (): Promise<Category[]> => {
-    return apiFetch<Category[]>(`${BASE_URL}/categories/tree`);
+    return apiFetch<Category[]>(`/api/admin/categories/tree`);
   },
 
   createCategory: async (request: CreateCategoryRequest): Promise<Category> => {
-    return apiFetch<Category>(`${BASE_URL}/categories`, {
+    return apiFetch<Category>(`/api/admin/categories`, {
       method: 'POST',
       body: JSON.stringify(request),
     });
   },
 
   updateCategory: async (id: number, request: UpdateCategoryRequest): Promise<Category> => {
-    return apiFetch<Category>(`${BASE_URL}/categories/${id}`, {
+    return apiFetch<Category>(`/api/admin/categories/${id}`, {
       method: 'PUT',
       body: JSON.stringify(request),
     });
   },
 
   deleteCategory: async (id: number): Promise<void> => {
-    return apiFetch<void>(`${BASE_URL}/categories/${id}`, { method: 'DELETE' });
+    return apiFetch<void>(`/api/admin/categories/${id}`, { method: 'DELETE' });
   },
 
   updateCategoryOrder: async (categoryIds: number[]): Promise<void> => {
-    return apiFetch<void>(`${BASE_URL}/categories/reorder`, {
+    return apiFetch<void>(`/api/admin/categories/reorder`, {
       method: 'PATCH',
       body: JSON.stringify({ categoryIds }),
     });
   },
 
   toggleCategoryStatus: async (id: number): Promise<Category> => {
-    return apiFetch<Category>(`${BASE_URL}/categories/${id}/toggle-status`, { method: 'PATCH' });
+    return apiFetch<Category>(`/api/admin/categories/${id}/toggle-status`, { method: 'PATCH' });
   },
 };

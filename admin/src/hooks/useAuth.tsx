@@ -24,18 +24,14 @@ export function useAuth() {
 
     try {
       setLoading(true);
-      console.log('Загружаем профиль пользователя...');
       const userData = await authApi.getCurrentUser();
-      console.log('Профиль пользователя загружен:', userData);
       setUser(userData);
     } catch (err: any) {
-      console.error('Ошибка при загрузке профиля:', err);
+      console.error('Error loading user profile:', err);
       setError(err.message);
       
-      // Создаем базовый объект пользователя, чтобы UI работал,
-      // даже если запрос профиля не удался
+      // Create basic user object so UI works even if profile request fails
       if (isAuthenticated()) {
-        console.log('Создаем базовый объект пользователя...');
         setUser({
           id: 0,
           email: 'admin@example.com',
@@ -51,13 +47,11 @@ export function useAuth() {
   const login = async (email: string, password: string) => {
     try {
       setLoading(true);
-      console.log('Выполняем вход с учетными данными:', { email });
       
-      // Вызываем метод login из authApi
+      // Call login method from authApi
       const response = await authApi.login({ email, password });
-      console.log('Успешный вход, получен токен');
       
-      // Устанавливаем базовые данные пользователя
+      // Set basic user data
       setUser({
         id: 0,
         email: email,
@@ -65,10 +59,10 @@ export function useAuth() {
         banned: false
       });
       
-      // authApi.login уже выполняет редирект, не нужно дублировать
+      // authApi.login already performs redirect, no need to duplicate
       return true;
     } catch (err: any) {
-      console.error('Ошибка входа:', err);
+      console.error('Login error:', err);
       setError(err.message);
       return false;
     } finally {
@@ -77,20 +71,15 @@ export function useAuth() {
   };
 
   const logout = () => {
-    console.log('Выполняем выход...');
     authApi.logout();
     setUser(null);
   };
 
   useEffect(() => {
-    // При монтировании компонента проверяем, есть ли токен
-    // и пытаемся загрузить данные пользователя
-    console.log('AuthContext mounted, checking authentication...');
+    // When component mounts, check if there's a token and try to load user data
     if (isAuthenticated()) {
-      console.log('Токен найден, пытаемся загрузить профиль...');
       fetchUser();
     } else {
-      console.log('Токен не найден, пользователь не аутентифицирован');
       setLoading(false);
     }
   }, [fetchUser, isAuthenticated]);

@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ComponentCard from "../common/ComponentCard";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
@@ -7,6 +7,7 @@ import { Modal } from "../ui/modal";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Select from "../form/Select";
+import { logPageView } from "@/lib/eventLogger";
 
 interface SiteSettings {
   general: {
@@ -66,60 +67,152 @@ const SiteSettingsPage = () => {
   const [activeTab, setActiveTab] = useState("general");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const [settings, setSettings] = useState<SiteSettings>({
     general: {
-      siteName: "AutoParts - Интернет-магазин автозапчастей",
-      siteDescription: "Крупнейший каталог автозапчастей с доставкой по всей России",
-      siteUrl: "https://autoparts.ru",
-      adminEmail: "admin@autoparts.ru",
+      siteName: "",
+      siteDescription: "",
+      siteUrl: "",
+      adminEmail: "",
       timezone: "Europe/Moscow",
       language: "ru",
       currency: "RUB"
     },
     appearance: {
-      logo: "/images/logo/logo.svg",
-      favicon: "/images/favicon.ico",
+      logo: "",
+      favicon: "",
       primaryColor: "#3B82F6",
       secondaryColor: "#10B981",
       theme: "light",
       fontFamily: "Inter"
     },
     seo: {
-      metaTitle: "AutoParts - Автозапчасти с доставкой по России",
-      metaDescription: "Большой выбор оригинальных и неоригинальных автозапчастей. Быстрая доставка, гарантия качества, низкие цены.",
-      metaKeywords: "автозапчасти, запчасти для авто, оригинальные запчасти, неоригинальные запчасти",
-      googleAnalytics: "GA_MEASUREMENT_ID",
-      yandexMetrica: "YANDEX_COUNTER_ID",
-      robotsTxt: "User-agent: *\nDisallow: /admin/\nDisallow: /api/\nSitemap: https://autoparts.ru/sitemap.xml"
+      metaTitle: "",
+      metaDescription: "",
+      metaKeywords: "",
+      googleAnalytics: "",
+      yandexMetrica: "",
+      robotsTxt: "User-agent: *\nDisallow: /admin/\nDisallow: /api/"
     },
     business: {
-      companyName: 'ООО "АвтоПартс"',
-      companyAddress: "г. Москва, ул. Примерная, д. 123",
-      companyPhone: "+7 (495) 123-45-67",
-      companyEmail: "info@autoparts.ru",
-      workingHours: "Пн-Пт: 9:00-18:00, Сб: 10:00-16:00",
-      inn: "1234567890",
-      kpp: "123456789",
-      ogrn: "1234567890123"
+      companyName: "",
+      companyAddress: "",
+      companyPhone: "",
+      companyEmail: "",
+      workingHours: "",
+      inn: "",
+      kpp: "",
+      ogrn: ""
     },
     social: {
-      facebook: "https://facebook.com/autoparts",
-      instagram: "https://instagram.com/autoparts_ru",
-      vkontakte: "https://vk.com/autoparts_ru",
-      telegram: "https://t.me/autoparts_ru",
-      whatsapp: "+7 (495) 123-45-67",
-      youtube: "https://youtube.com/c/autoparts"
+      facebook: "",
+      instagram: "",
+      vkontakte: "",
+      telegram: "",
+      whatsapp: "",
+      youtube: ""
     },
     integrations: {
       emailProvider: "smtp",
       smsProvider: "smsc",
-      paymentGateways: ["sberbank", "tinkoff", "yandex_money"],
-      deliveryServices: ["cdek", "post_russia", "courier"],
+      paymentGateways: [],
+      deliveryServices: [],
       crmSystem: "1c",
-      analyticsServices: ["google_analytics", "yandex_metrica"]
+      analyticsServices: []
     }
   });
+
+  // Load settings from API
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('http://localhost:8080/api/admin/settings', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (response.ok) {
+          const settingsArray = await response.json();
+          // Transform settings array to our format
+          const transformedSettings = transformSettingsData(settingsArray);
+          setSettings(transformedSettings);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load settings');
+        console.error('Failed to fetch settings:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSettings();
+    // Log page view
+    logPageView('Настройки сайта', '/site-settings');
+  }, []);
+
+  // Transform settings array from backend to our structure
+  const transformSettingsData = (settingsArray: any[]): SiteSettings => {
+    const settingsMap = new Map(settingsArray.map(s => [s.key, s.value]));
+    
+    return {
+      general: {
+        siteName: settingsMap.get('site.name') || 'AutoParts',
+        siteDescription: settingsMap.get('site.description') || '',
+        siteUrl: settingsMap.get('site.url') || '',
+        adminEmail: settingsMap.get('site.admin_email') || '',
+        timezone: settingsMap.get('site.timezone') || 'Europe/Moscow',
+        language: settingsMap.get('site.language') || 'ru',
+        currency: settingsMap.get('site.currency') || 'RUB'
+      },
+      appearance: {
+        logo: settingsMap.get('appearance.logo') || '',
+        favicon: settingsMap.get('appearance.favicon') || '',
+        primaryColor: settingsMap.get('appearance.primary_color') || '#3B82F6',
+        secondaryColor: settingsMap.get('appearance.secondary_color') || '#10B981',
+        theme: (settingsMap.get('appearance.theme') as any) || 'light',
+        fontFamily: settingsMap.get('appearance.font_family') || 'Inter'
+      },
+      seo: {
+        metaTitle: settingsMap.get('seo.meta_title') || '',
+        metaDescription: settingsMap.get('seo.meta_description') || '',
+        metaKeywords: settingsMap.get('seo.meta_keywords') || '',
+        googleAnalytics: settingsMap.get('seo.google_analytics') || '',
+        yandexMetrica: settingsMap.get('seo.yandex_metrica') || '',
+        robotsTxt: settingsMap.get('seo.robots_txt') || 'User-agent: *\nDisallow: /admin/\nDisallow: /api/'
+      },
+      business: {
+        companyName: settingsMap.get('business.company_name') || '',
+        companyAddress: settingsMap.get('business.company_address') || '',
+        companyPhone: settingsMap.get('business.company_phone') || '',
+        companyEmail: settingsMap.get('business.company_email') || '',
+        workingHours: settingsMap.get('business.working_hours') || '',
+        inn: settingsMap.get('business.inn') || '',
+        kpp: settingsMap.get('business.kpp') || '',
+        ogrn: settingsMap.get('business.ogrn') || ''
+      },
+      social: {
+        facebook: settingsMap.get('social.facebook') || '',
+        instagram: settingsMap.get('social.instagram') || '',
+        vkontakte: settingsMap.get('social.vkontakte') || '',
+        telegram: settingsMap.get('social.telegram') || '',
+        whatsapp: settingsMap.get('social.whatsapp') || '',
+        youtube: settingsMap.get('social.youtube') || ''
+      },
+      integrations: {
+        emailProvider: settingsMap.get('integrations.email_provider') || 'smtp',
+        smsProvider: settingsMap.get('integrations.sms_provider') || 'smsc',
+        paymentGateways: JSON.parse(settingsMap.get('integrations.payment_gateways') || '[]'),
+        deliveryServices: JSON.parse(settingsMap.get('integrations.delivery_services') || '[]'),
+        crmSystem: settingsMap.get('integrations.crm_system') || '1c',
+        analyticsServices: JSON.parse(settingsMap.get('integrations.analytics_services') || '[]')
+      }
+    };
+  };
 
   const timezoneOptions = [
     { value: "Europe/Moscow", label: "Москва (UTC+3)" },
@@ -159,10 +252,80 @@ const SiteSettingsPage = () => {
     setHasUnsavedChanges(true);
   };
 
-  const saveSettings = () => {
-    // Здесь будет логика сохранения настроек
-    console.log("Saving settings:", settings);
-    setHasUnsavedChanges(false);
+  const saveSettings = async () => {
+    try {
+      // Convert settings object to key-value pairs for the backend
+      const settingsToSave = [
+        // General settings
+        { key: 'site.name', value: settings.general.siteName },
+        { key: 'site.description', value: settings.general.siteDescription },
+        { key: 'site.url', value: settings.general.siteUrl },
+        { key: 'site.admin_email', value: settings.general.adminEmail },
+        { key: 'site.timezone', value: settings.general.timezone },
+        { key: 'site.language', value: settings.general.language },
+        { key: 'site.currency', value: settings.general.currency },
+        
+        // Appearance settings
+        { key: 'appearance.logo', value: settings.appearance.logo },
+        { key: 'appearance.favicon', value: settings.appearance.favicon },
+        { key: 'appearance.primary_color', value: settings.appearance.primaryColor },
+        { key: 'appearance.secondary_color', value: settings.appearance.secondaryColor },
+        { key: 'appearance.theme', value: settings.appearance.theme },
+        { key: 'appearance.font_family', value: settings.appearance.fontFamily },
+        
+        // SEO settings
+        { key: 'seo.meta_title', value: settings.seo.metaTitle },
+        { key: 'seo.meta_description', value: settings.seo.metaDescription },
+        { key: 'seo.meta_keywords', value: settings.seo.metaKeywords },
+        { key: 'seo.google_analytics', value: settings.seo.googleAnalytics },
+        { key: 'seo.yandex_metrica', value: settings.seo.yandexMetrica },
+        { key: 'seo.robots_txt', value: settings.seo.robotsTxt },
+        
+        // Business settings
+        { key: 'business.company_name', value: settings.business.companyName },
+        { key: 'business.company_address', value: settings.business.companyAddress },
+        { key: 'business.company_phone', value: settings.business.companyPhone },
+        { key: 'business.company_email', value: settings.business.companyEmail },
+        { key: 'business.working_hours', value: settings.business.workingHours },
+        { key: 'business.inn', value: settings.business.inn },
+        { key: 'business.kpp', value: settings.business.kpp },
+        { key: 'business.ogrn', value: settings.business.ogrn },
+        
+        // Social settings
+        { key: 'social.facebook', value: settings.social.facebook },
+        { key: 'social.instagram', value: settings.social.instagram },
+        { key: 'social.vkontakte', value: settings.social.vkontakte },
+        { key: 'social.telegram', value: settings.social.telegram },
+        { key: 'social.whatsapp', value: settings.social.whatsapp },
+        { key: 'social.youtube', value: settings.social.youtube },
+        
+        // Integrations settings
+        { key: 'integrations.email_provider', value: settings.integrations.emailProvider },
+        { key: 'integrations.sms_provider', value: settings.integrations.smsProvider },
+        { key: 'integrations.payment_gateways', value: JSON.stringify(settings.integrations.paymentGateways) },
+        { key: 'integrations.delivery_services', value: JSON.stringify(settings.integrations.deliveryServices) },
+        { key: 'integrations.crm_system', value: settings.integrations.crmSystem },
+        { key: 'integrations.analytics_services', value: JSON.stringify(settings.integrations.analyticsServices) }
+      ];
+
+      // Save each setting individually
+      for (const setting of settingsToSave) {
+        await fetch(`http://localhost:8080/api/admin/settings/${setting.key}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ value: setting.value })
+        });
+      }
+      
+      setHasUnsavedChanges(false);
+      alert('Настройки успешно сохранены!');
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      alert('Ошибка сохранения настроек');
+    }
   };
 
   const resetSettings = () => {
@@ -171,6 +334,26 @@ const SiteSettingsPage = () => {
 
   return (
     <div className="space-y-6">
+      {loading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-gray-500 dark:text-gray-400">
+            <p className="text-lg font-medium">Загрузка настроек...</p>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="text-red-500 dark:text-red-400">
+            <p className="text-lg font-medium">Ошибка загрузки: {error}</p>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="mt-2 text-sm underline hover:no-underline"
+            >
+              Обновить страницу
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Уведомление о несохраненных изменениях */}
       {hasUnsavedChanges && (
         <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
@@ -692,6 +875,8 @@ const SiteSettingsPage = () => {
           </div>
         </div>
       </Modal>
+        </>
+      )}
     </div>
   );
 };

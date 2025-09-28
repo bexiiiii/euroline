@@ -41,9 +41,47 @@ public class BannerController {
     public Banner upload(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
         var b = repo.findById(id).orElseThrow();
         Path dir = Paths.get("storage/images/banners"); Files.createDirectories(dir);
-        Path path = dir.resolve("banner_"+id+"_"+System.currentTimeMillis()+"_"+file.getOriginalFilename());
+        
+        // Sanitize filename to avoid URL encoding issues
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null) originalFilename = "banner.png";
+        String sanitizedFilename = originalFilename
+            .replaceAll("[^a-zA-Z0-9._-]", "_") // Replace special chars with underscore
+            .replaceAll("_+", "_"); // Replace multiple underscores with single
+        
+        Path path = dir.resolve("banner_"+id+"_"+System.currentTimeMillis()+"_"+sanitizedFilename);
         Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
-        b.setImageUrl("/files/"+path.getFileName()); // см. FilesController ниже
+        
+        // Store relative path from banners directory for better URL construction
+        b.setImageUrl("/files/"+path.getFileName());
         return repo.save(b);
+    }
+    
+    // Debug endpoint to fix existing banner URLs
+    @PostMapping("/fix-urls")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String fixBannerUrls() {
+        var banners = repo.findAll();
+        int updated = 0;
+        
+        for (var banner : banners) {
+            String oldUrl = banner.getImageUrl();
+            if (oldUrl != null && oldUrl.contains("/files/")) {
+                String filename = oldUrl.substring(oldUrl.lastIndexOf("/") + 1);
+                // Sanitize filename to match our file renaming
+                String sanitizedFilename = filename
+                    .replaceAll("[^a-zA-Z0-9._-]", "_")
+                    .replaceAll("_+", "_");
+                
+                String newUrl = "/files/" + sanitizedFilename;
+                if (!oldUrl.equals(newUrl)) {
+                    banner.setImageUrl(newUrl);
+                    repo.save(banner);
+                    updated++;
+                }
+            }
+        }
+        
+        return "Updated " + updated + " banner URLs";
     }
 }

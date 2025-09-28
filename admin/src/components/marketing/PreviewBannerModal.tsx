@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
+import { API_URL } from "@/lib/api";
 
 interface ProductBanner {
   id: number;
@@ -57,12 +58,27 @@ const PreviewBannerModal: React.FC<PreviewBannerModalProps> = ({
           return (
             <div className={`banner-preview ${className}`}>
               <img
-                src={bannerData.imageUrl}
+                src={bannerData.imageUrl.startsWith('http') ? bannerData.imageUrl : `${API_URL}${bannerData.imageUrl}`}
                 alt={bannerData.title}
                 className="w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
-                  target.src = "/images/placeholder.png";
+                  console.error('Ошибка загрузки изображения баннера:', target.src);
+                  // Try with sanitized filename
+                  if (!target.src.includes('fallback')) {
+                    const baseUrl = bannerData.imageUrl.startsWith('http') ? '' : API_URL;
+                    const imagePath = bannerData.imageUrl.startsWith('http') ? 
+                      bannerData.imageUrl.split('/files/')[1] : 
+                      bannerData.imageUrl.replace('/files/', '');
+                    
+                    const sanitizedPath = imagePath
+                      .replace(/[^a-zA-Z0-9._-]/g, '_')
+                      .replace(/_+/g, '_');
+                    
+                    target.src = `${baseUrl}/files/${sanitizedPath}?fallback=1`;
+                  } else {
+                    target.src = "/images/placeholder.png";
+                  }
                 }}
               />
             </div>
@@ -83,12 +99,27 @@ const PreviewBannerModal: React.FC<PreviewBannerModalProps> = ({
               <div className="flex">
                 <div className="flex-shrink-0 w-32 h-24">
                   <img
-                    src={bannerData.imageUrl}
+                    src={bannerData.imageUrl.startsWith('http') ? bannerData.imageUrl : `${API_URL}${bannerData.imageUrl}`}
                     alt={bannerData.title}
                     className="w-full h-full object-cover"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
-                      target.src = "/images/placeholder.png";
+                      console.error('Ошибка загрузки изображения баннера:', target.src);
+                      // Try with sanitized filename
+                      if (!target.src.includes('fallback')) {
+                        const baseUrl = bannerData.imageUrl.startsWith('http') ? '' : API_URL;
+                        const imagePath = bannerData.imageUrl.startsWith('http') ? 
+                          bannerData.imageUrl.split('/files/')[1] : 
+                          bannerData.imageUrl.replace('/files/', '');
+                        
+                        const sanitizedPath = imagePath
+                          .replace(/[^a-zA-Z0-9._-]/g, '_')
+                          .replace(/_+/g, '_');
+                        
+                        target.src = `${baseUrl}/files/${sanitizedPath}?fallback=1`;
+                      } else {
+                        target.src = "/images/placeholder.png";
+                      }
                     }}
                   />
                 </div>

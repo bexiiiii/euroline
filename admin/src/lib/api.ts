@@ -81,7 +81,27 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       throw new ApiError('Не авторизован', res.status);
     }
     if (res.status === 403) {
-      // Не очищаем токен; возвращаем явную ошибку Forbidden
+      // Check if this is a JWT signature mismatch (token signed with old key)
+      const contentType = res.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        try {
+          const errorData = await res.clone().json();
+          const errorMsg = errorData?.message || errorData?.error || '';
+          if (errorMsg.includes('JWT signature does not match') || errorMsg.includes('signature')) {
+            if (typeof window !== 'undefined') {
+              try {
+                localStorage.removeItem('admin_token');
+                document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
+                console.warn('JWT signature mismatch — токен очищен. Требуется повторный вход.');
+              } catch {}
+            }
+            throw new ApiError('Не авторизован', 401);
+          }
+        } catch (jsonError) {
+          // If we can't parse JSON, continue with regular 403 handling
+        }
+      }
+      // Regular 403 - insufficient permissions, don't clear token
       throw new ApiError('Доступ запрещён', 403);
     }
 
