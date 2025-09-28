@@ -1,0 +1,8 @@
+{
+  "$schema": "https://ui.shadcn.dev/schema.json",
+  "componentPath": "./app/components",
+  "components": ["alert", "button", "input"],
+  "aliases": {
+    "@/components": "./app/components"
+  }
+}
