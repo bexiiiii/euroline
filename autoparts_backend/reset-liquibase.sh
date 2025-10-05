@@ -17,7 +17,7 @@ PGPASSWORD=234Bex456 psql -h localhost -U postgres -d autoparts -c "DROP TABLE I
 echo "Liquibase tables cleared."
 echo "Running migrations again..."
 
-cd /Applications/development/autoparts/autoparts_backend
+cd /Users/behruztohtamishov/euroline/autoparts_backend
 ./mvnw liquibase:update
 
 RESULT=$?

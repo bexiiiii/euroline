@@ -1,31 +1,49 @@
 "use client"
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useSearchStore } from "@/lib/stores/searchStore";
 import AutoPartsTable, { convertSearchItemToAutoPart } from "@/components/TableComponent";
 import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import FiltersSidebar from "@/components/FiltersSidebar";
 import PaginationButton from "@/components/PaginationWithPrimaryButton";
+import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 function SearchPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [filtersVersion, setFiltersVersion] = useState(0);
   const searchParams = useSearchParams();
   const { 
     search, results, isLoading, query, error,
     detectedType, applicableVehicles, selectedCatalog, setSelectedCatalog,
     loadOemApplicableVehicles, loadOemApplicability, resetOemFlow,
-    filters
+    filters, clearResults,
+    resetFilters: resetSearchFilters
   } = useSearchStore();
+
+  const { brands, photoOnly } = filters;
+  const activeFiltersCount = useMemo(() => {
+    let count = brands.length;
+    if (photoOnly) count += 1;
+    return count;
+  }, [brands, photoOnly]);
 
   // Выполняем поиск при загрузке страницы, если есть параметр q
   useEffect(() => {
     const queryParam = searchParams?.get('q');
-    if (queryParam && queryParam !== query) {
-      search(queryParam);
+    if (queryParam) {
+      // Only search if the query parameter has actually changed
+      if (queryParam !== query) {
+        search(queryParam);
+      }
+    } else {
+      // Clear results when there's no query parameter
+      clearResults();
     }
-  }, [searchParams, search, query]);
+  }, [searchParams, search, query, clearResults]);
 
   // Применяем клиентские фильтры и конвертируем в AutoPart
   const parts = results
@@ -92,56 +110,69 @@ function SearchPage() {
           )}
 
           {/* Мобильные фильтры */}
-          <div className="lg:hidden mb-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-medium">
-                Результаты поиска
-                {results && results.length > 0 && (
-                  <span className="ml-2 text-gray-500">({results.length})</span>
-                )}
-              </h2>
-              <button
-                onClick={() => setFiltersOpen(!filtersOpen)}
-                className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-                <span className="text-sm font-medium text-gray-700">Фильтры</span>
-              </button>
-            </div>
-
-            {/* Полноэкранная панель фильтров */}
-            {filtersOpen && (
-              <div className="fixed inset-0 bg-white z-50 w-screen h-screen">
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white w-full">
-                  <h3 className="text-lg font-semibold text-gray-900">Фильтры</h3>
-                  <button
-                    onClick={() => setFiltersOpen(false)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="flex flex-col h-full w-full">
-                  <div className="flex-1 overflow-y-auto p-4 pb-24 w-full">
-                    <FiltersSidebar />
-                  </div>
-
-                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 w-full">
-                    <button
-                      onClick={() => setFiltersOpen(false)}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-                    >
-                      Применить фильтры
-                    </button>
-                  </div>
-                </div>
+          <div className="mb-4 lg:hidden">
+            <Drawer open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Результаты поиска
+                  {results && results.length > 0 && (
+                    <span className="ml-2 text-sm font-normal text-slate-500">({results.length})</span>
+                  )}
+                </h2>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 rounded-full border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
+                  onClick={() => setFiltersOpen(true)}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Фильтры
+                  {activeFiltersCount > 0 && (
+                    <Badge className="ml-1 rounded-full bg-orange-500 px-2 py-0 text-xs text-white">
+                      {activeFiltersCount}
+                    </Badge>
+                  )}
+                </Button>
               </div>
-            )}
+
+              <DrawerContent>
+                <DrawerHeader className="bg-white">
+                  <DrawerTitle className="text-base font-semibold text-slate-900">Фильтры поиска</DrawerTitle>
+                  <p className="text-sm text-slate-500">Выберите бренды или включите отображение только с фотографиями.</p>
+                </DrawerHeader>
+                <DrawerBody className="pb-10">
+                  <FiltersSidebar
+                    key={filtersVersion}
+                    isMobile
+                    showApplyButton={false}
+                  />
+                </DrawerBody>
+                <DrawerFooter className="bg-white">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-slate-200 text-slate-600 hover:text-slate-900"
+                      onClick={() => {
+                        resetSearchFilters();
+                        setFiltersVersion((prev) => prev + 1);
+                      }}
+                    >
+                      Сбросить
+                    </Button>
+                    <DrawerClose asChild>
+                      <Button
+                        type="button"
+                        className="w-full bg-orange-500 text-white hover:bg-orange-600"
+                      >
+                        Показать
+                      </Button>
+                    </DrawerClose>
+                  </div>
+                </DrawerFooter>
+              </DrawerContent>
+            </Drawer>
           </div>
 
           {/* Основной флекс-контейнер */}
@@ -149,7 +180,13 @@ function SearchPage() {
             {/* Левая колонка – фильтры (только на desktop) */}
             <aside className="hidden lg:block w-full lg:w-1/4">
               <div className="sticky top-28">
-                <FiltersSidebar />
+                <FiltersSidebar
+                  key={`desktop-${filtersVersion}`}
+                  onReset={() => {
+                    resetSearchFilters();
+                    setFiltersVersion((prev) => prev + 1);
+                  }}
+                />
               </div>
             </aside>
 

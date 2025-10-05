@@ -1,210 +1,245 @@
 "use client";
-import React, { useState, useEffect } from "react";
+
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import ComponentCard from "../common/ComponentCard";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
 import { Modal } from "../ui/modal";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table";
 import Label from "../form/Label";
+import Form from "../form/Form";
 import Input from "../form/input/InputField";
+import TextArea from "../form/input/TextArea";
+import { CopyIcon } from "@/icons";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table";
+import { apiKeysApi, ApiKeyItem, ApiKeyLogEntry, ApiKeyMetrics } from "@/lib/api/api-keys";
+import { useToast } from "@/context/ToastContext";
 import { logPageView, logUserAction } from "@/lib/eventLogger";
+import { cn } from "@/lib/utils";
 
-interface ApiKey {
+const TABS = [
+  { id: "keys", name: "API ключи" },
+  { id: "docs", name: "Документация" },
+  { id: "usage", name: "Примеры" },
+] as const;
+
+type TabId = (typeof TABS)[number]["id"];
+
+type CreatedKeyState = {
   id: number;
-  name: string;
-  active: boolean;
-  createdAt?: string;
-  lastUsed?: string;
-}
+  apiKey: string;
+} | null;
 
-const ApiManagementPage = () => {
-  const [activeTab, setActiveTab] = useState("keys");
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
+const ApiManagementPage: React.FC = () => {
+  const { success: showSuccess, error: showError } = useToast();
+
+  const [activeTab, setActiveTab] = useState<TabId>("keys");
+  const [apiKeys, setApiKeys] = useState<ApiKeyItem[]>([]);
+  const [metrics, setMetrics] = useState<ApiKeyMetrics | null>(null);
+  const [logs, setLogs] = useState<ApiKeyLogEntry[]>([]);
+  const [selectedKeyId, setSelectedKeyId] = useState<number | null>(null);
+
   const [loading, setLoading] = useState(true);
+  const [metricsLoading, setMetricsLoading] = useState(true);
+  const [logsLoading, setLogsLoading] = useState(false);
+
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
-  const [createdKey, setCreatedKey] = useState<{id: string, apiKey: string} | null>(null);
+  const [newKeyDescription, setNewKeyDescription] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [createdKey, setCreatedKey] = useState<CreatedKeyState>(null);
+
+  const [confirmRevoke, setConfirmRevoke] = useState<ApiKeyItem | null>(null);
+
+  const loadKeys = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await apiKeysApi.list();
+      setApiKeys(data);
+    } catch (err) {
+      console.error("Failed to load API keys", err);
+      showError("Не удалось загрузить список ключей");
+    } finally {
+      setLoading(false);
+    }
+  }, [showError]);
+
+  const loadMetrics = useCallback(async () => {
+    try {
+      setMetricsLoading(true);
+      const stats = await apiKeysApi.metrics();
+      setMetrics(stats);
+    } catch (err) {
+      console.error("Failed to load metrics", err);
+      showError("Не удалось загрузить статистику по API");
+    } finally {
+      setMetricsLoading(false);
+    }
+  }, [showError]);
+
+  const loadLogs = useCallback(async (keyId: number) => {
+    try {
+      setLogsLoading(true);
+      const entries = await apiKeysApi.logs(keyId);
+      setLogs(entries);
+    } catch (err) {
+      console.error("Failed to load logs", err);
+      showError("Не удалось загрузить журнал запросов");
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [showError]);
 
   useEffect(() => {
-    const fetchApiKeys = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('http://localhost:8080/api/admin/api/keys', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setApiKeys(data);
-        }
-      } catch (err) {
-        console.error('Failed to fetch API keys:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+    loadKeys();
+    loadMetrics();
+    logPageView("Управление API", "/api-management");
+  }, [loadKeys, loadMetrics]);
 
-    fetchApiKeys();
-    // Log page view
-    logPageView('Управление API', '/api-management');
-  }, []);
+  useEffect(() => {
+    if (selectedKeyId !== null) {
+      loadLogs(selectedKeyId);
+    }
+  }, [loadLogs, selectedKeyId]);
 
-  const createApiKey = async () => {
-    if (!newKeyName.trim()) {
-      alert('Пожалуйста, введите название ключа');
+  const handleCreateKey = async () => {
+    const trimmedName = newKeyName.trim();
+
+    if (!trimmedName) {
+      setNameError("Введите название ключа");
       return;
     }
 
     try {
-      const response = await fetch('http://localhost:8080/api/admin/api/keys', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: `name=${encodeURIComponent(newKeyName)}`
+      setCreatingKey(true);
+      const result = await apiKeysApi.create({
+        name: trimmedName,
+        description: newKeyDescription.trim() || undefined,
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        setCreatedKey(result);
-        setNewKeyName('');
-        
-        // Log user action
-        logUserAction(`Создан API ключ: ${newKeyName}`, `ID: ${result.id}`);
-        
-        const keysResponse = await fetch('http://localhost:8080/api/admin/api/keys', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (keysResponse.ok) {
-          const keysData = await keysResponse.json();
-          setApiKeys(keysData);
-        }
-      } else {
-        alert('Ошибка создания ключа');
-      }
-    } catch (error) {
-      console.error('Failed to create API key:', error);
-      alert('Ошибка создания ключа');
+      setCreatedKey(result);
+      setNewKeyName("");
+      setNewKeyDescription("");
+      setNameError(null);
+      showSuccess("API ключ создан. Скопируйте секрет и храните безопасно.");
+      logUserAction(`Создан API ключ: ${result.id}`, newKeyName.trim());
+      await Promise.all([loadKeys(), loadMetrics()]);
+    } catch (err) {
+      console.error("Failed to create API key", err);
+      showError("Ошибка при создании ключа");
+    } finally {
+      setCreatingKey(false);
     }
   };
 
-  const revokeApiKey = async (keyId: number) => {
-    if (!confirm('Вы уверены, что хотите отозвать этот ключ?')) {
-      return;
-    }
-
+  const handleCopySecret = async (secret: string) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/api/keys/${keyId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const keysResponse = await fetch('http://localhost:8080/api/admin/api/keys', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (keysResponse.ok) {
-          const keysData = await keysResponse.json();
-          setApiKeys(keysData);
-        }
-      } else {
-        alert('Ошибка отзыва ключа');
-      }
-    } catch (error) {
-      console.error('Failed to revoke API key:', error);
-      alert('Ошибка отзыва ключа');
+      await navigator.clipboard.writeText(secret);
+      showSuccess("Секрет скопирован в буфер обмена");
+    } catch (err) {
+      console.error("Failed to copy secret", err);
+      showError("Не удалось скопировать секрет. Скопируйте вручную.");
     }
   };
 
-  const formatDateTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleString('ru-RU', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+  const toggleActive = async (key: ApiKeyItem) => {
+    try {
+      const updated = await apiKeysApi.update(key.id, { active: !key.active });
+      showSuccess(updated.active ? "Ключ активирован" : "Ключ деактивирован");
+      setApiKeys(prev => prev.map(k => (k.id === updated.id ? updated : k)));
+      await loadMetrics();
+    } catch (err) {
+      console.error("Failed to toggle API key", err);
+      showError("Не удалось изменить статус ключа");
+    }
   };
 
-  const getStatusBadge = (active: boolean) => {
-    return active 
-      ? <Badge color="success" size="sm">Активен</Badge>
-      : <Badge color="error" size="sm">Неактивен</Badge>;
+  const rotateKey = async (key: ApiKeyItem) => {
+    try {
+      const result = await apiKeysApi.rotate(key.id);
+      setCreatedKey(result);
+      showSuccess("Секрет ключа обновлён. Обновите конфигурацию интеграций.");
+      await loadKeys();
+    } catch (err) {
+      console.error("Failed to rotate API key", err);
+      showError("Не удалось перегенерировать ключ");
+    }
   };
+
+  const revokeKey = async () => {
+    if (!confirmRevoke) return;
+    try {
+      await apiKeysApi.revoke(confirmRevoke.id);
+      showSuccess("Ключ отозван");
+      setConfirmRevoke(null);
+      await Promise.all([loadKeys(), loadMetrics()]);
+    } catch (err) {
+      console.error("Failed to revoke API key", err);
+      showError("Не удалось отозвать ключ");
+    }
+  };
+
+  const activeKeys = useMemo(() => apiKeys.filter(k => k.active).length, [apiKeys]);
+
+  const renderKeyStatus = (key: ApiKeyItem) => (
+    <Badge color={key.active ? "success" : "error"} size="sm">
+      {key.active ? "Активен" : "Неактивен"}
+    </Badge>
+  );
+
+  const renderDateTime = (value?: string | null) => {
+    if (!value) return "—";
+    return new Date(value).toLocaleString('ru-RU');
+  };
+
+  const handleSelectKey = (keyId: number) => {
+    setSelectedKeyId(prev => (prev === keyId ? null : keyId));
+  };
+
+  const selectedKey = selectedKeyId != null ? apiKeys.find(k => k.id === selectedKeyId) : null;
 
   return (
     <div className="space-y-6">
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="text-gray-500 dark:text-gray-400">
-            <p className="text-lg font-medium">Загрузка API данных...</p>
-          </div>
-        </div>
-      ) : (
+      {activeTab === "keys" && (
         <>
-          {/* Overview Stats */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">API Ключи</h3>
-              <div className="mt-2 flex items-baseline">
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{apiKeys.filter(k => k.active).length}</p>
-                <div className="ml-2 flex items-center text-sm font-medium text-gray-500">
-                  <span>из {apiKeys.length}</span>
-                </div>
-              </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">активных ключей</p>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Запросы сегодня</h3>
-              <div className="mt-2 flex items-baseline">
-                <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">1,247</p>
-              </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">API вызовов</p>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Статус API</h3>
-              <div className="mt-2 flex items-center space-x-2">
-                <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                <p className="text-lg font-medium text-green-600">Работает</p>
-              </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">99.9% uptime</p>
-            </div>
+            <MetricsCard
+              loading={metricsLoading}
+              title="Активные ключи"
+              value={activeKeys}
+              subtitle={`из ${apiKeys.length}`}
+              tone="primary"
+            />
+            <MetricsCard
+              loading={metricsLoading}
+              title="Запросов сегодня"
+              value={metrics?.requestsToday ?? 0}
+              subtitle="проверено через API"
+              tone="info"
+            />
+            <MetricsCard
+              loading={metricsLoading}
+              title="Uptime"
+              value={`${(metrics?.uptimePercentage ?? 100).toFixed(2)}%`}
+              subtitle={`${metrics?.errorCountToday ?? 0} ошибок сегодня`
+              }
+              tone="success"
+            />
           </div>
 
-          {/* Navigation Tabs */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <div className="border-b border-gray-200 dark:border-gray-700">
               <nav className="flex space-x-8 px-6" aria-label="Tabs">
-                {[
-                  { id: "keys", name: "API Ключи" },
-                  { id: "docs", name: "Документация" },
-                  { id: "usage", name: "Использование" }
-                ].map(tab => (
+                {TABS.map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                    className={cn(
+                      "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm",
                       activeTab === tab.id
                         ? "border-blue-500 text-blue-600 dark:text-blue-400"
                         : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                    }`}
+                    )}
                   >
                     {tab.name}
                   </button>
@@ -213,332 +248,401 @@ const ApiManagementPage = () => {
             </div>
 
             <div className="p-6">
-              {activeTab === "keys" && (
-                <ComponentCard
-                  title="Управление API ключами"
-                  description="Создание и управление API ключами для внешних интеграций"
-                  action={
-                    <Button size="sm" onClick={() => setIsModalOpen(true)}>
-                      Создать ключ
-                    </Button>
-                  }
-                >
-                  <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+              <ComponentCard
+                title="Управление API ключами"
+                description="Создание и управление доступом внешних интеграций"
+                action={
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setIsCreateModalOpen(true);
+                      setCreatedKey(null);
+                      setNameError(null);
+                    }}
+                  >
+                    Создать ключ
+                  </Button>
+                }
+              >
+                {loading ? (
+                  <div className="flex justify-center items-center py-10 text-gray-500 dark:text-gray-400">
+                    Загрузка ключей...
+                  </div>
+                ) : apiKeys.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                    <p className="text-lg font-medium">API ключи не найдены</p>
+                    <p className="text-sm mt-1">Создайте первый ключ, чтобы предоставить доступ партнёрам</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
                     <Table>
-                      <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
+                      <TableHeader>
                         <TableRow>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Название</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Статус</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Создан</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Последнее использование</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Действия</TableCell>
+                          <TableCell isHeader className="px-5 py-3 text-left">Название</TableCell>
+                          <TableCell isHeader className="px-5 py-3 text-left">Статус</TableCell>
+                          <TableCell isHeader className="px-5 py-3 text-left">Последнее использование</TableCell>
+                          <TableCell isHeader className="px-5 py-3 text-left">Запросов</TableCell>
+                          <TableCell isHeader className="px-5 py-3 text-left">Действия</TableCell>
                         </TableRow>
                       </TableHeader>
-                      <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+                      <TableBody>
                         {apiKeys.map((key) => (
-                          <TableRow key={key.id}>
-                            <TableCell className="px-5 py-4 sm:px-6 text-start">
-                              <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                                {key.name}
-                              </div>
-                              <div className="font-mono text-gray-500 text-theme-xs dark:text-gray-400 mt-1">
-                                ID: {key.id}
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-start text-theme-sm">
-                              {getStatusBadge(key.active)}
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-start text-theme-sm">
-                              <div className="text-gray-700 dark:text-gray-300">
-                                {key.createdAt ? formatDateTime(key.createdAt) : 'Не указано'}
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-start text-theme-sm">
-                              <div className="text-gray-700 dark:text-gray-300">
-                                {key.lastUsed ? formatDateTime(key.lastUsed) : 'Никогда'}
+                          <TableRow
+                            key={key.id}
+                            className={cn(
+                              "cursor-pointer",
+                              selectedKeyId === key.id ? "bg-blue-50/60 dark:bg-blue-900/30" : "hover:bg-gray-50 dark:hover:bg-gray-800"
+                            )}
+                            onClick={() => handleSelectKey(key.id)}
+                          >
+                            <TableCell className="px-5 py-4">
+                              <div className="font-medium text-gray-900 dark:text-white">{key.name || `Ключ #${key.id}`}</div>
+                              {key.description && (
+                                <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">{key.description}</div>
+                              )}
+                              <div className="text-xs text-gray-400 mt-1">
+                                Создан: {renderDateTime(key.createdAt)}
                               </div>
                             </TableCell>
-                            <TableCell className="px-4 py-3 text-start">
-                              {key.active && (
+                            <TableCell className="px-5 py-4">{renderKeyStatus(key)}</TableCell>
+                            <TableCell className="px-5 py-4">
+                              <div className="text-sm text-gray-700 dark:text-gray-300">{renderDateTime(key.lastUsedAt)}</div>
+                              <div className="text-xs text-gray-400">IP: {key.lastUsedIp || '—'}</div>
+                            </TableCell>
+                            <TableCell className="px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
+                              {key.requestCount}
+                            </TableCell>
+                            <TableCell className="px-5 py-4">
+                              <div className="flex flex-wrap gap-2">
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => revokeApiKey(key.id)}
+                                  className="!px-3 !py-2 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleActive(key);
+                                  }}
+                                >
+                                  {key.active ? "Деактивировать" : "Активировать"}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="!px-3 !py-2 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    rotateKey(key);
+                                  }}
+                                >
+                                  Перегенерировать
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="!px-3 !py-2 text-xs text-red-600 hover:text-red-700"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmRevoke(key);
+                                  }}
                                 >
                                   Отозвать
                                 </Button>
-                              )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
-                    
-                    {apiKeys.length === 0 && (
-                      <div className="text-center py-12">
-                        <div className="text-gray-500 dark:text-gray-400">
-                          <p className="text-lg font-medium">API ключи не найдены</p>
-                          <p className="text-sm mt-1">Создайте первый API ключ для начала работы</p>
-                        </div>
+                  </div>
+                )}
+
+                {selectedKey && (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                      Последние запросы ключа «{selectedKey.name || selectedKey.id}»
+                    </h4>
+                    {logsLoading ? (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Загрузка журнала...</div>
+                    ) : logs.length === 0 ? (
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Запросов пока не было.</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableCell isHeader className="px-4 py-2 text-left">Время</TableCell>
+                              <TableCell isHeader className="px-4 py-2 text-left">Маршрут</TableCell>
+                              <TableCell isHeader className="px-4 py-2 text-left">Метод</TableCell>
+                              <TableCell isHeader className="px-4 py-2 text-left">Статус</TableCell>
+                              <TableCell isHeader className="px-4 py-2 text-left">IP</TableCell>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {logs.map((log) => (
+                              <TableRow key={log.id}>
+                                <TableCell className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                  {renderDateTime(log.requestedAt)}
+                                </TableCell>
+                                <TableCell className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 font-mono">
+                                  {log.requestPath || '—'}
+                                </TableCell>
+                                <TableCell className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                  {log.requestMethod || '—'}
+                                </TableCell>
+                                <TableCell className="px-4 py-2 text-sm">
+                                  <Badge color={(log.responseStatus ?? 0) >= 500 ? "error" : "info"} size="sm">
+                                    {log.responseStatus ?? '—'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300">
+                                  {log.clientIp || '—'}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
                       </div>
                     )}
                   </div>
-                </ComponentCard>
-              )}
+                )}
+              </ComponentCard>
+            </div>
+          </div>
+        </>
+      )}
 
-              {activeTab === "docs" && (
-                <div className="space-y-6">
-                  <ComponentCard
-                    title="API Документация"
-                    description="Руководство по интеграции с нашим API"
-                  >
-                    <div className="space-y-6">
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Базовый URL</h4>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm">
-                          https://api.autoparts.kz/v1
-                        </div>
-                      </div>
+      {activeTab === "docs" && (
+        <ComponentCard
+          title="Документация"
+          description="Рекомендации по использованию API для внешних партнёров"
+        >
+          <div className="space-y-6 text-sm text-gray-700 dark:text-gray-300">
+            <section>
+              <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Аутентификация</h4>
+              <p>
+                Каждый запрос к внешнему API должен содержать заголовок <code className="font-mono">X-API-Key</code> с вашим активным секретом. Ключи следует хранить в защищённых секрет-хранилищах и перегенерировать при компрометации.
+              </p>
+            </section>
 
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Аутентификация</h4>
-                        <p className="text-gray-600 dark:text-gray-400 mb-3">
-                          Все запросы к API должны включать заголовок X-API-Key с вашим API ключом:
-                        </p>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm">
-                          X-API-Key: YOUR_API_KEY_HERE
-                        </div>
-                      </div>
+            <section>
+              <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Базовые эндпоинты</h4>
+              <ul className="list-disc list-inside space-y-2">
+                <li><code className="font-mono">GET /api/external/products</code> — список товаров</li>
+                <li><code className="font-mono">GET /api/external/products/{{id}}</code> — карточка товара</li>
+                <li><code className="font-mono">POST /api/external/orders</code> — создание заказа</li>
+                <li><code className="font-mono">GET /api/external/orders/{{id}}/status</code> — статус заказа</li>
+              </ul>
+            </section>
 
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Доступные эндпоинты</h4>
-                        <div className="space-y-4">
-                          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <Badge color="success" size="sm">GET</Badge>
-                              <code className="text-sm">/external/products</code>
-                            </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Получить список товаров с возможностью фильтрации
-                            </p>
-                          </div>
-                          
-                          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <Badge color="success" size="sm">GET</Badge>
-                              <code className="text-sm">/external/products/&#123;id&#125;</code>
-                            </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Получить детальную информацию о товаре
-                            </p>
-                          </div>
-                          
-                          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <Badge color="info" size="sm">POST</Badge>
-                              <code className="text-sm">/external/orders</code>
-                            </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Создать новый заказ
-                            </p>
-                          </div>
-                          
-                          <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <Badge color="success" size="sm">GET</Badge>
-                              <code className="text-sm">/external/orders/&#123;id&#125;/status</code>
-                            </div>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Получить статус заказа
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+            <section>
+              <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Коды ответов</h4>
+              <ul className="list-disc list-inside space-y-1">
+                <li><strong>200</strong> — успешный запрос</li>
+                <li><strong>401</strong> — ключ отсутствует или недействителен</li>
+                <li><strong>429</strong> — превышен лимит запросов</li>
+                <li><strong>500</strong> — внутреняя ошибка сервера</li>
+              </ul>
+            </section>
+          </div>
+        </ComponentCard>
+      )}
 
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Формат ответа</h4>
-                        <p className="text-gray-600 dark:text-gray-400 mb-3">
-                          Все ответы API возвращаются в формате JSON:
-                        </p>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm">
-{`{
-  "success": true,
-  "data": {
-    // данные ответа
-  },
-  "message": "Запрос выполнен успешно"
-}`}
-                        </div>
-                      </div>
-                    </div>
-                  </ComponentCard>
-                </div>
-              )}
-
-              {activeTab === "usage" && (
-                <div className="space-y-6">
-                  <ComponentCard
-                    title="Примеры использования"
-                    description="Готовые примеры интеграции на разных языках программирования"
-                  >
-                    <div className="space-y-6">
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">JavaScript (fetch)</h4>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
-{`// Получить список товаров
-fetch('https://api.autoparts.kz/v1/external/products', {
+      {activeTab === "usage" && (
+        <ComponentCard
+          title="Примеры интеграции"
+          description="Шаблоны запросов на популярных языках"
+        >
+          <div className="space-y-6 text-sm text-gray-700 dark:text-gray-300">
+            <section>
+              <h4 className="text-base font-semibold mb-3">JavaScript (fetch)</h4>
+              <pre className="bg-gray-900 text-white rounded-lg p-4 text-xs overflow-x-auto">
+{`const response = await fetch('https://api.autoparts.kz/api/external/products', {
   headers: {
-    'X-API-Key': 'YOUR_API_KEY_HERE',
+    'X-API-Key': process.env.EXTERNAL_API_KEY,
     'Content-Type': 'application/json'
   }
-})
-.then(response => response.json())
-.then(data => console.log(data))
-.catch(error => console.error('Error:', error));`}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">PHP (cURL)</h4>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
-{`<?php
-$curl = curl_init();
-
-curl_setopt_array($curl, [
-  CURLOPT_URL => 'https://api.autoparts.kz/v1/external/products',
-  CURLOPT_RETURNTRANSFER => true,
-  CURLOPT_HTTPHEADER => [
-    'X-API-Key: YOUR_API_KEY_HERE',
-    'Content-Type: application/json'
-  ]
-]);
-
-$response = curl_exec($curl);
-$data = json_decode($response, true);
-
-curl_close($curl);
-print_r($data);
-?>`}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Python (requests)</h4>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
+});
+const data = await response.json();`}
+              </pre>
+            </section>
+            <section>
+              <h4 className="text-base font-semibold mb-3">Python (requests)</h4>
+              <pre className="bg-gray-900 text-white rounded-lg p-4 text-xs overflow-x-auto">
 {`import requests
 
 headers = {
-    'X-API-Key': 'YOUR_API_KEY_HERE',
-    'Content-Type': 'application/json'
+  'X-API-Key': API_KEY,
+  'Content-Type': 'application/json'
 }
 
-response = requests.get(
-    'https://api.autoparts.kz/v1/external/products',
-    headers=headers
+response = requests.post(
+  'https://api.autoparts.kz/api/external/orders',
+  headers=headers,
+  json={'orderId': '12345'}
 )
+response.raise_for_status()
+print(response.json())`}
+              </pre>
+            </section>
+          </div>
+        </ComponentCard>
+      )}
 
-if response.status_code == 200:
-    data = response.json()
-    print(data)
-else:
-    print(f'Error: {response.status_code}')`}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3">Создание заказа (POST)</h4>
-                        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
-{`// JavaScript example
-const orderData = {
-  customer: {
-    name: 'Иван Иванов',
-    email: 'ivan@example.com',
-    phone: '+7 (495) 123-45-67'
-  },
-  items: [
-    {
-      productId: 12345,
-      quantity: 2
-    }
-  ],
-  deliveryAddress: {
-    city: 'Москва',
-    address: 'ул. Пример, д. 1'
-  }
-};
-
-fetch('https://api.autoparts.kz/v1/external/orders', {
-  method: 'POST',
-  headers: {
-    'X-API-Key': 'YOUR_API_KEY_HERE',
-    'Content-Type': 'application/json'
-  },
-  body: JSON.stringify(orderData)
-})
-.then(response => response.json())
-.then(data => console.log('Order created:', data));`}
-                        </div>
-                      </div>
-                    </div>
-                  </ComponentCard>
-                </div>
-              )}
-            </div>
+      <Modal
+        isOpen={isCreateModalOpen}
+        onClose={() => {
+          setIsCreateModalOpen(false);
+          setCreatedKey(null);
+          setNameError(null);
+        }}
+        className="max-w-lg"
+      >
+        <div className="space-y-6 p-6 sm:p-8">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Создание API ключа
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Укажите название для идентификации ключа и при необходимости добавьте описание.
+            </p>
           </div>
 
-          <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} size="md">
-            <div className="p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">
-                Создание API ключа
-              </h3>
-              
-              {!createdKey ? (
-                <div className="space-y-4">
-                  <div>
-                    <Label>Название ключа</Label>
-                    <Input
-                      type="text"
-                      placeholder="Введите название для API ключа..."
-                      value={newKeyName}
-                      onChange={(e) => setNewKeyName(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex justify-end pt-4 space-x-3">
-                    <Button variant="outline" onClick={() => setIsModalOpen(false)}>
-                      Отмена
-                    </Button>
-                    <Button onClick={createApiKey}>
-                      Создать ключ
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                    <h4 className="font-medium text-green-800 dark:text-green-300">API ключ создан успешно!</h4>
-                    <p className="text-sm text-green-700 dark:text-green-400 mt-1">
-                      Скопируйте этот ключ сейчас. Он больше не будет отображаться.
-                    </p>
-                    <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded font-mono text-sm">
-                      {createdKey.apiKey}
-                    </div>
-                  </div>
-                  <div className="flex justify-end">
-                    <Button onClick={() => {
-                      setCreatedKey(null);
-                      setIsModalOpen(false);
-                    }}>
-                      Закрыть
-                    </Button>
-                  </div>
-                </div>
-              )}
+          {!createdKey ? (
+            <Form
+              onSubmit={(_event) => {
+                handleCreateKey();
+              }}
+              className="space-y-5"
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="api-key-name">Название</Label>
+                <Input
+                  id="api-key-name"
+                  placeholder="Например, CRM интеграция"
+                  value={newKeyName}
+                  onChange={(event) => {
+                    setNewKeyName(event.target.value);
+                    if (nameError) {
+                      setNameError(null);
+                    }
+                  }}
+                  error={Boolean(nameError)}
+                  hint={nameError ?? "Название поможет вам отличать ключи между собой"}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="api-key-description">Описание</Label>
+                <TextArea
+                  rows={3}
+                  id="api-key-description"
+                  placeholder="Дополнительная информация для команды"
+                  value={newKeyDescription}
+                  onChange={(value) => setNewKeyDescription(value)}
+                  hint="Необязательное поле"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsCreateModalOpen(false);
+                    setNameError(null);
+                  }}
+                >
+                  Отмена
+                </Button>
+                <Button type="submit" disabled={creatingKey}>
+                  {creatingKey ? "Создание..." : "Создать"}
+                </Button>
+              </div>
+            </Form>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 dark:border-blue-900/50 dark:bg-blue-900/20 dark:text-blue-100">
+                Скопируйте секрет ниже — он будет показан только один раз.
+              </div>
+              <div className="relative rounded-lg border border-gray-200 bg-gray-50 p-4 pr-12 font-mono text-sm dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100">
+                {createdKey.apiKey}
+                <button
+                  type="button"
+                  onClick={() => handleCopySecret(createdKey.apiKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white/80 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-hidden focus:ring-3 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-300 dark:hover:bg-gray-800"
+                  aria-label="Скопировать секрет ключа"
+                >
+                  <CopyIcon className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => {
+                    setIsCreateModalOpen(false);
+                    setCreatedKey(null);
+                    setNameError(null);
+                  }}
+                >
+                  Готово
+                </Button>
+              </div>
             </div>
-          </Modal>
-        </>
-      )}
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={confirmRevoke !== null}
+        onClose={() => setConfirmRevoke(null)}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Отзыв API ключа</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Ключ «{confirmRevoke?.name || confirmRevoke?.id}» будет немедленно деактивирован. Все интеграции, использующие этот ключ, потеряют доступ.
+          </p>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setConfirmRevoke(null)}>
+              Отмена
+            </Button>
+            <Button
+              variant="primary"
+              className="!bg-red-600 hover:!bg-red-700"
+              onClick={revokeKey}
+            >
+              Отозвать
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
+
+interface MetricsCardProps {
+  loading: boolean;
+  title: string;
+  value: number | string;
+  subtitle?: string;
+  tone?: "primary" | "info" | "success";
+}
+
+const toneClasses: Record<NonNullable<MetricsCardProps["tone"]>, string> = {
+  primary: "text-blue-600 dark:text-blue-300",
+  info: "text-indigo-600 dark:text-indigo-300",
+  success: "text-emerald-600 dark:text-emerald-300",
+};
+
+const MetricsCard: React.FC<MetricsCardProps> = ({ loading, title, value, subtitle, tone = "primary" }) => (
+  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+    <h3 className="text-lg font-medium text-gray-900 dark:text-white">{title}</h3>
+    <div className="mt-2 flex items-baseline">
+      <p className={cn("text-3xl font-bold", toneClasses[tone])}>
+        {loading ? "—" : value}
+      </p>
+    </div>
+    {subtitle && (
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{subtitle}</p>
+    )}
+  </div>
+);
 
 export default ApiManagementPage;

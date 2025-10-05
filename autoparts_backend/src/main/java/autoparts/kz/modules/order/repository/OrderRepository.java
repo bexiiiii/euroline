@@ -25,9 +25,14 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
            """)
     BigDecimal totalRevenue();
     
+    @EntityGraph(attributePaths = {"items", "items.product"})
     @Query("SELECT o FROM Order o WHERE o.createdAt >= :startDate AND o.createdAt < :endDate")
     List<Order> findByCreatedAtBetween(@Param("startDate") LocalDateTime startDate, 
                                       @Param("endDate") LocalDateTime endDate);
+
+    @EntityGraph(attributePaths = {"items", "items.product"})
+    @Query("SELECT o FROM Order o")
+    List<Order> findAllWithItems();
 
     Optional<Order> findByExternalId(String externalId);
     Optional<Order> findByIdempotencyKey(String idempotencyKey);

@@ -25,6 +25,10 @@ export default function financePage() {
   const [topUps, setTopUps] = useState<PageResponse<TopUp> | null>(null)
   const [txns, setTxns] = useState<PageResponse<FinanceTxn> | null>(null)
   const [loading, setLoading] = useState(true)
+  const [topUpsPage, setTopUpsPage] = useState(0)
+  const [txnsPage, setTxnsPage] = useState(0)
+  const [loadingMoreTopUps, setLoadingMoreTopUps] = useState(false)
+  const [loadingMoreTxns, setLoadingMoreTxns] = useState(false)
 
   const fmtKzt = (n: number) => new Intl.NumberFormat('ru-KZ', { style: 'currency', currency: 'KZT', maximumFractionDigits: 0 }).format(n)
 
@@ -33,16 +37,54 @@ export default function financePage() {
     try {
       const [b, t, x] = await Promise.all([
         getMyBalance(),
-        getMyTopUps(0, 20),
-        getMyTransactions(0, 50),
+        getMyTopUps(0, 10),
+        getMyTransactions(0, 15),
       ])
       setBalance(b)
       setTopUps(t)
       setTxns(x)
+      setTopUpsPage(0)
+      setTxnsPage(0)
     } catch (e: any) {
       toast.error(e?.message || 'Не удалось загрузить финансы')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadMoreTopUps = async () => {
+    if (!topUps || loadingMoreTopUps) return
+    setLoadingMoreTopUps(true)
+    try {
+      const nextPage = topUpsPage + 1
+      const moreTopUps = await getMyTopUps(nextPage, 10)
+      setTopUps({
+        ...moreTopUps,
+        content: [...topUps.content, ...moreTopUps.content]
+      })
+      setTopUpsPage(nextPage)
+    } catch (e: any) {
+      toast.error('Не удалось загрузить больше пополнений')
+    } finally {
+      setLoadingMoreTopUps(false)
+    }
+  }
+
+  const loadMoreTxns = async () => {
+    if (!txns || loadingMoreTxns) return
+    setLoadingMoreTxns(true)
+    try {
+      const nextPage = txnsPage + 1
+      const moreTxns = await getMyTransactions(nextPage, 15)
+      setTxns({
+        ...moreTxns,
+        content: [...txns.content, ...moreTxns.content]
+      })
+      setTxnsPage(nextPage)
+    } catch (e: any) {
+      toast.error('Не удалось загрузить больше транзакций')
+    } finally {
+      setLoadingMoreTxns(false)
     }
   }
 
@@ -122,7 +164,7 @@ export default function financePage() {
                 </div>
 
                 <div className="space-y-2 mb-4">
-                  <div className="text-sm font-medium">Чек оплаты (изображение или PDF)</div>
+                 
                   <FileUploader onFileSelected={setReceipt} />
                 </div>
 
@@ -142,9 +184,9 @@ export default function financePage() {
                 <div className="flex items-center justify-between mb-3">
                   <h2 className="text-lg font-semibold">История пополнений</h2>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="sticky top-0 bg-white z-10">
                       <TableRow>
                         <TableHead>Дата</TableHead>
                         <TableHead>Сумма</TableHead>
@@ -169,6 +211,22 @@ export default function financePage() {
                     </TableBody>
                   </Table>
                 </div>
+                {topUps && topUps.totalElements > topUps.content.length && (
+                  <div className="flex flex-col items-center gap-2 pt-3 border-t mt-2">
+                    <div className="text-xs text-muted-foreground">
+                      Показано {topUps.content.length} из {topUps.totalElements} записей
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={loadMoreTopUps}
+                      disabled={loadingMoreTopUps}
+                      className="w-full max-w-xs"
+                    >
+                      {loadingMoreTopUps ? 'Загрузка...' : 'Показать больше'}
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {(txns && txns.content.length > 0) && (
@@ -176,9 +234,9 @@ export default function financePage() {
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="text-lg font-semibold">История транзакций</h2>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
                     <Table>
-                      <TableHeader>
+                      <TableHeader className="sticky top-0 bg-white z-10">
                         <TableRow>
                           <TableHead>Дата</TableHead>
                           <TableHead>Тип</TableHead>
@@ -198,6 +256,22 @@ export default function financePage() {
                       </TableBody>
                     </Table>
                   </div>
+                  {txns.totalElements > txns.content.length && (
+                    <div className="flex flex-col items-center gap-2 pt-3 border-t mt-2">
+                      <div className="text-xs text-muted-foreground">
+                        Показано {txns.content.length} из {txns.totalElements} записей
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={loadMoreTxns}
+                        disabled={loadingMoreTxns}
+                        className="w-full max-w-xs"
+                      >
+                        {loadingMoreTxns ? 'Загрузка...' : 'Показать больше'}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import SearchIcon from "@/shared/icons /SearchIcon";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchStore } from "@/lib/stores/searchStore";
 import { useVehicle } from "@/context/VehicleContext";
@@ -11,16 +11,41 @@ const SearchSection = () => {
   const { search, isLoading } = useSearchStore();
   const { setSession } = useVehicle();
   const router = useRouter();
+  
+  // Ref for search timeout
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Debounced search effect - triggers search when user stops typing (both adding and deleting)
+  useEffect(() => {
+    // Clear any existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
     
-    if (!query.trim()) {
+    // If query is empty, do nothing on the main page
+    if (query.trim().length === 0) {
+      return;
+    }
+    
+    // Don't trigger search for queries that are too short
+    if (query.trim().length < 3) {
+      return;
+    }
+    
+    // Set new timeout to perform search
+    searchTimeoutRef.current = setTimeout(() => {
+      performSearch(query.trim());
+    }, 1000); // Wait 1 second after user stops typing (adding or deleting)
+    
+  }, [query]); // Trigger this effect whenever query changes
+
+  const performSearch = async (searchQuery: string) => {
+    if (!searchQuery.trim()) {
       return;
     }
 
     // Выполняем поиск
-    const result = await search(query.trim());
+    const result = await search(searchQuery);
     
     // Если найден автомобиль по VIN, сохраняем в контексте и открываем каталог
     if (result?.detectedType === 'VIN' && result?.vehicle) {
@@ -32,25 +57,57 @@ const SearchSection = () => {
         ssd: vehicleData.ssd,
         catalog: vehicleData.catalog || 'SCANIA202010',
         brand: vehicleData.brand,
-        name: vehicleData.name,
-        attributes: vehicleData.attributes || []
+        name: vehicleData.name
       });
       
       // Открываем страницу каталога с параметрами
-      const catalogUrl = `/catalogs/${vehicleData.vehicleId}?vin=${encodeURIComponent(query.trim())}&ssd=${encodeURIComponent(vehicleData.ssd)}&catalog=${encodeURIComponent(vehicleData.catalog || '')}&brand=${encodeURIComponent(vehicleData.brand || '')}&name=${encodeURIComponent(vehicleData.name || '')}`;
+      const catalogUrl = `/catalogs/${vehicleData.vehicleId}?vin=${encodeURIComponent(searchQuery)}&ssd=${encodeURIComponent(vehicleData.ssd)}&catalog=${encodeURIComponent(vehicleData.catalog || '')}&brand=${encodeURIComponent(vehicleData.brand || '')}&name=${encodeURIComponent(vehicleData.name || '')}`;
       window.open(catalogUrl, '_blank');
       return;
     }
     
     // Для остальных типов поиска перенаправляем на страницу результатов
-    router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+    router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Clear any pending search timeout when user explicitly triggers search
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+      searchTimeoutRef.current = null;
+    }
+    
+    if (!query.trim()) {
+      // If query is empty, do nothing
+      return;
+    }
+
+    // Выполняем поиск immediately
+    await performSearch(query.trim());
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
+      // Clear any pending search timeout when user explicitly triggers search
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+        searchTimeoutRef.current = null;
+      }
+      
       handleSearch(e as any);
     }
   };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <section className="pt-32 pb-8 bg-gray-100">

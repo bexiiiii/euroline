@@ -1,189 +1,161 @@
 "use client"
 
-import { Input } from '@/components/ui/input'
-import { Checkbox } from '@/components/ui/checkbox'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Label } from '@/components/ui/label'
-import { Separator } from '@/components/ui/separator'
 import { useMemo, useState } from 'react'
+import { Building2, Check, Image as ImageIcon, Search as SearchIcon } from 'lucide-react'
+
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 import { useSearchStore } from '@/lib/stores/searchStore'
 
-const manufacturers = ['4RIDE', 'AAA', 'ABSEL', 'AC/DC', 'ACDELCO']
-const programs = ['Грузовые запчасти', 'Легковые запчасти', 'Мотозапчасти']
-const voltages = ['6', '12', '24']
-const capacities = ['0.8', '1000']
-const polarities = [
-  '0 обратная (-/+)',
-  '1 прямая (+/-)',
-  '2 диагональная (+/-)',
-  '3 боковая обратная (+/-)',
-  '4 боковая прямая (-/+)',
-  '5 универсальная (±/±)',
-]
-const startingCurrents = ['7', '8750']
-const dimensions = {
-  Длина: ['35', '1200'],
-  Ширина: ['24', '1896'],
-  Высота: ['16', '1790'],
+interface FiltersSidebarProps {
+  onApply?: () => void
+  onReset?: () => void
+  showApplyButton?: boolean
+  isMobile?: boolean
 }
-const terminalTypes = [
-  'A конус стандартные',
-  'B конус тонкие (Азия)',
-  'E винтовые (Европа)',
-  'F винтовые (Америка)',
-  'G под болт (Америка)',
-]
-const batteryTypes = ['AGM', 'AGM+GEL', 'Ca/Ca', 'EFB', 'GEL']
-const mountTypes = ['B00 без выступов', 'B01 с 2 сторон', 'B03 с 4 сторон', 'B13 с 4 сторон', 'Korean B1']
-const features = [
-  'для автомобилей с функцией "Старт-Стоп"',
-  'защита от утечки',
-  'необслуживаемый',
-  'устойчивость к вибрации',
-  'устойчивость к циклам',
-]
 
-const FiltersSidebar = () => {
+const FiltersSidebar = ({
+  onApply,
+  onReset,
+  showApplyButton = true,
+  isMobile = false,
+}: FiltersSidebarProps) => {
   const { results, filters, toggleBrand, setPhotoOnly } = useSearchStore()
-  // Бренды берём из результатов, чтобы фильтр был релевантен
+
   const allBrands = useMemo(() => {
-    const set = new Set<string>()
-    results.forEach(r => { if (r.brand) set.add(r.brand) })
-    return Array.from(set).sort()
+    const unique = new Set<string>()
+    results.forEach((item) => {
+      if (item.brand) {
+        unique.add(item.brand)
+      }
+    })
+    return Array.from(unique).sort((a, b) => a.localeCompare(b))
   }, [results])
 
   const [brandQuery, setBrandQuery] = useState('')
+
   const visibleBrands = useMemo(() => {
-    const q = brandQuery.trim().toLowerCase()
-    if (!q) return allBrands
-    return allBrands.filter(b => b.toLowerCase().includes(q))
+    const query = brandQuery.trim().toLowerCase()
+    if (!query) return allBrands
+    return allBrands.filter((brand) => brand.toLowerCase().includes(query))
   }, [allBrands, brandQuery])
 
+  const handleBrandToggle = (brand: string) => {
+    toggleBrand(brand)
+  }
+
+  const handleReset = () => {
+    setBrandQuery('')
+    onReset?.()
+  }
+
+  const hasBrands = visibleBrands.length > 0
+
   return (
-    <aside className='px-6 w-full max-w-xs bg-white rounded-md p-4 border-1'>
-     
-        {/* Производители */}
-        <Label className='font-semibold'>Производители</Label>
-        <Input placeholder='Поиск' className='my-2' value={brandQuery} onChange={e => setBrandQuery(e.target.value)} />
-        <ScrollArea className='max-h-64 pr-2'>
-          {visibleBrands.map((m) => (
-            <div key={m} className='flex items-center space-x-2 my-1'>
-              <Checkbox id={`brand-${m}`} checked={filters.brands.includes(m)} onCheckedChange={() => toggleBrand(m)} />
-              <label htmlFor={`brand-${m}`} className='text-sm'>
-                {m}
-              </label>
-            </div>
-          ))}
-          {visibleBrands.length === 0 && (
-            <div className='text-xs text-gray-500 py-2'>Бренды не найдены</div>
-          )}
-        </ScrollArea>
-
-        <Separator className='my-4' />
-
-        {/* Программа */}
-        <Label className='font-semibold'>Программа</Label>
-        {programs.map((p) => (
-          <div key={p} className='flex items-center space-x-2 my-1'>
-            <Checkbox id={p} />
-            <label htmlFor={p} className='text-sm'>
-              {p}
-            </label>
-          </div>
-        ))}
-
-        <Separator className='my-4' />
-
-        {/* Напряжение */}
-        <Label className='font-semibold'>Напряжение, В</Label>
-        {voltages.map((v) => (
-          <div key={v} className='flex items-center space-x-2 my-1'>
-            <Checkbox id={`voltage-${v}`} />
-            <label htmlFor={`voltage-${v}`} className='text-sm'>
-              {v}
-            </label>
-          </div>
-        ))}
-
-        <Separator className='my-4' />
-
-        {/* Полярность */}
-        <Label className='font-semibold'>Полярность</Label>
-        <Input placeholder='Поиск' className='my-2' />
-        {polarities.map((p) => (
-          <div key={p} className='flex items-center space-x-2 my-1'>
-            <Checkbox id={p} />
-            <label htmlFor={p} className='text-sm'>
-              {p}
-            </label>
-          </div>
-        ))}
-
-        <Separator className='my-4' />
-
-        {/* Тип клемм */}
-        <Label className='font-semibold'>Тип клемм</Label>
-        <Input placeholder='Поиск' className='my-2' />
-        {terminalTypes.map((t) => (
-          <div key={t} className='flex items-center space-x-2 my-1'>
-            <Checkbox id={t} />
-            <label htmlFor={t} className='text-sm'>
-              {t}
-            </label>
-          </div>
-        ))}
-
-        <Separator className='my-4' />
-
-        {/* Тип АКБ */}
-        <Label className='font-semibold'>Тип АКБ</Label>
-        <Input placeholder='Поиск' className='my-2' />
-        {batteryTypes.map((t) => (
-          <div key={t} className='flex items-center space-x-2 my-1'>
-            <Checkbox id={t} />
-            <label htmlFor={t} className='text-sm'>
-              {t}
-            </label>
-          </div>
-        ))}
-
-        <Separator className='my-4' />
-
-        {/* Тип крепления */}
-        <Label className='font-semibold'>Тип крепления</Label>
-        {mountTypes.map((m) => (
-          <div key={m} className='flex items-center space-x-2 my-1'>
-            <Checkbox id={m} />
-            <label htmlFor={m} className='text-sm'>
-              {m}
-            </label>
-          </div>
-        ))}
-
-        <Separator className='my-4' />
-
-        {/* Особенности */}
-        <Label className='font-semibold'>Особенности</Label>
-        <Input placeholder='Поиск' className='my-2' />
-        {features.map((f) => (
-          <div key={f} className='flex items-center space-x-2 my-1'>
-            <Checkbox id={f} />
-            <label htmlFor={f} className='text-sm'>
-              {f}
-            </label>
-          </div>
-        ))}
-
-        <Separator className='my-4' />
-
-        {/* Только с фото */}
-        <div className='flex items-center space-x-2'>
-          <Checkbox id='photo' checked={filters.photoOnly} onCheckedChange={(v) => setPhotoOnly(!!v)} />
-          <label htmlFor='photo' className='text-sm'>
-            Только с фото
-          </label>
+    <aside
+      className={cn(
+        'w-full rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm',
+        isMobile && 'border-none bg-transparent p-0 shadow-none'
+      )}
+    >
+      <div className={cn('space-y-6', isMobile && 'px-1 pb-2')}> 
+        <div className='space-y-1'>
+          <p className='text-xs font-semibold uppercase tracking-wide text-slate-400'>Фильтрация</p>
+          <h3 className='text-lg font-semibold text-slate-900'>Уточните результаты поиска</h3>
+          <p className='text-sm text-slate-500'>Выберите популярные бренды или показывайте только товары с фотографиями.</p>
         </div>
-     
+
+        <section className='space-y-4'>
+          <div className='rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4'>
+            <div className='flex items-center justify-between gap-2'>
+              <div>
+                <p className='text-sm font-medium text-slate-800'>Производитель</p>
+                <p className='text-xs text-slate-500'>Отметьте бренды, которые хотите видеть в списке</p>
+              </div>
+              <Building2 className='h-5 w-5 text-slate-400' />
+            </div>
+            <div className='mt-4 space-y-3'>
+              <div className='relative'>
+                <SearchIcon className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400' />
+                <Input
+                  placeholder='Поиск бренда'
+                  value={brandQuery}
+                  onChange={(event) => setBrandQuery(event.target.value)}
+                  className='h-11 rounded-xl border-slate-200 bg-white pl-9 text-sm shadow-sm focus-visible:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/40'
+                />
+              </div>
+              <ScrollArea className='max-h-56 pr-1'>
+                <div className='grid gap-2 sm:grid-cols-2'>
+                  {hasBrands ? (
+                    visibleBrands.map((brand) => {
+                      const selected = filters.brands.includes(brand)
+                      return (
+                        <button
+                          key={brand}
+                          type='button'
+                          onClick={() => handleBrandToggle(brand)}
+                          className={cn(
+                            'flex items-center justify-between rounded-xl border px-3 py-2 text-sm transition-colors',
+                            selected
+                              ? 'border-orange-500 bg-orange-50 text-orange-600'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                          )}
+                        >
+                          <span className='truncate'>{brand}</span>
+                          {selected && <Check className='h-4 w-4' />}
+                        </button>
+                      )
+                    })
+                  ) : (
+                    <p className='rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-500'>
+                      Бренды не найдены по запросу
+                    </p>
+                  )}
+                </div>
+              </ScrollArea>
+            </div>
+          </div>
+
+          <div className='flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4'>
+            <div>
+              <p className='text-sm font-medium text-slate-800'>Только товары с фото</p>
+              <p className='text-xs text-slate-500'>Скрывать позиции без изображений</p>
+            </div>
+            <div className='flex items-center gap-2'>
+              <ImageIcon className='h-4 w-4 text-slate-400' />
+              <Switch
+                checked={filters.photoOnly}
+                onCheckedChange={(value) => setPhotoOnly(!!value)}
+              />
+            </div>
+          </div>
+        </section>
+
+        {showApplyButton && (
+          <div className='flex flex-col gap-2 pt-2'>
+            {onReset && (
+              <Button
+                type='button'
+                variant='outline'
+                className='w-full justify-center border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                onClick={handleReset}
+              >
+                Сбросить фильтры
+              </Button>
+            )}
+            <Button
+              type='button'
+              className='w-full bg-orange-500 text-white hover:bg-orange-600'
+              onClick={() => onApply?.()}
+            >
+              Показать результаты
+            </Button>
+          </div>
+        )}
+      </div>
     </aside>
   )
 }

@@ -19,8 +19,9 @@ const items = [
 
 function Cart() {
   const router = useRouter()
-  const { items } = useCartStore()
-  const total = useMemo(() => items.reduce((s, it) => s + (it.price || 0) * it.quantity, 0), [items])
+  const { items: cartItems } = useCartStore()
+  const total = useMemo(() => cartItems.reduce((s, it) => s + (it.price || 0) * it.quantity, 0), [cartItems])
+  const hasItems = cartItems.length > 0
 
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'check'|'insufficient'|'confirm'>('check')
@@ -28,6 +29,11 @@ function Cart() {
   const [loading, setLoading] = useState(false)
 
   const handleCheckout = async () => {
+    if (!hasItems) {
+      toast.error('Добавьте товары в корзину для оформления заказа')
+      return
+    }
+    
     setOpen(true)
     setMode('check')
     try {
@@ -72,9 +78,11 @@ function Cart() {
             
             <CartTable />
             <div className="mt-4 flex justify-end pr-4">
-              <div onClick={handleCheckout}>
-                <GetStartedButton label="оформить заказ" />
-              </div>
+              <GetStartedButton 
+                label="оформить заказ" 
+                onClick={handleCheckout}
+                disabled={!hasItems}
+              />
             </div>
         </section>
 

@@ -4,7 +4,7 @@ const AboutUsComponent = () => {
   return (
     <About3
       title="О Компании"
-      description="ALATRADE занимается продажей легковых запчастей оптом. Наш опыт и современные технологии позволяют предложить клиентам только лучшую продукцию и сервис."
+      description="Euroline занимается продажей легковых запчастей оптом. Наш опыт и современные технологии позволяют предложить клиентам только лучшую продукцию и сервис."
       mainImage={{
         src: "https://shadcnblocks.com/images/block/placeholder-1.svg",
         alt: "placeholder",
@@ -16,7 +16,7 @@ const AboutUsComponent = () => {
       breakout={{
         src: "https://shadcnblocks.com/images/block/block-1.svg",
         alt: "logo",
-        title: "Alatrade",
+        title: "Euroline",
         description:
           "Мы предлагаем полный ассортимент запасных частей для легковых и грузовых автомобилей европейских, американских, японских, корейских и российских марок.",
         buttonText: "Узнать больше",

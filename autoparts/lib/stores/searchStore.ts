@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 
 interface SearchState {
   query: string;
-  detectedType: 'VIN' | 'FRAME' | 'OEM' | 'TEXT' | null;
+  detectedType: 'VIN' | 'FRAME' | 'OEM' | 'TEXT' | 'PLATE' | null;
   vehicle: SearchVehicle | null;
   results: SearchItem[];
   isLoading: boolean;
@@ -53,6 +53,12 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
       return null;
     }
 
+    // Minimum 3 characters for search
+    if (query.trim().length < 3) {
+      toast.error('Введите не менее 3 символов для поиска');
+      return null;
+    }
+
     set({ 
       isLoading: true, 
       error: null, 
@@ -76,7 +82,7 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
       const cleanedBrands = currentFilters.brands.filter(b => presentBrands.has(b))
 
       set({
-        detectedType: response.detectedType,
+        detectedType: response.detectedType || null,
         vehicle: response.vehicle || null,
         results: newResults,
         isLoading: false,
@@ -89,6 +95,8 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
         toast.success(`Найден автомобиль: ${response.vehicle.brand} ${response.vehicle.name}`);
       } else if (response.detectedType === 'FRAME' && response.vehicle) {
         toast.success(`Найден автомобиль по номеру кузова: ${response.vehicle.brand} ${response.vehicle.name}`);
+      } else if (response.detectedType === 'PLATE' && response.vehicle) {
+        toast.success(`Найден автомобиль по номеру гос. знака: ${response.vehicle.brand} ${response.vehicle.name}`);
       } else if (response.results && response.results.length > 0) {
         toast.success(`Найдено ${response.results.length} запчастей`);
       } else {

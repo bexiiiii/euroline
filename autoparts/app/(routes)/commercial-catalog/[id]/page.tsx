@@ -274,8 +274,13 @@ function VehicleSelection() {
                 onClick={() => handleCarSelect(car)}
                 className="border rounded-lg bg-white p-6 flex flex-col items-center text-center hover:border-orange-500 transition cursor-pointer"
               >
-                <div className="w-16 h-16 bg-gray-100 flex items-center justify-center rounded mb-4">
-                  🚗
+                <div className="w-16 h-16 bg-gray-100 flex items-center justify-center rounded mb-4 overflow-hidden">
+                  <img
+                    src="/images/track_placeholder.png"
+                    alt="Изображение недоступно"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
                 </div>
                 <p className="text-lg font-bold">{car.name}</p>
                 <p className="text-gray-500">{car.years}</p>

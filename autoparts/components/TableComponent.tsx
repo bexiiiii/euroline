@@ -96,7 +96,7 @@ export const convertSearchItemToAutoPart = (item: SearchItem, index: number): Au
   if (img) img = laxSetSize(img, '200');
   if (!img) img = partImageUrl(item.oem);
   return {
-    id: `search-${index}`,
+    id: item.oem?.trim() || `search-${index}`,
     brand: item.brand || 'N/A',
     article: item.oem,
     name: item.name,
@@ -381,10 +381,10 @@ interface AutoPartLineProps {
 }
 
 function AutoPartLine({ part, onImageClick }: AutoPartLineProps) {
-   const [selectedQuantity, setSelectedQuantity] = useState(1);
-   const { add, addByOem } = useCartStore();
+  const [selectedQuantity, setSelectedQuantity] = useState(1);
+  const { add, addByOem } = useCartStore();
 
-   const handleAddToCart = async () => {
+  const handleAddToCart = async () => {
       // Если id — это числовой productId, используем обычный add
       const numericId = Number(part.id);
       const isNumericId = !Number.isNaN(numericId) && Number.isFinite(numericId);
@@ -405,6 +405,12 @@ function AutoPartLine({ part, onImageClick }: AutoPartLineProps) {
       if (availability >= 80) return 'text-yellow-600';
       return 'text-red-600';
    };
+
+  const numericId = Number(part.id);
+  const isNumericId = Number.isFinite(numericId);
+  const href = isNumericId
+    ? `/parts/${numericId}`
+    : `/parts/${encodeURIComponent(part.article || part.id)}`;
 
    return (
       <div className="w-full flex items-center py-3 px-6 border-b hover:bg-sidebar/50 border-muted-foreground/5 text-sm last:border-b-0">
@@ -442,11 +448,22 @@ function AutoPartLine({ part, onImageClick }: AutoPartLineProps) {
          
          <div className="w-32 shrink-0 font-mono text-xs text-blue-600">{part.article}</div>
          <div className="flex-grow px-2 overflow-hidden">
-   <span className="truncate block">{part.name}</span>
-   <Link href={`/parts/${part.id}`}>
-      <Info className=" text-blue-600" />
-   </Link>
-</div>
+            <span className="truncate block">{part.name}</span>
+            {isNumericId || part.article ? (
+              <Link href={href} prefetch={false}>
+                <Info className="mt-1 h-4 w-4 text-blue-600" />
+              </Link>
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="mt-1 inline-flex h-4 w-4 cursor-not-allowed items-center justify-center text-slate-300">
+                    <Info className="h-4 w-4" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Подробная карточка недоступна</TooltipContent>
+              </Tooltip>
+            )}
+         </div>
          <div className="w-20 shrink-0 text-center">
             <span
                className={`font-medium ${

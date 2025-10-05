@@ -68,9 +68,9 @@ export function FileUploader({ onFileSelected }: FileUploaderProps) {
   return (
     <div className="w-full max-w-md space-y-6 rounded-xl border border-border bg-card p-6 shadow-sm">
       <div className="space-y-2">
-        <h3 className="text-lg font-medium">Image Upload</h3>
+        <h3 className="text-lg font-medium">Чек оплаты</h3>
         <p className="text-sm text-muted-foreground">
-          Supported formats: JPG, PNG, GIF
+          Поддерживаемые форматы: JPG, PNG, PDF (макс. 10 МБ)
         </p>
       </div>
 
@@ -103,7 +103,7 @@ export function FileUploader({ onFileSelected }: FileUploaderProps) {
             <ImagePlus className="h-6 w-6 text-muted-foreground" />
           </div>
           <div className="text-center">
-            <p className="text-sm font-medium">Click to select</p>
+            <p className="text-sm font-medium">Нажмите что бы загрузить </p>
             <p className="text-xs text-muted-foreground">
               or drag and drop file here
             </p>

@@ -219,7 +219,7 @@ const PreviewBannerModal: React.FC<PreviewBannerModalProps> = ({
         {/* Footer */}
         <div className="mockup-footer bg-gray-100 dark:bg-gray-800 p-4 border-t border-gray-200 dark:border-gray-700">
           <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-            © 2024 AutoParts Store. Все права защищены.
+            © 2025 Euroline. Все права защищены.
           </div>
           
           {/* Footer Banner */}

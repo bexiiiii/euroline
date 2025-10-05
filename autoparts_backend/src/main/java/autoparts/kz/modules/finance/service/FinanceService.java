@@ -41,6 +41,7 @@ public class FinanceService {
     private final RefundRequestRepository refunds;
     private final NotificationService notifications;
     private final UserRepository users;
+    private final autoparts.kz.modules.telegram.service.TelegramNotificationService telegramNotificationService;
 
     // Top-ups
     public Page<FinanceDtos.TopUpResponse> listTopUps(String status, Pageable p){
@@ -63,6 +64,14 @@ public class FinanceService {
             t.setAdminComment(r.adminComment());
         }
         topups.save(t);
+        
+        // Отправить уведомление в Telegram о новом пополнении
+        try {
+            telegramNotificationService.notifyBalanceTopUp(t);
+        } catch (Exception ex) {
+            // Логируем, но не прерываем процесс
+        }
+        
         return toTopUpResponse(t);
     }
     public FinanceDtos.TopUpResponse getTopUp(Long id){
@@ -166,6 +175,13 @@ public class FinanceService {
         topups.save(t);
 
         if (statusChanged) {
+            // Отправить уведомление в Telegram об изменении статуса
+            try {
+                telegramNotificationService.notifyBalanceTopUp(t);
+            } catch (Exception ex) {
+                // Логируем, но не прерываем процесс
+            }
+            
             if (t.getStatus()== TopUp.Status.APPROVED) {
                 String desc = "TopUp "+t.getId();
                 if (!txns.existsByClientIdAndTypeAndDescription(t.getClientId(), "TOPUP", desc)){

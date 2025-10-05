@@ -130,6 +130,20 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
     return statusBadge[topUp.status] ?? { color: "light" as const, label: topUp.status };
   }, [topUp?.status]);
 
+  const receiptUrlCandidates = useMemo(
+    () => buildReceiptUrlCandidates(topUp?.receiptUrl),
+    [topUp?.receiptUrl]
+  );
+
+  const receiptOriginalUrl = receiptUrlCandidates[0] ?? null;
+  const [resolvedReceiptUrl, setResolvedReceiptUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setResolvedReceiptUrl(null);
+  }, [topUp?.receiptUrl]);
+
+  const receiptLinkHref = resolvedReceiptUrl ?? receiptOriginalUrl;
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setServerError(null);
@@ -389,29 +403,26 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
                 {topUp.receiptUrl ? (
                   <div className="space-y-3">
                     <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-                      <img
-                        src={`${API_URL}${topUp.receiptUrl}`}
+                      <ReceiptPreview
+                        candidates={receiptUrlCandidates}
                         alt="Квитанция"
-                        className="w-full h-64 object-contain bg-gray-100 dark:bg-gray-800"
-                        onError={(e) => {
-                          console.error('Ошибка загрузки изображения:', `${API_URL}${topUp.receiptUrl}`);
-                          // Попробовать резервный вариант с URL кодированием
-                          const target = e.target as HTMLImageElement;
-                          if (!target.src.includes('encodeURIComponent')) {
-                            const encodedPath = encodeURIComponent(topUp.receiptUrl?.replace('/files/', '') || '');
-                            target.src = `${API_URL}/files/${encodedPath}`;
-                          }
-                        }}
+                        onResolved={setResolvedReceiptUrl}
                       />
                     </div>
-                    <a
-                      href={`${API_URL}${topUp.receiptUrl}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                    >
-                      Открыть оригинал
-                    </a>
+                    {receiptLinkHref ? (
+                      <a
+                        href={receiptLinkHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                      >
+                        Открыть оригинал
+                      </a>
+                    ) : (
+                      <span className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400">
+                        Ссылка на оригинал недоступна
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400">
@@ -451,5 +462,118 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
     </Modal>
   );
 };
+
+interface ReceiptPreviewProps {
+  candidates: string[];
+  alt?: string;
+}
+
+const receiptFallback = (
+  <div className="flex h-64 w-full items-center justify-center bg-gray-100 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+    Изображение недоступно
+  </div>
+);
+
+const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({ candidates, alt = "" }) => {
+  const [index, setIndex] = useState(0);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setIndex(0);
+    setFailed(false);
+  }, [candidates]);
+
+  const currentSrc = candidates[index];
+
+  if (!currentSrc || failed) {
+    return receiptFallback;
+  }
+
+  const handleError = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    const nextIndex = index + 1;
+    if (nextIndex < candidates.length) {
+      setIndex(nextIndex);
+    } else {
+      setFailed(true);
+      console.error("Ошибка загрузки изображения:", event.currentTarget.src);
+    }
+  };
+
+  // eslint-disable-next-line @next/next/no-img-element
+  return (
+    <img
+      src={currentSrc}
+      alt={alt}
+      className="h-64 w-full bg-gray-100 object-contain dark:bg-gray-800"
+      onError={handleError}
+    />
+  );
+};
+
+function buildReceiptUrlCandidates(rawUrl?: string | null): string[] {
+  if (!rawUrl) return [];
+
+  const variants = new Set<string>();
+  const absolute = toAbsoluteReceiptUrl(rawUrl);
+  variants.add(absolute);
+
+  try {
+    const url = new URL(absolute);
+    const search = url.search || "";
+    const segments = url.pathname.split("/").filter(Boolean);
+
+    if (segments.length === 0) {
+      return Array.from(variants);
+    }
+
+    const lastSegment = segments[segments.length - 1];
+    const basePath = segments.length > 1 ? `${url.origin}/${segments.slice(0, -1).join("/")}/` : `${url.origin}/`;
+
+    const addVariant = (filename: string) => {
+      if (!filename) return;
+      const normalized = encodeURI(`${basePath}${filename}${search}`);
+      variants.add(normalized);
+    };
+
+    addVariant(lastSegment);
+
+    const decoded = safeDecode(lastSegment);
+    addVariant(decoded);
+
+    const spaceReplaced = decoded.replace(/\s+/g, "_");
+    addVariant(spaceReplaced);
+
+    const sanitized = decoded.replace(/[^a-zA-Z0-9._-]/g, "_");
+    addVariant(sanitized);
+
+    const collapsed = sanitized.replace(/_+/g, "_");
+    addVariant(collapsed);
+
+    const encoded = encodeURIComponent(decoded);
+    addVariant(encoded);
+
+    return Array.from(variants);
+  } catch (error) {
+    console.error("Не удалось обработать URL квитанции", rawUrl, error);
+    return [absolute];
+  }
+}
+
+function toAbsoluteReceiptUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim();
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+  const relative = trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+  return `${API_URL}${relative}`;
+}
+
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
 
 export default TopUpBalanceModal;

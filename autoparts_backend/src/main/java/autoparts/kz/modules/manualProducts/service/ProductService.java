@@ -7,15 +7,17 @@ import autoparts.kz.modules.manualProducts.entity.Product;
 import autoparts.kz.modules.manualProducts.entity.ProductProperty;
 import autoparts.kz.modules.manualProducts.repository.ProductRepository;
 import autoparts.kz.modules.manualProducts.spec.ProductSpecs;
-import autoparts.kz.modules.stockOneC.service.OneCService;
-import autoparts.kz.modules.order.repository.OrderItemRepository;
 import autoparts.kz.modules.order.orderStatus.OrderStatus;
+import autoparts.kz.modules.order.repository.OrderItemRepository;
+import autoparts.kz.modules.stockOneC.service.OneCService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -51,6 +53,7 @@ public class ProductService {
     }
 
     public ProductResponse toResponsePublic(Product product) { return toResponse(product); }
+    
     private ProductResponse toResponse(Product product) {
         ProductResponse response = new ProductResponse();
         response.setId(product.getId());
@@ -86,9 +89,19 @@ public class ProductService {
     @Transactional(readOnly = true)
     public ProductResponse getById(Long id) {
         Product product = productRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
         ProductResponse response = toResponse(product);
         return oneCService.enrichWithOneCData(response).orElse(response);
+    }
+
+    @Transactional(readOnly = true)
+    public ProductResponse getByCode(String code) {
+        return productRepository.findFirstByCodeIgnoreCase(code)
+                .map(product -> {
+                    ProductResponse response = toResponse(product);
+                    return oneCService.enrichWithOneCData(response).orElse(response);
+                })
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
     }
 
     public ProductResponse update(Long id, ProductRequest request) {
@@ -128,6 +141,7 @@ public class ProductService {
 
     public Product save(Product p) { return productRepository.save(p); }
 
+    @Transactional(readOnly = true)
     public List<ProductResponse> search(String query) {
         List<Product> products = productRepository.searchByQuery(query);
         return products.stream()
@@ -136,6 +150,7 @@ public class ProductService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public Page<ProductResponse> list(ProductQuery q, Pageable pageable) {
         // Create a new Specification instance instead of using the deprecated where() method
         Specification<Product> spec = Specification.allOf(
@@ -153,12 +168,14 @@ public class ProductService {
                 .map(p -> oneCService.enrichWithOneCData(p).orElse(p));
     }
 
+    @Transactional(readOnly = true)
     public Page<ProductResponse> listWeekly(Pageable pageable) {
         return productRepository.findByIsWeeklyTrue(pageable)
                 .map(this::toResponse)
                 .map(p -> oneCService.enrichWithOneCData(p).orElse(p));
     }
 
+    @Transactional(readOnly = true)
     public Page<ProductResponse> listWeeklyFiltered(
             String q,
             java.util.Set<String> brands,
@@ -199,6 +216,7 @@ public class ProductService {
                 .map(p -> oneCService.enrichWithOneCData(p).orElse(p));
     }
 
+    @Transactional(readOnly = true)
     public Page<ProductResponse> listWeeklyAuto(
             java.util.Set<String> brands,
             Boolean inStock,
@@ -234,7 +252,7 @@ public class ProductService {
 
         java.util.List<Product> products = new java.util.ArrayList<>();
         if (!ids.isEmpty()) {
-            var found = productRepository.findAllById(ids);
+            var found = productRepository.findAllByIdWithProperties(ids);
             var prodMap = new java.util.HashMap<Long, Product>();
             for (var p : found) prodMap.put(p.getId(), p);
             // rebuild list in ranking order without sorting immutables
@@ -252,6 +270,7 @@ public class ProductService {
         return new org.springframework.data.domain.PageImpl<>(responses, unsorted, total);
     }
 
+    @Transactional(readOnly = true)
     public Page<ProductResponse> listWeeklyHybrid(
             String q,
             java.util.Set<String> brands,

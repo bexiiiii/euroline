@@ -11,7 +11,9 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.LocalDateTime;
 import java.util.Objects;
 
 @AllArgsConstructor
@@ -57,6 +59,10 @@ public class User {
 
     @Column(nullable = false)
     private boolean banned = false;
+
+    @CreationTimestamp
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
 
     @Override
     public String toString() {

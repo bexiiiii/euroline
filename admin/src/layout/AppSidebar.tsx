@@ -81,6 +81,11 @@ const navItems: NavItem[] = [
   },
   {
     icon: <PlugInIcon />,
+    name: "Новости",
+    path: "/news",
+  },
+  {
+    icon: <PlugInIcon />,
     name: "Управление пользователями ",
     path: "/users",
   },

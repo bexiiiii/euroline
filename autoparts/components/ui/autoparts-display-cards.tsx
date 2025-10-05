@@ -42,7 +42,7 @@ function AutoPartsDisplayCards() {
       <div className="w-full max-w-6xl px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-800 mb-4">
-            ALATRADE - надежный партнер для вашего бизнеса
+            Euroline - надежный партнер для вашего бизнеса
           </h2>
           <p className="text-gray-600 max-w-3xl mx-auto mb-8">
             Мы работаем с различными типами клиентов, предоставляя индивидуальные решения для каждого сегмента рынка

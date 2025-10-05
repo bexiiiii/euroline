@@ -23,5 +23,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     // Подборка товаров недели
     org.springframework.data.domain.Page<Product> findByIsWeeklyTrue(org.springframework.data.domain.Pageable pageable);
 
+    // Поиск продуктов по ID с загрузкой связанных свойств
+    @Query("SELECT DISTINCT p FROM Product p LEFT JOIN FETCH p.properties WHERE p.id IN :ids")
+    List<Product> findAllByIdWithProperties(@Param("ids") List<Long> ids);
+
     java.util.Optional<Product> findFirstByCodeIgnoreCase(String code);
 }

@@ -1,62 +1,40 @@
 import { apiFetch } from '../api';
 
-export interface SiteSetting {
-  id: number;
+export interface AppSetting {
   key: string;
-  value: string;
-  description: string;
-  type: 'TEXT' | 'NUMBER' | 'BOOLEAN' | 'JSON';
-  category: string;
+  value: string | null;
+  updatedAt?: string;
 }
 
-export interface SiteSettingFilters {
-  category?: string;
+export interface BulkSettingUpdatePayload {
+  key: string;
+  value: string | null;
 }
 
-export const siteSettingsApi = {
-  /**
-   * Get all site settings
-   */
-  getSettings: async (filters: SiteSettingFilters = {}): Promise<SiteSetting[]> => {
-    const queryParams = new URLSearchParams();
-    
-    if (filters.category) queryParams.append('category', filters.category);
-    
-    const query = queryParams.toString() ? `?${queryParams.toString()}` : '';
-    return apiFetch<SiteSetting[]>(`/api/admin/settings${query}`);
+export const settingsApi = {
+  async list(): Promise<AppSetting[]> {
+    return apiFetch<AppSetting[]>('/api/admin/settings');
   },
 
-  /**
-   * Get a specific setting by key
-   */
-  getSettingByKey: async (key: string): Promise<SiteSetting> => {
-    return apiFetch<SiteSetting>(`/api/admin/settings/${key}`);
-  },
-
-  /**
-   * Update a site setting
-   */
-  updateSetting: async (key: string, value: string): Promise<SiteSetting> => {
-    return apiFetch<SiteSetting>(`/api/admin/settings/${key}`, {
+  async update(key: string, value: string | null): Promise<AppSetting> {
+    return apiFetch<AppSetting>(`/api/admin/settings/${encodeURIComponent(key)}`, {
       method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value }),
     });
   },
 
-  /**
-   * Update multiple settings at once
-   */
-  updateBulkSettings: async (settings: { key: string, value: string }[]): Promise<SiteSetting[]> => {
-    return apiFetch<SiteSetting[]>('/api/admin/settings/bulk', {
+  async updateBulk(payload: BulkSettingUpdatePayload[]): Promise<AppSetting[]> {
+    return apiFetch<AppSetting[]>('/api/admin/settings/bulk', {
       method: 'PUT',
-      body: JSON.stringify({ settings }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
   },
 
-  /**
-   * Get setting categories
-   */
-  getCategories: async (): Promise<string[]> => {
-    return apiFetch<string[]>('/api/admin/settings/categories');
+  async reset(): Promise<void> {
+    await apiFetch('/api/admin/settings/init', {
+      method: 'POST',
+    });
   },
 };

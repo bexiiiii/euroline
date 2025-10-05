@@ -36,8 +36,20 @@ public final class ProductSpecs {
     public static Specification<Product> categories(Collection<Long> categoryIds) {
         return (root, query, cb) -> {
             if (categoryIds == null || categoryIds.isEmpty()) return cb.conjunction();
-            // product.category.id IN (:categoryIds)
-            return root.get("category").get("id").in(categoryIds);
+            
+            // Check direct category relationship
+            var directCategory = root.get("category").get("id").in(categoryIds);
+            
+            // Also check for category information stored in properties
+            // Join with properties and check if any property has subcategoryId matching our categoryIds
+            var propertiesJoin = root.join("properties", jakarta.persistence.criteria.JoinType.LEFT);
+            var propertyCategory = cb.and(
+                propertiesJoin.get("propertyName").in("subcategoryId", "categoryId"),
+                propertiesJoin.get("propertyValue").in(categoryIds.stream().map(String::valueOf).toArray(String[]::new))
+            );
+            
+            // Return products that match either direct category or property-based category
+            return cb.or(directCategory, propertyCategory);
         };
     }
 

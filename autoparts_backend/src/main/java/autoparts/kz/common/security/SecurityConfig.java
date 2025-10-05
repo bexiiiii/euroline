@@ -69,8 +69,18 @@ public class SecurityConfig {
                         // --- публичные эндпоинты CAT (read-only) ---
                         .requestMatchers(HttpMethod.GET, "/api/v1/cat/catalogs/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/cat/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/search/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/search/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/products/weekly").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/products/by-category/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/banners/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/search").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/external/categories").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/admin/categories/tree").permitAll()
+                        // News endpoints
+                        .requestMatchers(HttpMethod.GET, "/api/news/published").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/news/{id}").permitAll()
                         // New unified wizard endpoints with body-only SSD
                         .requestMatchers(HttpMethod.POST, "/api/v1/wizard/start").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/wizard/next").permitAll()
@@ -102,6 +112,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/finance/my/balance").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/api/finance/my/transactions").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/api/admin/categories").hasRole("ADMIN")
+                        // News admin endpoints - require ADMIN role
+                        .requestMatchers(HttpMethod.GET, "/api/news").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/news").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/news/{id}").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/news/{id}").hasRole("ADMIN")
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                         

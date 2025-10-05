@@ -4,19 +4,20 @@ import Breadcrumbs from "@/components/Breadcrumb";
 import WeeklyFiltersSidebar from "@/components/WeeklyFiltersSidebar";
 import ItemCardComponent, { Product as UIProduct } from "@/components/ItemCardComponent";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { API_BASE } from "@/lib/api/base";
 import { getWeeklyProducts, ProductResponse, WeeklyProductsFilters } from "@/lib/api/products";
 import { PaginatedResponse } from "@/lib/api/types";
-import { PackageSearch } from "lucide-react";
-
+import { PackageSearch, SlidersHorizontal } from "lucide-react";
+import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const items = [
   { label: "Главная", href: "/" },
   { label: "Товары недели", href: "/weekly-product" },
- 
-]
+];
 
-
-const PartnersPage = () => {
+const WeeklyProductsPage = () => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +25,6 @@ const PartnersPage = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [size, setSize] = useState(12);
 
-  // filters
   const [brandInput, setBrandInput] = useState<string>("");
   const [inStock, setInStock] = useState<boolean | undefined>(undefined);
   const [priceFrom, setPriceFrom] = useState<number | undefined>(undefined);
@@ -35,7 +35,7 @@ const PartnersPage = () => {
     inStock,
     priceFrom,
     priceTo,
-    sort: 'id,desc'
+    sort: 'id,desc',
   }), [brandInput, inStock, priceFrom, priceTo]);
 
   const load = useCallback(async (page = currentPage) => {
@@ -52,13 +52,29 @@ const PartnersPage = () => {
     }
   }, [currentPage, size, filters]);
 
+  const resetFilters = useCallback(() => {
+    setBrandInput('');
+    setInStock(undefined);
+    setPriceFrom(undefined);
+    setPriceTo(undefined);
+  }, []);
+
+  const activeFilters = useMemo(() => {
+    let count = 0;
+    if (brandInput.trim()) count += 1;
+    if (inStock) count += 1;
+    if (typeof priceFrom === 'number') count += 1;
+    if (typeof priceTo === 'number') count += 1;
+    return count;
+  }, [brandInput, inStock, priceFrom, priceTo]);
+
   useEffect(() => {
     load(0);
   }, [filters, size, load]);
 
   const uiProducts: UIProduct[] | undefined = useMemo(() => {
     if (!pageData) return undefined;
-    return pageData.content.map((p, idx) => ({
+    return pageData.content.map((p) => ({
       id: p.id,
       brand: p.brand || '-',
       article: p.code || String(p.id),
@@ -67,84 +83,96 @@ const PartnersPage = () => {
       availability: (p.stock ?? 0) > 0 ? 'На складе' : 'Ожидается',
       quantity: (p.stock ?? 0) > 50 ? '>50 шт.' : `${p.stock ?? 0} шт.`,
       price: p.price ?? 0,
-      image: p.imageUrl || 'https://cdn.shadcnstudio.com/ss-assets/components/card/image-10.png',
+      image: p.imageUrl
+        ? (p.imageUrl.startsWith('http') ? p.imageUrl : `${API_BASE}${p.imageUrl}`)
+        : undefined,
     }));
   }, [pageData]);
+
+  const handleResetAndReload = useCallback(() => {
+    resetFilters();
+    load(0);
+  }, [resetFilters, load]);
 
   return (
     <div className="bg-gray-100 min-h-screen pt-20 md:pt-24">
       <main className="container mx-auto px-4 md:px-6">
         <div className="pt-3 md:pt-5">
-            <Breadcrumbs items={items} />
+          <Breadcrumbs items={items} />
         </div>
-        <h1 className="text-2xl md:text-3xl font-bold pt-6 md:pt-8">Товар недели</h1>
+        <div className="flex flex-col gap-3 pt-4 md:flex-row md:items-end md:justify-between">
+          <h1 className="text-2xl font-bold md:text-3xl">Товар недели</h1>
+          
+        </div>
 
-        <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 pt-6">
-            
-          {/* Фильтры - мобильная версия (floating overlay) */}
+        <div className="flex flex-col gap-4 pt-6 lg:flex-row lg:gap-6">
           <div className="lg:hidden">
-            {/* Иконка фильтров */}
-            <div className="flex justify-end mb-4">
-              <button
-                onClick={() => setFiltersOpen(!filtersOpen)}
-                className="flex items-center gap-2 bg-white rounded-lg px-4 py-2 shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors"
-              >
-                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                </svg>
-                <span className="text-sm font-medium text-gray-700">Фильтры</span>
-              </button>
-            </div>
-
-            {/* Overlay backdrop */}
-            {filtersOpen && (
-              <div className="fixed inset-0 bg-white z-50 w-screen h-screen">
-                {/* Header панели */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white w-full">
-                  <h3 className="text-lg font-semibold text-gray-900">Фильтры</h3>
-                  <button
-                    onClick={() => setFiltersOpen(false)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  >
-                    <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                {/* Content панели с прокруткой */}
-                <div className="flex flex-col h-full w-full">
-                  <div className="flex-1 overflow-y-auto p-4 pb-24 w-full">
-                    <WeeklyFiltersSidebar
-                      brand={brandInput}
-                      setBrand={setBrandInput}
-                      inStock={inStock}
-                      setInStock={setInStock}
-                      priceFrom={priceFrom}
-                      setPriceFrom={setPriceFrom}
-                      priceTo={priceTo}
-                      setPriceTo={setPriceTo}
-                      onApply={() => { setFiltersOpen(false); load(0); }}
-                      showApplyButton={false}
-                    />
-                  </div>
-
-                  {/* Кнопка применить внизу */}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 w-full">
-                    <button
-                      onClick={() => { setFiltersOpen(false); load(0); }}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors"
-                    >
-                      Применить фильтры
-                    </button>
-                  </div>
-                </div>
+            <Drawer open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <div className="mb-4 flex justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 rounded-full border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
+                  onClick={() => setFiltersOpen(true)}
+                >
+                  <SlidersHorizontal className="h-4 w-4" />
+                  Фильтры
+                  {activeFilters > 0 && (
+                    <Badge className="ml-1 rounded-full bg-orange-500 px-2 py-0 text-xs text-white">
+                      {activeFilters}
+                    </Badge>
+                  )}
+                </Button>
               </div>
-            )}
+
+              <DrawerContent>
+                <DrawerHeader className="bg-white">
+                  <DrawerTitle className="text-base font-semibold text-slate-900">Фильтры для «Товар недели»</DrawerTitle>
+                  <p className="text-sm text-slate-500">Настройте параметры, чтобы подобрать предложения под ваш запрос.</p>
+                </DrawerHeader>
+                <DrawerBody className="pb-10">
+                  <WeeklyFiltersSidebar
+                    brand={brandInput}
+                    setBrand={setBrandInput}
+                    inStock={inStock}
+                    setInStock={setInStock}
+                    priceFrom={priceFrom}
+                    setPriceFrom={setPriceFrom}
+                    priceTo={priceTo}
+                    setPriceTo={setPriceTo}
+                    onApply={() => load(0)}
+                    onReset={resetFilters}
+                    showApplyButton={false}
+                    isMobile
+                  />
+                </DrawerBody>
+                <DrawerFooter className="bg-white">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-slate-200 text-slate-600 hover:text-slate-900"
+                      onClick={handleResetAndReload}
+                    >
+                      Сбросить
+                    </Button>
+                    <DrawerClose asChild>
+                      <Button
+                        type="button"
+                        className="w-full bg-orange-500 text-white hover:bg-orange-600"
+                        onClick={() => load(0)}
+                      >
+                        Показать
+                      </Button>
+                    </DrawerClose>
+                  </div>
+                </DrawerFooter>
+              </DrawerContent>
+            </Drawer>
           </div>
-            
-          {/* Левая колонка — фильтры (desktop) */}
-          <aside className="hidden lg:block w-80 shrink-0">
+
+          <aside className="hidden w-80 shrink-0 lg:block">
             <div className="sticky top-28 pt-2">
               <WeeklyFiltersSidebar
                 brand={brandInput}
@@ -156,48 +184,55 @@ const PartnersPage = () => {
                 priceTo={priceTo}
                 setPriceTo={setPriceTo}
                 onApply={() => load(0)}
+                onReset={handleResetAndReload}
               />
             </div>
           </aside>
-          
-          {/* Правая колонка — карточки */}
-          <section className="flex-1 min-w-0">
-            {/* Адаптивная сетка карточек */}
+
+          <section className="min-w-0 flex-1">
             <div className="space-y-4 md:space-y-0">
               {error && (
-                <div className="p-4 bg-red-50 text-red-700 rounded">{error}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">{error}</div>
               )}
-              {/* Пустое состояние */}
               {!loading && pageData && pageData.numberOfElements === 0 && !error && (
-                <div className="flex flex-col items-center justify-center py-16 bg-white rounded-lg border border-gray-200">
-                  <PackageSearch className="w-12 h-12 text-gray-400" />
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-gray-200 bg-white py-16 text-center">
+                  <PackageSearch className="h-12 w-12 text-gray-400" />
                   <h3 className="mt-4 text-lg font-semibold text-gray-800">Нет товаров</h3>
-                  <p className="mt-1 text-sm text-gray-500">Попробуйте изменить фильтры или очистить их.</p>
+                  <p className="mt-1 max-w-xs text-sm text-gray-500">Измените параметры фильтра или сбросьте их, чтобы увидеть другие предложения.</p>
                 </div>
               )}
-              {/* Грид товаров */}
               {pageData && pageData.numberOfElements > 0 && (
                 <ItemCardComponent products={uiProducts} />
               )}
               {loading && (
-                <div className="text-center py-6 text-gray-500">Загрузка...</div>
+                <div className="py-6 text-center text-gray-500">Загрузка...</div>
               )}
             </div>
-            
-            {/* Простая пагинация */}
+
             {pageData && pageData.totalPages > 1 && (
-              <div className="flex justify-center items-center gap-3 mt-6 md:mt-8">
-                <button disabled={currentPage<=0} onClick={()=>load(currentPage-1)} className="px-3 py-2 border rounded disabled:opacity-50">Назад</button>
-                <span className="text-sm">Стр. {currentPage+1} / {pageData.totalPages}</span>
-                <button disabled={currentPage>=pageData.totalPages-1} onClick={()=>load(currentPage+1)} className="px-3 py-2 border rounded disabled:opacity-50">Вперед</button>
+              <div className="mt-6 flex items-center justify-center gap-3 md:mt-8">
+                <button
+                  disabled={currentPage <= 0}
+                  onClick={() => load(currentPage - 1)}
+                  className="rounded border px-3 py-2 text-sm font-medium transition hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Назад
+                </button>
+                <span className="text-sm text-gray-500">Стр. {currentPage + 1} / {pageData.totalPages}</span>
+                <button
+                  disabled={currentPage >= pageData.totalPages - 1}
+                  onClick={() => load(currentPage + 1)}
+                  className="rounded border px-3 py-2 text-sm font-medium transition hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Вперед
+                </button>
               </div>
             )}
           </section>
-
         </div>
       </main>
     </div>
   );
 };
 
-export default PartnersPage;
+export default WeeklyProductsPage;

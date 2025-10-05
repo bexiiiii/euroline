@@ -34,6 +34,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'img.laximo.ru',
       },
+      {
+        protocol: 'https',
+        hostname: 'alatrade.kz',
+      },
     ],
   },
 }

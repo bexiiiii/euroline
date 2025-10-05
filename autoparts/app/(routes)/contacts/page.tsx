@@ -13,7 +13,7 @@ export function NewsComponent() {
                     <div>
                         <h2 className="text-2xl text-white font-bold mb-4">Главный офис</h2>
                         <div className="space-y-2 text-orange-500 text-base">
-                            <div className="font-semibold">ALATRADE</div>
+                            <div className="font-semibold">Euroline</div>
                             <div>г. Алматы, пр. Суюнбая 2, к. 4</div>
                         </div>
                     </div>
@@ -21,8 +21,8 @@ export function NewsComponent() {
                         <a href="tel:+77273307552" className="text-orange-500 hover:underline font-semibold">
                             +7 727 330 75 52
                         </a>
-                        <a href="mailto:cc@alatrade.com.kz" className="text-orange-500 hover:underline font-semibold">
-                            cc@alatrade.com.kz
+                        <a href="mailto:cc@euroline.com.kz" className="text-orange-500 hover:underline font-semibold">
+                            cc@euroline.com.kz
                         </a>
                     </div>
                 </div>

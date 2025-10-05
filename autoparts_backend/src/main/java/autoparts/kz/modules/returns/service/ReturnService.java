@@ -20,6 +20,7 @@ import java.util.Map;
 public class ReturnService {
     private final ReturnRequestRepository repo;
     private final FinanceService finance;
+    private final autoparts.kz.modules.telegram.service.TelegramNotificationService telegramNotificationService;
 
     public Page<ReturnDtos.Response> list(String status, Pageable p) {
         Specification<ReturnRequest> spec = (status==null)?null:
@@ -30,12 +31,29 @@ public class ReturnService {
         ReturnRequest e = ReturnRequest.builder()
                 .orderId(r.orderId()).customerId(r.customerId()).reason(r.reason())
                 .status(ReturnStatus.NEW).build();
-        repo.save(e); return map(e);
+        repo.save(e);
+        
+        // Отправить уведомление в Telegram
+        try {
+            telegramNotificationService.notifyReturnRequest(e);
+        } catch (Exception ex) {
+            // Логируем, но не прерываем процесс
+        }
+        
+        return map(e);
     }
     public ReturnDtos.Response get(Long id){ return map(find(id)); }
     public ReturnDtos.Response patch(Long id, ReturnDtos.PatchStatus r){
         var e = find(id);
         e.setStatus(ReturnStatus.valueOf(r.status()));
+        
+        // Отправить уведомление в Telegram при изменении статуса
+        try {
+            telegramNotificationService.notifyReturnRequest(e);
+        } catch (Exception ex) {
+            // Логируем, но не прерываем процесс
+        }
+        
         // On approval – credit amount back to balance (idempotent)
         if ((e.getStatus()==ReturnStatus.APPROVED || e.getStatus()==ReturnStatus.REFUNDED || e.getStatus()==ReturnStatus.PROCESSED)
                 && e.getAmount()!=null && e.getAmount().signum()>0){

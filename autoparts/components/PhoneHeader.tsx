@@ -12,7 +12,7 @@ const lucideDemoMenuItems: InteractiveMenuItem[] = [
   { label: 'Новости', icon: User, href: '/news' },
 ];
 
-const customAccentColor = 'var(--chart-2)';
+const customAccentColor = '#FF5733'; // Example custom color
 
 const Default = () => {
   return <InteractiveMenu />;

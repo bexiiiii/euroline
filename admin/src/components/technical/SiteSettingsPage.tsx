@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import ComponentCard from "../common/ComponentCard";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
@@ -8,6 +8,8 @@ import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Select from "../form/Select";
 import { logPageView } from "@/lib/eventLogger";
+import { settingsApi } from "@/lib/api/settings";
+import { useToast } from "@/context/ToastContext";
 
 interface SiteSettings {
   general: {
@@ -64,11 +66,15 @@ interface SiteSettings {
 }
 
 const SiteSettingsPage = () => {
+  const { success: showSuccess, error: showError } = useToast();
+
   const [activeTab, setActiveTab] = useState("general");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
 
   const [settings, setSettings] = useState<SiteSettings>({
     general: {
@@ -124,36 +130,28 @@ const SiteSettingsPage = () => {
     }
   });
 
-  // Load settings from API
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch('http://localhost:8080/api/admin/settings', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (response.ok) {
-          const settingsArray = await response.json();
-          // Transform settings array to our format
-          const transformedSettings = transformSettingsData(settingsArray);
-          setSettings(transformedSettings);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load settings');
-        console.error('Failed to fetch settings:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchSettings = useCallback(async () => {
+    try {
+      setLoading(true);
+      const settingsArray = await settingsApi.list();
+      const transformedSettings = transformSettingsData(settingsArray);
+      setSettings(transformedSettings);
+      setHasUnsavedChanges(false);
+      setError(null);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Не удалось загрузить настройки';
+      setError(message);
+      console.error('Failed to fetch settings:', err);
+      showError('Не удалось загрузить настройки');
+    } finally {
+      setLoading(false);
+    }
+  }, [showError]);
 
+  useEffect(() => {
     fetchSettings();
-    // Log page view
     logPageView('Настройки сайта', '/site-settings');
-  }, []);
+  }, [fetchSettings]);
 
   // Transform settings array from backend to our structure
   const transformSettingsData = (settingsArray: any[]): SiteSettings => {
@@ -161,7 +159,7 @@ const SiteSettingsPage = () => {
     
     return {
       general: {
-        siteName: settingsMap.get('site.name') || 'AutoParts',
+        siteName: settingsMap.get('site.name') || 'Euroline',
         siteDescription: settingsMap.get('site.description') || '',
         siteUrl: settingsMap.get('site.url') || '',
         adminEmail: settingsMap.get('site.admin_email') || '',
@@ -254,7 +252,8 @@ const SiteSettingsPage = () => {
 
   const saveSettings = async () => {
     try {
-      // Convert settings object to key-value pairs for the backend
+      setSaving(true);
+
       const settingsToSave = [
         // General settings
         { key: 'site.name', value: settings.general.siteName },
@@ -308,28 +307,40 @@ const SiteSettingsPage = () => {
         { key: 'integrations.analytics_services', value: JSON.stringify(settings.integrations.analyticsServices) }
       ];
 
-      // Save each setting individually
-      for (const setting of settingsToSave) {
-        await fetch(`http://localhost:8080/api/admin/settings/${setting.key}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ value: setting.value })
-        });
-      }
-      
+      await settingsApi.updateBulk(settingsToSave.map(setting => ({
+        key: setting.key,
+        value: setting.value,
+      })));
+
       setHasUnsavedChanges(false);
-      alert('Настройки успешно сохранены!');
+      showSuccess('Настройки успешно сохранены');
+      await fetchSettings();
     } catch (error) {
       console.error('Failed to save settings:', error);
-      alert('Ошибка сохранения настроек');
+      showError('Ошибка сохранения настроек');
+    } finally {
+      setSaving(false);
     }
   };
 
   const resetSettings = () => {
     setIsModalOpen(true);
+  };
+
+  const confirmReset = async () => {
+    try {
+      setResetLoading(true);
+      await settingsApi.reset();
+      await fetchSettings();
+      setHasUnsavedChanges(false);
+      showSuccess('Настройки сброшены к значениям по умолчанию');
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error('Failed to reset settings:', err);
+      showError('Не удалось сбросить настройки');
+    } finally {
+      setResetLoading(false);
+    }
   };
 
   return (
@@ -345,7 +356,7 @@ const SiteSettingsPage = () => {
           <div className="text-red-500 dark:text-red-400">
             <p className="text-lg font-medium">Ошибка загрузки: {error}</p>
             <button 
-              onClick={() => window.location.reload()} 
+              onClick={() => fetchSettings()} 
               className="mt-2 text-sm underline hover:no-underline"
             >
               Обновить страницу
@@ -367,11 +378,19 @@ const SiteSettingsPage = () => {
               </span>
             </div>
             <div className="flex space-x-3">
-              <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  fetchSettings();
+                  setHasUnsavedChanges(false);
+                }}
+                disabled={saving}
+              >
                 Отменить
               </Button>
-              <Button size="sm" onClick={saveSettings}>
-                Сохранить
+              <Button size="sm" onClick={saveSettings} disabled={saving}>
+                {saving ? "Сохранение..." : "Сохранить"}
               </Button>
             </div>
           </div>
@@ -384,11 +403,11 @@ const SiteSettingsPage = () => {
         description="Конфигурация основных параметров и интеграций сайта"
         action={
           <div className="flex space-x-2">
-            <Button size="sm" variant="outline" onClick={resetSettings}>
+            <Button size="sm" variant="outline" onClick={resetSettings} disabled={saving || resetLoading}>
               Сбросить
             </Button>
-            <Button size="sm" onClick={saveSettings} disabled={!hasUnsavedChanges}>
-              Сохранить изменения
+            <Button size="sm" onClick={saveSettings} disabled={!hasUnsavedChanges || saving}>
+              {saving ? "Сохранение..." : "Сохранить изменения"}
             </Button>
           </div>
         }
@@ -426,7 +445,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Название сайта</Label>
                 <Input
-                  defaultValue={settings.general.siteName}
+                  value={settings.general.siteName}
                   onChange={(e) => updateSetting("general", "siteName", e.target.value)}
                   placeholder="Введите название сайта"
                 />
@@ -434,7 +453,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>URL сайта</Label>
                 <Input
-                  defaultValue={settings.general.siteUrl}
+                  value={settings.general.siteUrl}
                   onChange={(e) => updateSetting("general", "siteUrl", e.target.value)}
                   placeholder="https://example.com"
                 />
@@ -442,7 +461,7 @@ const SiteSettingsPage = () => {
               <div className="md:col-span-2">
                 <Label>Описание сайта</Label>
                 <textarea
-                  defaultValue={settings.general.siteDescription}
+                  value={settings.general.siteDescription}
                   onChange={(e) => updateSetting("general", "siteDescription", e.target.value)}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -453,7 +472,7 @@ const SiteSettingsPage = () => {
                 <Label>Email администратора</Label>
                 <Input
                   type="email"
-                  defaultValue={settings.general.adminEmail}
+                  value={settings.general.adminEmail}
                   onChange={(e) => updateSetting("general", "adminEmail", e.target.value)}
                   placeholder="admin@example.com"
                 />
@@ -462,7 +481,7 @@ const SiteSettingsPage = () => {
                 <Label>Часовой пояс</Label>
                 <Select
                   options={timezoneOptions}
-                  defaultValue={settings.general.timezone}
+                  value={settings.general.timezone}
                   onChange={(value) => updateSetting("general", "timezone", value)}
                   placeholder="Выберите часовой пояс"
                 />
@@ -471,7 +490,7 @@ const SiteSettingsPage = () => {
                 <Label>Язык по умолчанию</Label>
                 <Select
                   options={languageOptions}
-                  defaultValue={settings.general.language}
+                  value={settings.general.language}
                   onChange={(value) => updateSetting("general", "language", value)}
                   placeholder="Выберите язык"
                 />
@@ -480,7 +499,7 @@ const SiteSettingsPage = () => {
                 <Label>Валюта</Label>
                 <Select
                   options={currencyOptions}
-                  defaultValue={settings.general.currency}
+                  value={settings.general.currency}
                   onChange={(value) => updateSetting("general", "currency", value)}
                   placeholder="Выберите валюту"
                 />
@@ -493,7 +512,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Логотип сайта</Label>
                 <Input
-                  defaultValue={settings.appearance.logo}
+                  value={settings.appearance.logo}
                   onChange={(e) => updateSetting("appearance", "logo", e.target.value)}
                   placeholder="/images/logo.svg"
                 />
@@ -501,7 +520,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Фавикон</Label>
                 <Input
-                  defaultValue={settings.appearance.favicon}
+                  value={settings.appearance.favicon}
                   onChange={(e) => updateSetting("appearance", "favicon", e.target.value)}
                   placeholder="/images/favicon.ico"
                 />
@@ -511,12 +530,12 @@ const SiteSettingsPage = () => {
                 <div className="flex space-x-2">
                   <Input
                     type="color"
-                    defaultValue={settings.appearance.primaryColor}
+                    value={settings.appearance.primaryColor}
                     onChange={(e) => updateSetting("appearance", "primaryColor", e.target.value)}
                     className="w-16"
                   />
                   <Input
-                    defaultValue={settings.appearance.primaryColor}
+                    value={settings.appearance.primaryColor}
                     onChange={(e) => updateSetting("appearance", "primaryColor", e.target.value)}
                     placeholder="#3B82F6"
                     className="flex-1"
@@ -528,12 +547,12 @@ const SiteSettingsPage = () => {
                 <div className="flex space-x-2">
                   <Input
                     type="color"
-                    defaultValue={settings.appearance.secondaryColor}
+                    value={settings.appearance.secondaryColor}
                     onChange={(e) => updateSetting("appearance", "secondaryColor", e.target.value)}
                     className="w-16"
                   />
                   <Input
-                    defaultValue={settings.appearance.secondaryColor}
+                    value={settings.appearance.secondaryColor}
                     onChange={(e) => updateSetting("appearance", "secondaryColor", e.target.value)}
                     placeholder="#10B981"
                     className="flex-1"
@@ -544,7 +563,7 @@ const SiteSettingsPage = () => {
                 <Label>Тема оформления</Label>
                 <Select
                   options={themeOptions}
-                  defaultValue={settings.appearance.theme}
+                  value={settings.appearance.theme}
                   onChange={(value) => updateSetting("appearance", "theme", value)}
                   placeholder="Выберите тему"
                 />
@@ -552,7 +571,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Шрифт</Label>
                 <Input
-                  defaultValue={settings.appearance.fontFamily}
+                  value={settings.appearance.fontFamily}
                   onChange={(e) => updateSetting("appearance", "fontFamily", e.target.value)}
                   placeholder="Inter, Arial, sans-serif"
                 />
@@ -565,7 +584,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Meta Title</Label>
                 <Input
-                  defaultValue={settings.seo.metaTitle}
+                  value={settings.seo.metaTitle}
                   onChange={(e) => updateSetting("seo", "metaTitle", e.target.value)}
                   placeholder="Заголовок для поисковых систем"
                 />
@@ -573,7 +592,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Meta Description</Label>
                 <textarea
-                  defaultValue={settings.seo.metaDescription}
+                  value={settings.seo.metaDescription}
                   onChange={(e) => updateSetting("seo", "metaDescription", e.target.value)}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -583,7 +602,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Ключевые слова</Label>
                 <Input
-                  defaultValue={settings.seo.metaKeywords}
+                  value={settings.seo.metaKeywords}
                   onChange={(e) => updateSetting("seo", "metaKeywords", e.target.value)}
                   placeholder="ключевое слово 1, ключевое слово 2"
                 />
@@ -592,7 +611,7 @@ const SiteSettingsPage = () => {
                 <div>
                   <Label>Google Analytics ID</Label>
                   <Input
-                    defaultValue={settings.seo.googleAnalytics}
+                    value={settings.seo.googleAnalytics}
                     onChange={(e) => updateSetting("seo", "googleAnalytics", e.target.value)}
                     placeholder="GA_MEASUREMENT_ID"
                   />
@@ -600,7 +619,7 @@ const SiteSettingsPage = () => {
                 <div>
                   <Label>Яндекс.Метрика ID</Label>
                   <Input
-                    defaultValue={settings.seo.yandexMetrica}
+                    value={settings.seo.yandexMetrica}
                     onChange={(e) => updateSetting("seo", "yandexMetrica", e.target.value)}
                     placeholder="12345678"
                   />
@@ -609,7 +628,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Robots.txt</Label>
                 <textarea
-                  defaultValue={settings.seo.robotsTxt}
+                  value={settings.seo.robotsTxt}
                   onChange={(e) => updateSetting("seo", "robotsTxt", e.target.value)}
                   rows={6}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm"
@@ -624,7 +643,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Название организации</Label>
                 <Input
-                  defaultValue={settings.business.companyName}
+                  value={settings.business.companyName}
                   onChange={(e) => updateSetting("business", "companyName", e.target.value)}
                   placeholder='ООО "Название компании"'
                 />
@@ -632,7 +651,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Телефон</Label>
                 <Input
-                  defaultValue={settings.business.companyPhone}
+                  value={settings.business.companyPhone}
                   onChange={(e) => updateSetting("business", "companyPhone", e.target.value)}
                   placeholder="+7 (495) 123-45-67"
                 />
@@ -640,7 +659,7 @@ const SiteSettingsPage = () => {
               <div className="md:col-span-2">
                 <Label>Адрес</Label>
                 <Input
-                  defaultValue={settings.business.companyAddress}
+                  value={settings.business.companyAddress}
                   onChange={(e) => updateSetting("business", "companyAddress", e.target.value)}
                   placeholder="г. Город, ул. Улица, д. Дом"
                 />
@@ -649,7 +668,7 @@ const SiteSettingsPage = () => {
                 <Label>Email</Label>
                 <Input
                   type="email"
-                  defaultValue={settings.business.companyEmail}
+                  value={settings.business.companyEmail}
                   onChange={(e) => updateSetting("business", "companyEmail", e.target.value)}
                   placeholder="info@company.ru"
                 />
@@ -657,7 +676,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Часы работы</Label>
                 <Input
-                  defaultValue={settings.business.workingHours}
+                  value={settings.business.workingHours}
                   onChange={(e) => updateSetting("business", "workingHours", e.target.value)}
                   placeholder="Пн-Пт: 9:00-18:00"
                 />
@@ -665,7 +684,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>ИНН</Label>
                 <Input
-                  defaultValue={settings.business.inn}
+                  value={settings.business.inn}
                   onChange={(e) => updateSetting("business", "inn", e.target.value)}
                   placeholder="1234567890"
                 />
@@ -673,7 +692,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>КПП</Label>
                 <Input
-                  defaultValue={settings.business.kpp}
+                  value={settings.business.kpp}
                   onChange={(e) => updateSetting("business", "kpp", e.target.value)}
                   placeholder="123456789"
                 />
@@ -681,7 +700,7 @@ const SiteSettingsPage = () => {
               <div className="md:col-span-2">
                 <Label>ОГРН</Label>
                 <Input
-                  defaultValue={settings.business.ogrn}
+                  value={settings.business.ogrn}
                   onChange={(e) => updateSetting("business", "ogrn", e.target.value)}
                   placeholder="1234567890123"
                 />
@@ -694,7 +713,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Facebook</Label>
                 <Input
-                  defaultValue={settings.social.facebook}
+                  value={settings.social.facebook}
                   onChange={(e) => updateSetting("social", "facebook", e.target.value)}
                   placeholder="https://facebook.com/username"
                 />
@@ -702,7 +721,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Instagram</Label>
                 <Input
-                  defaultValue={settings.social.instagram}
+                  value={settings.social.instagram}
                   onChange={(e) => updateSetting("social", "instagram", e.target.value)}
                   placeholder="https://instagram.com/username"
                 />
@@ -710,7 +729,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>ВКонтакте</Label>
                 <Input
-                  defaultValue={settings.social.vkontakte}
+                  value={settings.social.vkontakte}
                   onChange={(e) => updateSetting("social", "vkontakte", e.target.value)}
                   placeholder="https://vk.com/username"
                 />
@@ -718,7 +737,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>Telegram</Label>
                 <Input
-                  defaultValue={settings.social.telegram}
+                  value={settings.social.telegram}
                   onChange={(e) => updateSetting("social", "telegram", e.target.value)}
                   placeholder="https://t.me/username"
                 />
@@ -726,7 +745,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>WhatsApp</Label>
                 <Input
-                  defaultValue={settings.social.whatsapp}
+                  value={settings.social.whatsapp}
                   onChange={(e) => updateSetting("social", "whatsapp", e.target.value)}
                   placeholder="+7 (495) 123-45-67"
                 />
@@ -734,7 +753,7 @@ const SiteSettingsPage = () => {
               <div>
                 <Label>YouTube</Label>
                 <Input
-                  defaultValue={settings.social.youtube}
+                  value={settings.social.youtube}
                   onChange={(e) => updateSetting("social", "youtube", e.target.value)}
                   placeholder="https://youtube.com/c/username"
                 />
@@ -747,30 +766,30 @@ const SiteSettingsPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label>Провайдер email</Label>
-                  <Select
-                    options={[
-                      { value: "smtp", label: "SMTP" },
-                      { value: "sendgrid", label: "SendGrid" },
-                      { value: "mailgun", label: "Mailgun" }
-                    ]}
-                    defaultValue={settings.integrations.emailProvider}
-                    onChange={(value) => updateSetting("integrations", "emailProvider", value)}
-                    placeholder="Выберите провайдера"
-                  />
-                </div>
-                <div>
-                  <Label>Провайдер SMS</Label>
-                  <Select
-                    options={[
-                      { value: "smsc", label: "SMSC.ru" },
-                      { value: "sms_aero", label: "SMS Aero" },
-                      { value: "twilio", label: "Twilio" }
-                    ]}
-                    defaultValue={settings.integrations.smsProvider}
-                    onChange={(value) => updateSetting("integrations", "smsProvider", value)}
-                    placeholder="Выберите провайдера"
-                  />
-                </div>
+                <Select
+                  options={[
+                    { value: "smtp", label: "SMTP" },
+                    { value: "sendgrid", label: "SendGrid" },
+                    { value: "mailgun", label: "Mailgun" }
+                  ]}
+                  value={settings.integrations.emailProvider}
+                  onChange={(value) => updateSetting("integrations", "emailProvider", value)}
+                  placeholder="Выберите провайдера"
+                />
+              </div>
+              <div>
+                <Label>Провайдер SMS</Label>
+                <Select
+                  options={[
+                    { value: "smsc", label: "SMSC.ru" },
+                    { value: "sms_aero", label: "SMS Aero" },
+                    { value: "twilio", label: "Twilio" }
+                  ]}
+                  value={settings.integrations.smsProvider}
+                  onChange={(value) => updateSetting("integrations", "smsProvider", value)}
+                  placeholder="Выберите провайдера"
+                />
+              </div>
               </div>
               
               <div>
@@ -834,17 +853,17 @@ const SiteSettingsPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label>CRM система</Label>
-                  <Select
-                    options={[
-                      { value: "1c", label: "1С:Предприятие" },
-                      { value: "amoCRM", label: "amoCRM" },
-                      { value: "bitrix24", label: "Битрикс24" },
-                      { value: "custom", label: "Собственная разработка" }
-                    ]}
-                    defaultValue={settings.integrations.crmSystem}
-                    onChange={(value) => updateSetting("integrations", "crmSystem", value)}
-                    placeholder="Выберите CRM"
-                  />
+                <Select
+                  options={[
+                    { value: "1c", label: "1С:Предприятие" },
+                    { value: "amoCRM", label: "amoCRM" },
+                    { value: "bitrix24", label: "Битрикс24" },
+                    { value: "custom", label: "Собственная разработка" }
+                  ]}
+                  value={settings.integrations.crmSystem}
+                  onChange={(value) => updateSetting("integrations", "crmSystem", value)}
+                  placeholder="Выберите CRM"
+                />
                 </div>
               </div>
             </div>
@@ -863,14 +882,20 @@ const SiteSettingsPage = () => {
             Это действие нельзя отменить.
           </p>
           <div className="flex justify-end space-x-3">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsModalOpen(false)}
+              disabled={resetLoading}
+            >
               Отменить
             </Button>
-            <Button onClick={() => {
-              window.location.reload();
-              setIsModalOpen(false);
-            }}>
-              Сбросить
+            <Button
+              variant="primary"
+              className="!bg-red-600 hover:!bg-red-700"
+              onClick={confirmReset}
+              disabled={resetLoading}
+            >
+              {resetLoading ? "Сбрасываем..." : "Сбросить"}
             </Button>
           </div>
         </div>

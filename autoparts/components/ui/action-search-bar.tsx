@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -12,22 +12,6 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { useSearchStore } from "@/lib/stores/searchStore";
 import { useRouter, useSearchParams } from "next/navigation";
-
-function useDebounce<T>(value: T, delay: number = 1000): T {
-    const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setDebouncedValue(value);
-        }, delay);
-
-        return () => {
-            clearTimeout(timer);
-        };
-    }, [value, delay]);
-
-    return debouncedValue;
-}
 
 export interface SearchHistoryItem {
     id: string;
@@ -43,18 +27,42 @@ interface SearchResult {
 function ActionSearchBar() {
     const searchParams = useSearchParams();
     const router = useRouter();
-    const { search, isLoading, query: storeQuery, setQuery } = useSearchStore();
+    const { search, isLoading, query: storeQuery, setQuery, clearResults } = useSearchStore();
     
     const [query, setLocalQuery] = useState(searchParams?.get('q') || storeQuery || "");
     const [result, setResult] = useState<SearchResult | null>(null);
     const [isFocused, setIsFocused] = useState(false);
-    const [isTyping, setIsTyping] = useState(false);
     const [selectedItem, setSelectedItem] = useState<SearchHistoryItem | null>(null);
     const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
+    
+    // Ref for search timeout
+    const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    const debouncedQuery = useDebounce(query, 800); // Увеличили задержку
+    // Debounced query for search history
+    const debouncedQuery = useDebounce(query, 500);
 
-    // Синхронизация с URL параметрами
+    // Effect for handling search history
+    useEffect(() => {
+        if (!isFocused) {
+            setResult(null);
+            return;
+        }
+
+        if (!debouncedQuery) {
+            setResult({ history: searchHistory.slice(0, 4) });
+            return;
+        }
+
+        const normalizedQuery = debouncedQuery.toLowerCase().trim();
+        const filteredHistory = searchHistory.filter((item) => {
+            const searchableText = item.query.toLowerCase();
+            return searchableText.includes(normalizedQuery);
+        });
+
+        setResult({ history: filteredHistory.slice(0, 4) });
+    }, [debouncedQuery, isFocused, searchHistory]);
+
+    // Синхронизация с URL параметрами только при монтировании
     useEffect(() => {
         const urlQuery = searchParams?.get('q') || '';
         setLocalQuery(urlQuery);
@@ -83,56 +91,65 @@ function ActionSearchBar() {
         localStorage.setItem("search-history", JSON.stringify(searchHistory));
     }, [searchHistory]);
 
+    // Debounced search effect - triggers search when user stops typing (both adding and deleting)
     useEffect(() => {
-        if (!isFocused) {
-            setResult(null);
+        // Clear any existing timeout
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+        }
+        
+        // If query is empty, do nothing (don't redirect)
+        if (query.trim().length === 0) {
             return;
         }
-
-        if (!debouncedQuery) {
-            setResult({ history: searchHistory });
+        
+        // Don't trigger search for queries that are too short
+        if (query.trim().length < 3) {
             return;
         }
-
-        const normalizedQuery = debouncedQuery.toLowerCase().trim();
-        const filteredHistory = searchHistory.filter((item) => {
-            const searchableText = item.query.toLowerCase();
-            return searchableText.includes(normalizedQuery);
-        });
-
-        setResult({ history: filteredHistory });
-    }, [debouncedQuery, isFocused, searchHistory]);
+        
+        // Set new timeout to perform search
+        searchTimeoutRef.current = setTimeout(() => {
+            performSearch(query);
+        }, 1000); // Wait 1 second after user stops typing (adding or deleting)
+        
+    }, [query]); // Trigger this effect whenever query changes
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         setLocalQuery(value);
         setQuery(value);
-        setIsTyping(true);
+        
+        // Only show search history dropdown when there are at least 3 characters
+        if (value.length >= 3 || value.length === 0) {
+            setIsFocused(true);
+        } else {
+            setIsFocused(false);
+        }
     };
 
-    const handleSearch = async (queryToSearch?: string) => {
-        const finalQuery = queryToSearch || query;
-        if (!finalQuery.trim()) {
+    const performSearch = async (searchQuery: string) => {
+        if (!searchQuery.trim()) {
             return;
         }
 
         // Минимальная длина для поиска - 3 символа
-        if (finalQuery.trim().length < 3) {
+        if (searchQuery.trim().length < 3) {
             return;
         }
 
         // Добавляем в историю
-        addToHistory(finalQuery);
+        addToHistory(searchQuery);
         
         // Выполняем поиск
-        const searchResult = await search(finalQuery);
+        const searchResult = await search(searchQuery);
         
         // Если найден автомобиль по VIN, открываем в новой вкладке каталог
         if (searchResult?.detectedType === 'VIN' && searchResult?.vehicle) {
             const vehicleId = searchResult.vehicle.vehicleId;
             const ssd = searchResult.vehicle.ssd;
             if (vehicleId && ssd) {
-                const catalogUrl = `/catalogs/${vehicleId}?vin=${encodeURIComponent(finalQuery)}&ssd=${encodeURIComponent(ssd)}&brand=${encodeURIComponent(searchResult.vehicle.brand || '')}&name=${encodeURIComponent(searchResult.vehicle.name || '')}`;
+                const catalogUrl = `/catalogs/${vehicleId}?vin=${encodeURIComponent(searchQuery)}&ssd=${encodeURIComponent(ssd)}&brand=${encodeURIComponent(searchResult.vehicle.brand || '')}&name=${encodeURIComponent(searchResult.vehicle.name || '')}`;
                 window.open(catalogUrl, '_blank');
                 setIsFocused(false);
                 setSelectedItem(null);
@@ -141,15 +158,35 @@ function ActionSearchBar() {
         }
         
         // Для остальных типов поиска перенаправляем на страницу результатов
-        router.push(`/search?q=${encodeURIComponent(finalQuery)}`);
+        router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+    };
+
+    const clearSearch = () => {
+        setLocalQuery('');
+        setQuery('');
+        
+        // Clear any pending search timeout
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+            searchTimeoutRef.current = null;
+        }
         
         setIsFocused(false);
-        setSelectedItem(null);
-    };    const handleHistoryItemClick = (item: SearchHistoryItem) => {
+    };
+
+    const handleHistoryItemClick = (item: SearchHistoryItem) => {
         setLocalQuery(item.query);
         setQuery(item.query);
         setSelectedItem(item);
-        handleSearch(item.query);
+        
+        // Clear any pending search timeout
+        if (searchTimeoutRef.current) {
+            clearTimeout(searchTimeoutRef.current);
+            searchTimeoutRef.current = null;
+        }
+        
+        // Perform immediate search for history items
+        performSearch(item.query);
     };
 
     const removeFromHistory = (id: string, e: React.MouseEvent) => {
@@ -187,7 +224,7 @@ function ActionSearchBar() {
                 timestamp: new Date(),
             });
 
-            return updated.slice(0, 20);
+            return updated.slice(0, 4);
         });
     };
 
@@ -198,9 +235,24 @@ function ActionSearchBar() {
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && query.trim()) {
-            handleSearch();
+            // Clear any pending search timeout when user explicitly triggers search
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+                searchTimeoutRef.current = null;
+            }
+            
+            performSearch(query);
         }
     };
+
+    // Cleanup timeout on unmount
+    useEffect(() => {
+        return () => {
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        };
+    }, []);
 
     return (
         <div className="w-full max-w-2xl mx-auto">
@@ -214,7 +266,12 @@ function ActionSearchBar() {
                             value={query}
                             onChange={handleInputChange}
                             onFocus={handleFocus}
-                            onBlur={() => setTimeout(() => setIsFocused(false), 200)}
+                            onBlur={() => setTimeout(() => {
+                                // Only hide dropdown if not clicking on history items
+                                if (!selectedItem) {
+                                    setIsFocused(false);
+                                }
+                            }, 200)}
                             onKeyDown={handleKeyPress}
                             disabled={isLoading}
                             className="pl-5 pr-16 py-4 h-16 text-lg rounded-xl focus-visible:ring-offset-0 border-2 focus-visible:border-orange-500"
@@ -239,11 +296,7 @@ function ActionSearchBar() {
                                             animate={{ y: 0, opacity: 1 }}
                                             exit={{ y: 20, opacity: 0 }}
                                             transition={{ duration: 0.2 }}
-                                            onClick={() => {
-                                                setLocalQuery('');
-                                                setQuery('');
-                                                router.push('/search');
-                                            }}
+                                            onClick={clearSearch}
                                         >
                                             <X className="w-5 h-5 text-gray-500 hover:text-gray-700 cursor-pointer" />
                                         </motion.div>
@@ -253,7 +306,14 @@ function ActionSearchBar() {
                                             animate={{ y: 0, opacity: 1 }}
                                             exit={{ y: 20, opacity: 0 }}
                                             transition={{ duration: 0.2 }}
-                                            onClick={() => handleSearch()}
+                                            onClick={() => {
+                                                // Clear any pending search timeout when user explicitly triggers search
+                                                if (searchTimeoutRef.current) {
+                                                    clearTimeout(searchTimeoutRef.current);
+                                                    searchTimeoutRef.current = null;
+                                                }
+                                                performSearch(query);
+                                            }}
                                         >
                                             <Send className="w-5 h-5 text-blue-500 hover:text-blue-600 cursor-pointer" />
                                         </motion.div>
@@ -287,7 +347,7 @@ function ActionSearchBar() {
                                 <div className="p-3 text-sm text-gray-500 border-b">
                                     История поиска
                                 </div>
-                                {result.history.map((item) => (
+                                {result.history.slice(0, 4).map((item) => (
                                     <div
                                         key={item.id}
                                         className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer group"
@@ -320,6 +380,23 @@ function ActionSearchBar() {
             </div>
         </div>
     );
+}
+
+// Custom debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(timer);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
 }
 
 export { ActionSearchBar };

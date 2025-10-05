@@ -37,6 +37,7 @@ public class OrderService {
     private final NotificationService notifications;
     private final ObjectMapper objectMapper;
     private final FinanceService financeService;
+    private final autoparts.kz.modules.telegram.service.TelegramNotificationService telegramNotificationService;
 
     @Transactional
     public Order createOrderFromCart(Long userId, CreateOrderRequest req) {
@@ -60,6 +61,13 @@ public class OrderService {
 
         // Сформировать событие и положить в outbox
         enqueueOrderCreated(order);
+
+        // Отправить уведомление в Telegram
+        try {
+            telegramNotificationService.notifyNewOrder(order);
+        } catch (Exception e) {
+            log.error("Failed to send Telegram notification for order {}: {}", order.getId(), e.getMessage());
+        }
 
         // Очистить корзину
         clearCart(cart);

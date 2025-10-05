@@ -101,19 +101,23 @@ export const searchApi = {
     if (catalog) {
       params.append('catalog', catalog);
     }
+    
+    // Add a small delay to ensure proper request handling
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     return apiRequest<SearchResponse>(`/search?${params.toString()}`);
   },
   
   // OEM: применимые автомобили по выбранному каталогу и артикулу
   async getApplicableVehicles(catalog: string, oem: string): Promise<OemApplicableVehicle[]> {
     const params = new URLSearchParams({ catalog, oem });
-    return apiRequest<OemApplicableVehicle[]>(`/v1/search/oem/applicable-vehicles?${params.toString()}`);
+    return apiRequest<OemApplicableVehicle[]>(`/api/v1/search/oem/applicable-vehicles?${params.toString()}`);
   },
 
   // OEM: применимость (категории/узлы/детали)
   async getApplicability(catalog: string, ssd: string, oem: string): Promise<OemApplicabilityResponse> {
     const params = new URLSearchParams({ catalog, ssd, oem });
-    return apiRequest<OemApplicabilityResponse>(`/v1/search/oem/applicability?${params.toString()}`);
+    return apiRequest<OemApplicabilityResponse>(`/api/v1/search/oem/applicability?${params.toString()}`);
   },
 };
 

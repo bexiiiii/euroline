@@ -6,18 +6,22 @@ interface GetStartedButtonProps {
   onClick?: () => void;
   label?: string; // 👈 можно передать текст
   className?: string;
+  disabled?: boolean;
 }
 
 export function GetStartedButton({
   onClick,
   label = "Добавить в корзину", // 👈 дефолтный текст
   className = "",
+  disabled = false,
 }: GetStartedButtonProps) {
   return (
     <Button
       onClick={onClick}
+      disabled={disabled}
       className={cn(
         "group relative overflow-hidden h-14 px-8 text-lg bg-orange-400 hover:bg-orange-500 text-white",
+        disabled && "opacity-50 cursor-not-allowed hover:bg-orange-400",
         className
       )}
       size="lg"

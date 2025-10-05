@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/analytics")
@@ -57,6 +58,65 @@ public class AdminAnalyticsController {
             @RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
     ) {
         return analyticsService.getRevenueChart(from, to);
+    }
+
+    @GetMapping("/monthly-sales")
+    public List<ChartDataPoint> getMonthlySales() {
+        return analyticsService.getMonthlySalesChart();
+    }
+
+    @GetMapping("/monthly-revenue")
+    public List<ChartDataPoint> getMonthlyRevenue() {
+        return analyticsService.getMonthlyRevenueChart();
+    }
+
+    @GetMapping("/customer-growth")
+    public ResponseEntity<Map<String, Object>> getCustomerGrowth() {
+        return ResponseEntity.ok(analyticsService.getCustomerGrowthStats());
+    }
+    
+    @GetMapping("/customer-growth-chart")
+    public ResponseEntity<List<Map<String, Object>>> getCustomerGrowthChart() {
+        return ResponseEntity.ok(analyticsService.getCustomerGrowthChart());
+    }
+    
+    @GetMapping("/finance-overview")
+    public ResponseEntity<Map<String, Object>> getFinanceOverview() {
+        return ResponseEntity.ok(analyticsService.getFinanceOverview());
+    }
+    
+    @GetMapping("/top-products-detailed")
+    public ResponseEntity<List<Map<String, Object>>> getTopProductsDetailed(
+            @RequestParam(defaultValue = "10") int limit
+    ) {
+        return ResponseEntity.ok(analyticsService.getTopProductsDetailed(limit));
+    }
+    
+    @GetMapping("/category-distribution")
+    public ResponseEntity<List<Map<String, Object>>> getCategoryDistribution() {
+        return ResponseEntity.ok(analyticsService.getCategoryDistribution());
+    }
+    
+    @GetMapping("/sales-heatmap")
+    public ResponseEntity<List<Map<String, Object>>> getSalesHeatmap() {
+        return ResponseEntity.ok(analyticsService.getSalesHeatmap());
+    }
+    
+    @GetMapping("/recent-orders")
+    public ResponseEntity<List<Map<String, Object>>> getRecentOrders(
+            @RequestParam(defaultValue = "5") int limit
+    ) {
+        return ResponseEntity.ok(analyticsService.getRecentOrders(limit));
+    }
+    
+    @GetMapping("/monthly-target")
+    public ResponseEntity<Map<String, Object>> getMonthlyTarget() {
+        return ResponseEntity.ok(analyticsService.getMonthlyTarget());
+    }
+    
+    @GetMapping("/customer-demographics")
+    public ResponseEntity<List<Map<String, Object>>> getCustomerDemographics() {
+        return ResponseEntity.ok(analyticsService.getCustomerDemographics());
     }
 
 }

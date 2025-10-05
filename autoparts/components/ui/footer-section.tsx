@@ -42,19 +42,28 @@ function Footerdemo() {
             <h3 className="mb-4 text-lg font-semibold">Категории</h3>
             <nav className="space-y-2 text-sm">
               <a href="#" className="block transition-colors hover:text-primary">
-                Home
+                Гланая
               </a>
               <a href="#" className="block transition-colors hover:text-primary">
-                About Us
+                О нас
               </a>
               <a href="#" className="block transition-colors hover:text-primary">
-                Services
+                Каталоги
               </a>
               <a href="#" className="block transition-colors hover:text-primary">
-                Products
+                Масло и автохимия
               </a>
               <a href="#" className="block transition-colors hover:text-primary">
-                Contact
+                Товар недели
+              </a>
+              <a href="#" className="block transition-colors hover:text-primary">
+                Контакты
+              </a>
+              <a href="#" className="block transition-colors hover:text-primary">
+                Партнерам
+              </a>
+              <a href="#" className="block transition-colors hover:text-primary">
+                Новости
               </a>
             </nav>
           </div>
@@ -79,7 +88,7 @@ function Footerdemo() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Follow us on Facebook</p>
+                    <p>Подписывайтесь на нас в Facebook</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -92,7 +101,7 @@ function Footerdemo() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Follow us on Twitter</p>
+                    <p>Подписывайтесь на нас в Twitter</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -105,40 +114,28 @@ function Footerdemo() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>Follow us on Instagram</p>
+                    <p>Подписывайтесь на нас в Instagram</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" className="rounded-full">
-                      <Linkedin className="h-4 w-4" />
-                      <span className="sr-only">LinkedIn</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Connect with us on LinkedIn</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              
             </div>
             
           </div>
         </div>
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t pt-8 text-center md:flex-row">
           <p className="text-sm text-muted-foreground">
-            © 2024 Your Company. All rights reserved.
+            © 2025 Euroline. Все права защищены.
           </p>
           <nav className="flex gap-4 text-sm">
             <a href="#" className="transition-colors hover:text-primary">
-              Privacy Policy
+              Политика конфиденциальности
             </a>
             <a href="#" className="transition-colors hover:text-primary">
-              Terms of Service
+              Условия использования
             </a>
             <a href="#" className="transition-colors hover:text-primary">
-              Cookie Settings
+              Cookie 
             </a>
           </nav>
         </div>

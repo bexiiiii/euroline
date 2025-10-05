@@ -47,3 +47,9 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/16-update-event-logs-table.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/17-create-news-table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/18-enhance-api-keys.sql
+      relativeToChangelogFile: false

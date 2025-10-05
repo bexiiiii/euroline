@@ -138,6 +138,12 @@ laximo:
     password: "9z3n_AyzyZ24RAI"
     locale: "ru_RU"
 
+telegram:
+  bot:
+    token: ${TELEGRAM_BOT_TOKEN:8250208628:AAEvjencS7ffYxD-KmSIFFqORCLWU0BHI4A}
+    username: ${TELEGRAM_BOT_USERNAME:euroline_autoparts_bot}
+    admin-chat-id: ${TELEGRAM_ADMIN_CHAT_ID:6322824405}
+
 # Настройки для production (закомментированы)
 # spring:
 #   jpa:
