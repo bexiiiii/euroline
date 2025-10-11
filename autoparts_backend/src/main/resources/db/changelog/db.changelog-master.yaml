@@ -39,6 +39,27 @@ databaseChangeLog:
       file: db/changelog/changes/12-add-last-browser-to-users.sql
       relativeToChangelogFile: false
   - include:
+      file: db/changelog/changes/12a-create-topups-table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/12b-create-finance-support-tables.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/12c-create-user-activity-table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/12d-create-event-logs-table.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/12e-add-created-at-to-users.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/12f-create-cml-processed-messages.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/12g-create-cml-domain-tables.sql
+      relativeToChangelogFile: false
+  - include:
       file: db/changelog/changes/13-update-topups-add-columns.sql
       relativeToChangelogFile: false
   - include:
