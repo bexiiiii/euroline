@@ -5,8 +5,8 @@ package autoparts.kz.modules.bridge.service;
 import autoparts.kz.modules.stockOneC.kafka.OrderRequestMsg;
 import lombok.RequiredArgsConstructor;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -14,6 +14,7 @@ import java.util.concurrent.*;
 
 @Service
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "integration.kafka", name = "enabled", havingValue = "true")
 public class OrderRequestBuffer {
 
     private final BlockingQueue<ConsumerRecord<String, OrderRequestMsg>> queue = new LinkedBlockingQueue<>();

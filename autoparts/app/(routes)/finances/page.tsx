@@ -17,7 +17,7 @@ const items = [
 ]
 
 
-export default function financePage() {
+export default function FinancePage() {
   const [amount, setAmount] = useState<string>("")
   const [submitting, setSubmitting] = useState(false)
   const [receipt, setReceipt] = useState<File | null>(null)

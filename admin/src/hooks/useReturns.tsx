@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { returnApi, ReturnFilters, Return, ReturnStatus } from '@/lib/api/returns';
+import { returnsApi, ReturnFilters, Return, ReturnStatus } from '@/lib/api/returns';
 
 export function useReturns() {
   const [returns, setReturns] = useState<Return[]>([]);
@@ -14,7 +14,7 @@ export function useReturns() {
     try {
       setLoading(true);
       setError(null);
-      const response = await returnApi.getReturns({
+      const response = await returnsApi.getReturns({
         ...filters,
         page: filters.page !== undefined ? filters.page : currentPage,
       });
@@ -36,7 +36,7 @@ export function useReturns() {
     try {
       setLoading(true);
       setError(null);
-      return await returnApi.getReturnById(returnId);
+      return await returnsApi.getReturnById(returnId);
     } catch (err: any) {
       console.error('Error fetching return:', err);
       setError(err.message);
@@ -50,7 +50,7 @@ export function useReturns() {
     try {
       setLoading(true);
       setError(null);
-      const updatedReturn = await returnApi.updateReturnStatus(returnId, status, notes);
+      const updatedReturn = await returnsApi.updateReturnStatus(returnId, status, notes);
       
       // Update the return in both lists if it exists
       setReturns(prevReturns => 
@@ -84,7 +84,7 @@ export function useReturns() {
     try {
       setLoading(true);
       setError(null);
-      const pendingItems = await returnApi.getPendingReturns();
+      const pendingItems = await returnsApi.getPendingReturns();
       setPendingReturns(pendingItems);
       return pendingItems;
     } catch (err: any) {

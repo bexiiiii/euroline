@@ -10,6 +10,7 @@ export interface UserProfile {
   clientName?: string;
   role?: string;
   balance?: number;
+  officeAddress?: string;
 }
 
 export interface UserProfileUpdateRequest {
@@ -22,6 +23,7 @@ export interface UserProfileUpdateRequest {
   city?: string;
   type?: string;
   clientName?: string;
+  officeAddress?: string;
 }
 
 export interface PasswordChangeRequest {

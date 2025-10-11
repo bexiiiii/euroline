@@ -1,80 +1,126 @@
 import { apiFetch } from '../api';
 import { PageResponse } from './types';
 
-export interface ReturnRequest {
+export type ReturnStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
+
+interface ReturnApiResponse {
   id: number;
-  userId: number;
   orderId: number;
+  customerId: number;
   reason: string;
-  description: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
+  status: ReturnStatus;
   createdAt: string;
-  updatedAt: string;
-  processedBy?: number;
-  refundAmount?: number;
+  amount?: number | string | null;
 }
 
-export interface CreateReturn {
+export interface Return {
+  id: number;
   orderId: number;
+  customerId: number;
   reason: string;
-  description: string;
+  status: ReturnStatus;
+  createdAt: string;
+  amount?: number;
 }
 
-export interface PatchStatus {
-  status: string;
-  comments?: string;
+export interface ReturnFilters {
+  page?: number;
+  size?: number;
+  status?: ReturnStatus;
 }
+
+export interface CreateReturnRequest {
+  orderId: number;
+  customerId?: number;
+  reason: string;
+}
+
+const normalizeReturn = (data: ReturnApiResponse): Return => ({
+  id: data.id,
+  orderId: data.orderId,
+  customerId: data.customerId,
+  reason: data.reason,
+  status: data.status,
+  createdAt: data.createdAt,
+  amount: data.amount != null ? Number(data.amount) : undefined,
+});
+
+const clampPage = (page?: number): number => {
+  if (page === undefined || Number.isNaN(page) || page < 0) {
+    return 0;
+  }
+  return Math.floor(page);
+};
+
+const normalizePageSize = (size?: number): number => {
+  if (!size || Number.isNaN(size) || size <= 0) {
+    return 20;
+  }
+  return Math.floor(size);
+};
 
 export const returnsApi = {
-  /**
-   * Get all returns with pagination and filtering
-   */
-  getReturns: async (status?: string, page = 0, size = 20): Promise<PageResponse<ReturnRequest>> => {
-    const params = new URLSearchParams({ page: page.toString(), size: size.toString() });
-    if (status) params.append('status', status);
-    return apiFetch<PageResponse<ReturnRequest>>(`/api/returns?${params}`);
+  getReturns: async (filters: ReturnFilters = {}): Promise<PageResponse<Return>> => {
+    const params = new URLSearchParams();
+
+    const page = clampPage(filters.page);
+    const size = normalizePageSize(filters.size);
+
+    params.append('page', page.toString());
+    params.append('size', size.toString());
+    if (filters.status) {
+      params.append('status', filters.status);
+    }
+
+    const response = await apiFetch<PageResponse<ReturnApiResponse>>(`/api/returns?${params}`);
+
+    return {
+      ...response,
+      content: response.content.map(normalizeReturn),
+    };
   },
 
-  /**
-   * Get a specific return by ID
-   */
-  getReturn: async (id: number): Promise<ReturnRequest> => {
-    return apiFetch<ReturnRequest>(`/api/returns/${id}`);
+  getReturnById: async (id: number): Promise<Return> => {
+    const response = await apiFetch<ReturnApiResponse>(`/api/returns/${id}`);
+    return normalizeReturn(response);
   },
 
-  /**
-   * Create a new return request
-   */
-  createReturn: async (data: CreateReturn): Promise<ReturnRequest> => {
-    return apiFetch<ReturnRequest>('/api/returns', {
+  createReturn: async (data: CreateReturnRequest): Promise<Return> => {
+    const response = await apiFetch<ReturnApiResponse>('/api/returns', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    return normalizeReturn(response);
   },
 
-  /**
-   * Update return status
-   */
-  updateReturnStatus: async (id: number, status: PatchStatus): Promise<ReturnRequest> => {
-    return apiFetch<ReturnRequest>(`/api/returns/${id}/status`, {
+  updateReturnStatus: async (id: number, status: ReturnStatus, notes?: string): Promise<Return> => {
+    const payload: Record<string, unknown> = { status };
+    if (notes) {
+      payload.notes = notes;
+    }
+
+    const response = await apiFetch<ReturnApiResponse>(`/api/returns/${id}/status`, {
       method: 'PATCH',
-      body: JSON.stringify(status),
+      body: JSON.stringify(payload),
     });
+    return normalizeReturn(response);
   },
 
-  /**
-   * Process return
-   */
-  processReturn: async (id: number): Promise<Record<string, any>> => {
-    return apiFetch<Record<string, any>>(`/api/returns/${id}/process`, {
+  processReturn: async (id: number): Promise<Record<string, unknown>> => {
+    return apiFetch<Record<string, unknown>>(`/api/returns/${id}/process`, {
       method: 'POST',
     });
   },
 
-  /**
-   * Get returns statistics
-   */
-  getStats: async (): Promise<Record<string, any>> => {
-    return apiFetch<Record<string, any>>('/api/returns/stats');
+  getStats: async (): Promise<Record<string, unknown>> => {
+    return apiFetch<Record<string, unknown>>('/api/returns/stats');
+  },
+
+  getPendingReturns: async (): Promise<Return[]> => {
+    const response = await returnsApi.getReturns({ status: 'PENDING', size: 100 });
+    return response.content;
   },
 };
+
+// Backwards compatibility for existing imports
+export const returnApi = returnsApi;

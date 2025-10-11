@@ -30,8 +30,6 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
   order,
   isLoading = false,
 }) => {
-  if (!order) return null;
-
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('kk-KZ', {
       style: 'currency',
@@ -50,17 +48,14 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
     });
   };
 
-  const statusMeta = orderStatusMeta[order.status as OrderStatus] ?? {
-    label: order.status,
-    color: "primary",
-  };
-
-  const paymentMeta = paymentStatusMeta[order.paymentStatus as PaymentStatus] ?? {
-    label: order.paymentStatus,
-    color: "warning",
-  };
-
   const { itemsTotal, deliveryFee } = useMemo(() => {
+    if (!order) {
+      return {
+        itemsTotal: 0,
+        deliveryFee: 0,
+      };
+    }
+
     const total = (order.items ?? []).reduce((acc, item) => {
       const unitPrice = typeof item.price === "number" ? item.price : Number(item.price ?? 0);
       const rawTotal = item.total ?? unitPrice * item.quantity;
@@ -73,6 +68,18 @@ const ViewOrderModal: React.FC<ViewOrderModalProps> = ({
       deliveryFee: delivery,
     };
   }, [order]);
+
+  if (!order) return null;
+
+  const statusMeta = orderStatusMeta[order.status as OrderStatus] ?? {
+    label: order.status,
+    color: "primary",
+  };
+
+  const paymentMeta = paymentStatusMeta[order.paymentStatus as PaymentStatus] ?? {
+    label: order.paymentStatus,
+    color: "warning",
+  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="xl">

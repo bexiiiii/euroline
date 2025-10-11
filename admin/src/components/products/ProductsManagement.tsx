@@ -31,9 +31,8 @@ const ProductsManagement: React.FC = () => {
     // Здесь должна быть логика удаления продукта
   };
 
-  const handleSaveProduct = (product: Product) => {
-    console.log("Сохранение продукта:", product);
-    // Здесь должна быть логика сохранения продукта
+  const handleSaveProduct = (productId: number, newStatus: string) => {
+    console.log("Сохранение статуса продукта:", productId, newStatus);
     setIsEditModalOpen(false);
   };
 

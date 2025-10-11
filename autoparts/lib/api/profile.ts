@@ -1,7 +1,9 @@
 import { API_BASE } from './base'
-
-// Типы для профиля пользователя
-export interface UserProfile {}
+import type {
+  UserProfile,
+  UserProfileUpdateRequest,
+  PasswordChangeRequest,
+} from '@/lib/types/profile'
 
 export class ApiError extends Error {
   status: number
@@ -45,14 +47,6 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<T>
   }
 }
 
-export interface ProfileUpdateRequest {
-  // поля для апдейта профиля
-}
-
-export interface PasswordChangeRequest {
-  // старый пароль, новый пароль
-}
-
 export const profileApi = {
   // Получить профиль текущего пользователя
   async getCurrentProfile(): Promise<UserProfile> {
@@ -60,7 +54,7 @@ export const profileApi = {
   },
 
   // Обновить профиль пользователя
-  async updateProfile(data: ProfileUpdateRequest): Promise<void> {
+  async updateProfile(data: UserProfileUpdateRequest): Promise<void> {
     return apiRequest<void>(`${API_BASE}/api/profile/update`, {
       method: 'PUT',
       body: JSON.stringify(data),

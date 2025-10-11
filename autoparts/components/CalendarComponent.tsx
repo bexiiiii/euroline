@@ -14,27 +14,29 @@ import {
   DateRangePicker,
 } from "@/components/ui/date-range-picker"
 import { DateInput } from "@/components/ui/datefield"
-import { FieldGroup, Label } from "@/components/ui/field"
+import { FieldGroup } from "@/components/ui/field"
 import { useState } from "react"
+import type { RangeValue } from "@react-types/shared"
+import type { DateValue } from "@react-types/datepicker"
 
 export function CalendarComponent({
   selectedRange,
   setSelectedRange,
 }: {
-  selectedRange: { start: Date; end: Date } | null
-  setSelectedRange: (range: { start: Date; end: Date } | null) => void
+  selectedRange: RangeValue<DateValue> | null
+  setSelectedRange: (range: RangeValue<DateValue> | null) => void
 }) {
   const [open, setOpen] = useState(false)
 
   return (
     <DateRangePicker
-      open={open}
+      isOpen={open}
       onOpenChange={setOpen}
       value={selectedRange}
-       onChange={(range) => {
-    setSelectedRange(range)
-    setOpen(false) 
-  }}
+      onChange={(range) => {
+        setSelectedRange(range)
+        setOpen(false)
+      }}
       className="min-w-[320px] space-y-1 relative"
     >
      

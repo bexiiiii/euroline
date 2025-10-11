@@ -18,7 +18,7 @@ import {
   TableIcon,
   UserCircleIcon,
 } from "../icons/index";
-import SidebarWidget from "./SidebarWidget";
+
 
 type NavItem = {
   name: string;
@@ -34,11 +34,11 @@ const navItems: NavItem[] = [
     subItems: [{ name: "Статистика", path: "/", pro: false }, { name: "Аналитика", path: "/analytics", pro: false }],
 
   },
-  {
-    icon: <CalenderIcon />,
-    name: "Календарь",
-    path: "/calendar",
-  },
+  // {
+  //   icon: <CalenderIcon />,
+  //   name: "Календарь",
+  //   path: "/calendar",
+  // },
   {
     icon: <UserCircleIcon />,
     name: "Профиль пользователя",
@@ -57,13 +57,13 @@ const navItems: NavItem[] = [
   {
     icon: <PlugInIcon />,
     name: "Управление клиентами",
-    subItems: [{ name: "Клиенты", path: "/customers", pro: false }, { name: "Клиентские отзывы", path: "/customer-reviews", pro: false }, { name: "История поиска", path: "/customer-search-history", pro: false }],
+    subItems: [{ name: "Клиенты", path: "/customers", pro: false }, { name: "История поиска", path: "/customer-search-history", pro: false }],
   },
-   {
-    icon: <PlugInIcon />,
-    name: "Управление складом и запасами",
-    subItems: [{ name: "Склад", path: "/inventory", pro: false }, { name: "Запасы", path: "/stock", pro: false }],
-  },
+  //  {
+  //   icon: <PlugInIcon />,
+  //   name: "Управление складом и запасами",
+  //   subItems: [{ name: "Склад", path: "/inventory", pro: false }, { name: "Запасы", path: "/stock", pro: false }],
+  // },
   {
     icon: <DollarLineIcon />,
     name: "Финансы и платежи",
@@ -77,7 +77,7 @@ const navItems: NavItem[] = [
   {
     icon: <PlugInIcon />, 
     name: "Маркетинг и акции",
-    subItems: [{ name: "Акций на товары", path: "/product-promotions", pro: false }, { name: "Рекламные баннеры", path: "/product-banners", pro: false }, { name: "История акций", path: "/promotion-history", pro: false }],
+    subItems: [ { name: "Рекламные баннеры", path: "/product-banners", pro: false }],
   },
   {
     icon: <PlugInIcon />,
@@ -109,55 +109,55 @@ const navItems: NavItem[] = [
 
 
 
-  {
-    name: "Forms",
-    icon: <ListIcon />,
-    subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
-  },
-  {
-    name: "Tables",
-    icon: <TableIcon />,
-    subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
-  },
-  {
-    name: "Pages",
-    icon: <PageIcon />,
-    subItems: [
-      { name: "Blank Page", path: "/blank", pro: false },
-      { name: "404 Error", path: "/error-404", pro: false },
-    ],
-  },
+  // {
+  //   name: "Forms",
+  //   icon: <ListIcon />,
+  //   subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
+  // },
+  // {
+  //   name: "Tables",
+  //   icon: <TableIcon />,
+  //   subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
+  // },
+  // {
+  //   name: "Pages",
+  //   icon: <PageIcon />,
+  //   subItems: [
+  //     { name: "Blank Page", path: "/blank", pro: false },
+  //     { name: "404 Error", path: "/error-404", pro: false },
+  //   ],
+  // },
 ];
 
 const othersItems: NavItem[] = [
-  {
-    icon: <PieChartIcon />,
-    name: "Charts",
-    subItems: [
-      { name: "Line Chart", path: "/line-chart", pro: false },
-      { name: "Bar Chart", path: "/bar-chart", pro: false },
-    ],
-  },
-  {
-    icon: <BoxCubeIcon />,
-    name: "UI Elements",
-    subItems: [
-      { name: "Alerts", path: "/alerts", pro: false },
-      { name: "Avatar", path: "/avatars", pro: false },
-      { name: "Badge", path: "/badge", pro: false },
-      { name: "Buttons", path: "/buttons", pro: false },
-      { name: "Images", path: "/images", pro: false },
-      { name: "Videos", path: "/videos", pro: false },
-    ],
-  },
-  {
-    icon: <PlugInIcon />,
-    name: "Authentication",
-    subItems: [
-      { name: "Sign In", path: "/signin", pro: false },
-      { name: "Sign Up", path: "/signup", pro: false },
-    ],
-  },
+  // {
+  //   icon: <PieChartIcon />,
+  //   name: "Charts",
+  //   subItems: [
+  //     { name: "Line Chart", path: "/line-chart", pro: false },
+  //     { name: "Bar Chart", path: "/bar-chart", pro: false },
+  //   ],
+  // },
+  // {
+  //   icon: <BoxCubeIcon />,
+  //   name: "UI Elements",
+  //   subItems: [
+  //     { name: "Alerts", path: "/alerts", pro: false },
+  //     { name: "Avatar", path: "/avatars", pro: false },
+  //     { name: "Badge", path: "/badge", pro: false },
+  //     { name: "Buttons", path: "/buttons", pro: false },
+  //     { name: "Images", path: "/images", pro: false },
+  //     { name: "Videos", path: "/videos", pro: false },
+  //   ],
+  // },
+  // {
+  //   icon: <PlugInIcon />,
+  //   name: "Authentication",
+  //   subItems: [
+  //     { name: "Sign In", path: "/signin", pro: false },
+  //     { name: "Sign Up", path: "/signup", pro: false },
+  //   ],
+  // },
 ];
 
 const AppSidebar: React.FC = () => {
@@ -440,7 +440,7 @@ const AppSidebar: React.FC = () => {
             </div>
           </div>
         </nav>
-        {isExpanded || isHovered || isMobileOpen ? <SidebarWidget /> : null}
+        
       </div>
     </aside>
   );

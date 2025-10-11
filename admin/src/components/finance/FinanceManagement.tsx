@@ -36,12 +36,9 @@ const FinanceManagement: React.FC = () => {
   };
 
   const handleSaveTopUp = async (
-    customerId: number,
-    amount: number,
-    paymentMethod: string,
-    notes?: string
+    payload: { clientId: number; amount: number; paymentMethod?: string; adminComment?: string }
   ) => {
-    await financeApi.createTopUp({ clientId: customerId, amount, paymentMethod, adminComment: notes });
+    await financeApi.createTopUp(payload);
     setIsTopUpModalOpen(false);
     setSelectedTopUp(null);
   };

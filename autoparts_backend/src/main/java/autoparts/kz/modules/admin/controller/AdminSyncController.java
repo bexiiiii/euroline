@@ -5,6 +5,7 @@ import autoparts.kz.modules.stockOneC.service.OneCIntegrationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -18,6 +19,7 @@ import java.util.concurrent.CompletableFuture;
 @PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 @Slf4j
+@ConditionalOnProperty(prefix = "integration.kafka", name = "enabled", havingValue = "true")
 public class AdminSyncController {
 
     private final InventoryOnDemandRefresher inventoryRefresher;

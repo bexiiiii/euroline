@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class OneCService {
     private final String BASE_URL = "https://https-1c-mock.free.beeceptor.com";
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
     private final ProductRepository productRepository;
     private final ProductMapper productMapper;
 

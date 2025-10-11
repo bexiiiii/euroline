@@ -4,36 +4,37 @@ package autoparts.kz.modules.admin.controller;
 import autoparts.kz.modules.admin.dto.AdsRequest;
 import autoparts.kz.modules.admin.dto.AdsResponse;
 import autoparts.kz.modules.admin.service.AdminAdsService;
+import autoparts.kz.modules.common.storage.FileStorageService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/files/ads")
+@RequiredArgsConstructor
 public class AdminAdsController {
 
     private final AdminAdsService adminAdsService;
-    public AdminAdsController(AdminAdsService adminAdsService) {
-        this.adminAdsService = adminAdsService;
-    }
-    private final String UPLOAD_DIR = "uploads/";
+    private final FileStorageService storageService;
 
     @PostMapping("/upload")
     public ResponseEntity<String> upload(@RequestParam("file") MultipartFile file) throws IOException {
-        String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
-        Path path = Paths.get(UPLOAD_DIR + filename);
-        Files.copy(file.getInputStream(), path);
-
-        String fileUrl = "/uploads/" + filename;
-        return ResponseEntity.ok(fileUrl);
+        var stored = storageService.store(file, "admin/ads/");
+        return ResponseEntity.ok(stored.url());
     }
+
     @GetMapping
     public List<AdsResponse> getAllAds() {
         return adminAdsService.getAllAds();
@@ -68,9 +69,4 @@ public class AdminAdsController {
         adminAdsService.updateAd(id, request);
         return ResponseEntity.ok().build();
     }
-
-
-
-
-
 }

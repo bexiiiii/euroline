@@ -5,7 +5,7 @@ import Link from "next/link";
 
 
 
-export function returns() {
+export default function OrderReturnsPage() {
   return (
     <div className="bg-white min-h-screen pt-24">
       <main className="container mx-auto px-6">
@@ -39,5 +39,3 @@ export function returns() {
     </div>
   );
 }
-
-export default returns;

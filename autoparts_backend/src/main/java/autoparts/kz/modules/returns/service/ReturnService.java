@@ -21,6 +21,7 @@ public class ReturnService {
     private final ReturnRequestRepository repo;
     private final FinanceService finance;
     private final autoparts.kz.modules.telegram.service.TelegramNotificationService telegramNotificationService;
+    private final autoparts.kz.modules.cml.service.OneCBridgePublisher oneCBridgePublisher;
 
     public Page<ReturnDtos.Response> list(String status, Pageable p) {
         Specification<ReturnRequest> spec = (status==null)?null:
@@ -45,6 +46,7 @@ public class ReturnService {
     public ReturnDtos.Response get(Long id){ return map(find(id)); }
     public ReturnDtos.Response patch(Long id, ReturnDtos.PatchStatus r){
         var e = find(id);
+        ReturnStatus previousStatus = e.getStatus();
         e.setStatus(ReturnStatus.valueOf(r.status()));
         
         // Отправить уведомление в Telegram при изменении статуса
@@ -61,7 +63,11 @@ public class ReturnService {
                 finance.creditReturnByRequest(e.getCustomerId(), e.getAmount(), e.getId());
             } catch (Exception ignored) {}
         }
-        repo.save(e); return map(e);
+        repo.save(e);
+        if (shouldPublishToOneC(previousStatus, e.getStatus())) {
+            oneCBridgePublisher.publishReturnAfterCommit(e);
+        }
+        return map(e);
     }
     public Page<ReturnDtos.Response> listByCustomer(Long customerId, Pageable p){
         Specification<ReturnRequest> spec = (root, cq, cb) -> cb.equal(root.get("customerId"), customerId);
@@ -69,8 +75,12 @@ public class ReturnService {
     }
     public Map<String,Object> process(Long id){
         var e = find(id);
+        ReturnStatus previousStatus = e.getStatus();
         e.setStatus(ReturnStatus.PROCESSED);
         repo.save(e);
+        if (shouldPublishToOneC(previousStatus, e.getStatus())) {
+            oneCBridgePublisher.publishReturnAfterCommit(e);
+        }
         return Map.of("processed", true, "id", e.getId());
     }
     public Map<String,Object> stats(){
@@ -82,5 +92,13 @@ public class ReturnService {
     private ReturnDtos.Response map(ReturnRequest e){
         return new ReturnDtos.Response(e.getId(), e.getOrderId(), e.getCustomerId(), e.getReason(),
                 e.getStatus().name(), e.getCreatedAt(), e.getAmount());
+    }
+
+    private boolean shouldPublishToOneC(ReturnStatus previousStatus, ReturnStatus currentStatus) {
+        if (currentStatus == null || currentStatus == previousStatus) {
+            return false;
+        }
+        return java.util.EnumSet.of(ReturnStatus.APPROVED, ReturnStatus.PROCESSED, ReturnStatus.REFUNDED)
+                .contains(currentStatus);
     }
 }

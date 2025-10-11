@@ -5,9 +5,14 @@ import autoparts.kz.modules.order.entity.Order;
 import autoparts.kz.modules.order.orderStatus.OrderStatus;
 import autoparts.kz.modules.order.repository.OrderRepository;
 import autoparts.kz.modules.stockOneC.service.InventoryOnDemandRefresher;
+import autoparts.kz.modules.cml.domain.dto.OneCOrderMessage;
+import autoparts.kz.modules.cml.domain.dto.OneCReturnMessage;
+import autoparts.kz.modules.cml.domain.dto.OneCIntegrationContract;
+import autoparts.kz.modules.cml.domain.mapper.OneCContractMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -38,6 +43,7 @@ public class OneCIntegrationServiceImpl implements OneCIntegrationService {
     private int connectionTimeout;
     
     @Autowired
+    @Qualifier("oneCRestTemplate")
     private RestTemplate restTemplate;
     
     @Autowired
@@ -45,6 +51,9 @@ public class OneCIntegrationServiceImpl implements OneCIntegrationService {
     
     @Autowired
     private InventoryOnDemandRefresher inventoryRefresher;
+    
+    @Autowired
+    private OneCContractMapper contractMapper;
     
     private String lastSyncMessage = "Не синхронизировалось";
     private String lastSyncTime = "Никогда";
@@ -144,6 +153,36 @@ public class OneCIntegrationServiceImpl implements OneCIntegrationService {
             throw new RuntimeException("Ошибка отправки заказа в 1С: " + e.getMessage());
         }
     }
+
+    @Override
+    public void sendOrderMessageToOneC(OneCOrderMessage message) {
+        try {
+            // Преобразуем сообщение в стандартизированный контракт
+            OneCIntegrationContract.OrderMessage contractMessage = contractMapper.toOrderMessage(message);
+            
+            HttpHeaders headers = createHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<OneCIntegrationContract.OrderMessage> entity = new HttpEntity<>(contractMessage, headers);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    oneCApiUrl + "/orders",
+                    HttpMethod.POST,
+                    entity,
+                    String.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                logger.info("Order {} delivered to 1C via Rabbit bridge using contract v{}", 
+                    message.getOrderId(), contractMessage.getContractVersion());
+            } else {
+                logger.error("Failed to deliver order {} to 1C, status {}", message.getOrderId(), response.getStatusCode());
+                throw new IllegalStateException("1C responded with status " + response.getStatusCode());
+            }
+        } catch (Exception e) {
+            logger.error("Error sending order {} message to 1C: {}", message.getOrderId(), e.getMessage(), e);
+            throw new RuntimeException("Ошибка отправки заказа в 1С: " + e.getMessage(), e);
+        }
+    }
     
     @Override
     public void sendPendingOrdersToOneC() {
@@ -193,6 +232,36 @@ public class OneCIntegrationServiceImpl implements OneCIntegrationService {
     @Override
     public SyncStatus getLastSyncStatus() {
         return new SyncStatus("GENERAL", "SUCCESS", lastSyncTime, lastSyncMessage);
+    }
+
+    @Override
+    public void sendReturnMessageToOneC(OneCReturnMessage message) {
+        try {
+            // Преобразуем сообщение в стандартизированный контракт
+            OneCIntegrationContract.ReturnMessage contractMessage = contractMapper.toReturnMessage(message);
+            
+            HttpHeaders headers = createHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<OneCIntegrationContract.ReturnMessage> entity = new HttpEntity<>(contractMessage, headers);
+            ResponseEntity<String> response = restTemplate.exchange(
+                    oneCApiUrl + "/returns",
+                    HttpMethod.POST,
+                    entity,
+                    String.class
+            );
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                logger.info("Return {} delivered to 1C via Rabbit bridge using contract v{}", 
+                    message.getReturnId(), contractMessage.getContractVersion());
+            } else {
+                logger.error("Failed to deliver return {} to 1C, status {}", message.getReturnId(), response.getStatusCode());
+                throw new IllegalStateException("1C responded with status " + response.getStatusCode());
+            }
+        } catch (Exception e) {
+            logger.error("Error sending return {} message to 1C: {}", message.getReturnId(), e.getMessage(), e);
+            throw new RuntimeException("Ошибка отправки возврата в 1С: " + e.getMessage(), e);
+        }
     }
     
     private HttpHeaders createHeaders() {

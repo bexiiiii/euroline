@@ -4,12 +4,14 @@ import autoparts.kz.modules.bridge.service.OrderRequestBuffer;
 import autoparts.kz.modules.stockOneC.kafka.OrderResponseMsg;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.*;
 
 @RestController @RequestMapping("/bridge/orders")
+@ConditionalOnProperty(prefix = "integration.kafka", name = "enabled", havingValue = "true")
 public class OrderBridgeController {
 
     private final OrderRequestBuffer buffer;

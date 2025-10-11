@@ -1,21 +1,13 @@
 "use client";
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { analyticsApi } from "@/lib/api/analytics";
+import { ApexOptions } from "apexcharts";
+import { analyticsApi, MonthlyTargetSummary } from "@/lib/api/analytics";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
-interface TargetData {
-  target: number;
-  currentRevenue: number;
-  todayRevenue: number;
-  progressPercent: number;
-  growthPercent?: number;
-  isGrowthPositive?: boolean;
-}
-
 export default function MonthlyTarget() {
-  const [targetData, setTargetData] = useState<TargetData | null>(null);
+  const [targetData, setTargetData] = useState<MonthlyTargetSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +15,6 @@ export default function MonthlyTarget() {
     const fetchTargetData = async () => {
       try {
         const data = await analyticsApi.getMonthlyTarget();
-        console.log("Monthly target data:", data);
         setTargetData(data);
         setError(null);
       } catch (error) {
@@ -45,7 +36,7 @@ export default function MonthlyTarget() {
     fetchTargetData();
   }, []);
 
-  const options: any = {
+  const options: ApexOptions = {
     chart: {
       height: 350,
       type: "radialBar",

@@ -1,6 +1,6 @@
 import ContributorsOverviewTable from "@/components/ui/contributors-overview-table";
 
-export function DetailedInfoOrder() {
+export default function OrderDetailPage() {
   return (
     <div className="bg-white min-h-screen pt-24">
       <div className="container mx-auto px-6 pt-5">
@@ -18,5 +18,3 @@ export function DetailedInfoOrder() {
     </div>
   );
 }
-
-export default DetailedInfoOrder;

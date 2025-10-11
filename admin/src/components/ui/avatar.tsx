@@ -1,37 +1,31 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "@/lib/utils"
+import * as React from "react";
+import { cn } from "@/lib/utils";
 
-const avatarVariants = cva(
-  "relative flex shrink-0 overflow-hidden rounded-full",
-  {
-    variants: {
-      size: {
-        sm: "h-8 w-8",
-        md: "h-10 w-10",
-        lg: "h-12 w-12",
-        xl: "h-16 w-16",
-      },
-    },
-    defaultVariants: {
-      size: "md",
-    },
-  }
-)
+const avatarSizeClass: Record<string, string> = {
+  sm: "h-8 w-8",
+  md: "h-10 w-10",
+  lg: "h-12 w-12",
+  xl: "h-16 w-16",
+};
 
-export interface AvatarProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof avatarVariants> {}
+export interface AvatarProps extends React.HTMLAttributes<HTMLDivElement> {
+  size?: keyof typeof avatarSizeClass;
+}
 
-const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>(
-  ({ className, size, ...props }, ref) => (
-    <div
-      ref={ref}
-      className={cn(avatarVariants({ size }), className)}
-      {...props}
-    />
-  )
-)
+const Avatar = React.forwardRef<HTMLDivElement, AvatarProps>((
+  { className, size = "md", ...props },
+  ref
+) => (
+  <div
+    ref={ref}
+    className={cn(
+      "relative flex shrink-0 overflow-hidden rounded-full",
+      avatarSizeClass[size] ?? avatarSizeClass.md,
+      className
+    )}
+    {...props}
+  />
+));
 Avatar.displayName = "Avatar"
 
 const AvatarImage = React.forwardRef<

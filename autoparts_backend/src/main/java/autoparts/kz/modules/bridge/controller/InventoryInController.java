@@ -4,10 +4,12 @@ import autoparts.kz.modules.stockOneC.kafka.InventoryDeltaMsg;
 import autoparts.kz.modules.stockOneC.kafka.InventorySnapshotMsg;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.web.bind.annotation.*;
 
 @RestController @RequestMapping("/bridge/inventory")
+@ConditionalOnProperty(prefix = "integration.kafka", name = "enabled", havingValue = "true")
 public class InventoryInController {
 
     private final KafkaTemplate<String,Object> kafka;

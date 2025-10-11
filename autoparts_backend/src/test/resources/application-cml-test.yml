@@ -1,0 +1,9 @@
+server:
+  ssl:
+    enabled: false
+
+cml:
+  username: test_1c
+  password: testpass
+  allowed-ips:
+    - 127.0.0.1

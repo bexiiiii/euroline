@@ -22,6 +22,36 @@ interface PromotionStats {
   totalUsageCount: number;
 }
 
+interface PromotionFormData {
+  title: string;
+  description: string;
+  discount: number;
+  type: 'PERCENTAGE' | 'FIXED';
+  startDate: string;
+  endDate: string;
+  status: 'ACTIVE' | 'INACTIVE';
+  minOrderAmount: string;
+  maxDiscountAmount: string;
+  usageLimit: string;
+  applicableCategories: string[];
+  applicableProducts: number[];
+}
+
+const emptyFormData: PromotionFormData = {
+  title: '',
+  description: '',
+  discount: 0,
+  type: 'PERCENTAGE',
+  startDate: '',
+  endDate: '',
+  status: 'ACTIVE',
+  minOrderAmount: '',
+  maxDiscountAmount: '',
+  usageLimit: '',
+  applicableCategories: [],
+  applicableProducts: [],
+};
+
 const ProductPromotionsPage = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState<"create" | "edit">("create");
@@ -36,13 +66,7 @@ const ProductPromotionsPage = () => {
     averageDiscount: 0,
     totalUsageCount: 0,
   });
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    startsAt: '',
-    endsAt: '',
-    status: 'ACTIVE',
-  });
+  const [formData, setFormData] = useState<PromotionFormData>({ ...emptyFormData });
 
   useEffect(() => {
     loadData();
@@ -59,11 +83,9 @@ const ProductPromotionsPage = () => {
 
       setPromotions(promotionsResponse.content);
       setProducts(productsResponse);
-      // categoriesApi.getCategories возвращает страницу
-      // @ts-ignore
-      setCategories((categoriesResponse as any).content || categoriesResponse);
+      setCategories(categoriesResponse.content ?? []);
 
-      const activePromotions = promotionsResponse.content.filter((p: Promotion) => p.status === 'ACTIVE').length;
+      const activePromotions = promotionsResponse.content.filter((p: Promotion) => p.isActive).length;
       setStats({
         activePromotions,
         totalPromotions: promotionsResponse.content.length,
@@ -81,25 +103,34 @@ const ProductPromotionsPage = () => {
     return new Date(dateString).toLocaleDateString('ru-RU');
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "ACTIVE":
-        return <Badge color="success">Активна</Badge>;
-      case "INACTIVE":
-        return <Badge color="light">Неактивна</Badge>;
-      default:
-        return <Badge color="light">{status}</Badge>;
+  const formatCurrency = (value?: number | null) => {
+    if (value === null || value === undefined) {
+      return '—';
     }
+    return new Intl.NumberFormat('kk-KZ', {
+      style: 'currency',
+      currency: 'KZT',
+      minimumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const getStatusBadge = (isActive: boolean, start?: string, end?: string) => {
+    const color = isActive ? "success" : "light";
+    const label = isActive ? "Активна" : "Неактивна";
+    return (
+      <div className="flex flex-col gap-1">
+        <Badge color={color}>{label}</Badge>
+        {start && end && (
+          <span className="text-xs text-gray-500 hidden lg:block">
+            {formatDate(start)} — {formatDate(end)}
+          </span>
+        )}
+      </div>
+    );
   };
 
   const resetForm = () => {
-    setFormData({
-      title: '',
-      description: '',
-      startsAt: '',
-      endsAt: '',
-      status: 'ACTIVE',
-    });
+    setFormData({ ...emptyFormData });
   };
 
   const openCreateModal = () => {
@@ -117,13 +148,14 @@ const ProductPromotionsPage = () => {
       description: promotion.description,
       discount: promotion.discount,
       type: promotion.type,
-      startDate: promotion.startDate.split('T')[0],
-      endDate: promotion.endDate.split('T')[0],
-      minOrderAmount: promotion.minOrderAmount?.toString() || '',
-      maxDiscountAmount: promotion.maxDiscountAmount?.toString() || '',
-      usageLimit: promotion.usageLimit?.toString() || '',
-      applicableCategories: promotion.applicableCategories || [],
-      applicableProducts: promotion.applicableProducts || [],
+      startDate: promotion.startDate?.split('T')[0] ?? '',
+      endDate: promotion.endDate?.split('T')[0] ?? '',
+      status: promotion.isActive ? 'ACTIVE' : 'INACTIVE',
+      minOrderAmount: promotion.minOrderAmount !== undefined ? String(promotion.minOrderAmount) : '',
+      maxDiscountAmount: promotion.maxDiscountAmount !== undefined ? String(promotion.maxDiscountAmount) : '',
+      usageLimit: promotion.usageLimit !== undefined ? String(promotion.usageLimit) : '',
+      applicableCategories: promotion.applicableCategories ?? [],
+      applicableProducts: promotion.applicableProducts ?? [],
     });
     setIsModalOpen(true);
   };

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useSearchStore } from "@/lib/stores/searchStore";
@@ -278,4 +278,10 @@ function SearchPage() {
   );
 }
 
-export default SearchPage;
+export default function SearchPageWrapper() {
+  return (
+    <Suspense fallback={<div className="py-16 text-center text-gray-500">Загрузка...</div>}>
+      <SearchPage />
+    </Suspense>
+  );
+}

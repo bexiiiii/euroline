@@ -10,5 +10,5 @@ export interface PageResponse<T> {
 export interface ApiError {
   message: string;
   status: number;
-  data?: any;
+  data?: unknown;
 }

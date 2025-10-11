@@ -136,13 +136,8 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
   );
 
   const receiptOriginalUrl = receiptUrlCandidates[0] ?? null;
-  const [resolvedReceiptUrl, setResolvedReceiptUrl] = useState<string | null>(null);
 
-  useEffect(() => {
-    setResolvedReceiptUrl(null);
-  }, [topUp?.receiptUrl]);
-
-  const receiptLinkHref = resolvedReceiptUrl ?? receiptOriginalUrl;
+  const receiptLinkHref = receiptOriginalUrl;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -406,7 +401,6 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
                       <ReceiptPreview
                         candidates={receiptUrlCandidates}
                         alt="Квитанция"
-                        onResolved={setResolvedReceiptUrl}
                       />
                     </div>
                     {receiptLinkHref ? (

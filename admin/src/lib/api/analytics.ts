@@ -48,25 +48,90 @@ export interface AnalyticsOverview {
   }>;
 }
 
+export interface FinanceOverviewSummary {
+  totalRevenue: number;
+  monthlyRevenue: number;
+  monthlyExpenses: number;
+  monthlyProfit: number;
+  averageOrderValue: number;
+  totalOrders: number;
+  profitMargin: number;
+}
+
+export interface TopProductDetail {
+  id: number;
+  name: string;
+  category: string;
+  sales: number;
+  revenue: number;
+  stock?: number;
+  trend?: string;
+}
+
+export interface CategoryDistributionItem {
+  category: string;
+  count: number;
+  percentage: number;
+}
+
+export interface HeatmapDataPoint {
+  day: string;
+  hour: number;
+  sales: number;
+}
+
+export interface MonthlyTargetSummary {
+  target: number;
+  currentRevenue: number;
+  todayRevenue: number;
+  progressPercent: number;
+  growthPercent?: number;
+  isGrowthPositive?: boolean;
+}
+
+export interface CustomerDemographic {
+  country: string;
+  customers?: number;
+  visitors?: number;
+  percentage: number;
+}
+
+export interface RecentOrderItemSummary {
+  productName: string;
+  quantity: number;
+  price: number;
+  category: string;
+}
+
+export interface RecentOrderSummary {
+  id: number;
+  publicCode: string;
+  status: string;
+  totalPrice: number;
+  createdAt: string;
+  customerEmail: string;
+  items: RecentOrderItemSummary[];
+}
+
 export const analyticsApi = {
   getDashboard: async (): Promise<DashboardStats> => {
     return apiFetch<DashboardStats>('/api/analytics/dashboard');
   },
 
-  getSales: async (): Promise<any> => {
-    return apiFetch<any>('/api/analytics/sales');
+  getSales: async (): Promise<Record<string, unknown>> => {
+    return apiFetch<Record<string, unknown>>('/api/analytics/sales');
   },
 
-  getCustomers: async (): Promise<any> => {
-    return apiFetch<any>('/api/analytics/customers');
+  getCustomers: async (): Promise<Record<string, unknown>> => {
+    return apiFetch<Record<string, unknown>>('/api/analytics/customers');
   },
 
-  getProducts: async (): Promise<any> => {
-    return apiFetch<any>('/api/analytics/products');
+  getProducts: async (): Promise<Record<string, unknown>> => {
+    return apiFetch<Record<string, unknown>>('/api/analytics/products');
   },
 
-  getFinance: async (): Promise<any> => {
-    return apiFetch<any>('/api/analytics/finance');
+  getFinance: async (): Promise<Record<string, unknown>> => {
+    return apiFetch<Record<string, unknown>>('/api/analytics/finance');
   },
 
   getTotalUsers: async (): Promise<number> => {
@@ -101,7 +166,11 @@ export const analyticsApi = {
     return apiFetch<ChartDataPoint[]>('/api/admin/analytics/monthly-revenue');
   },
 
-  getCustomerGrowth: async (): Promise<{ totalCustomers: number; newCustomersThisMonth: number; growth: string }> => {
+  getCustomerGrowth: async (): Promise<{
+    totalCustomers: number;
+    newCustomersThisMonth: number;
+    growth: string;
+  }> => {
     return apiFetch('/api/admin/analytics/customer-growth');
   },
 
@@ -109,31 +178,31 @@ export const analyticsApi = {
     return apiFetch<ChartDataPoint[]>('/api/admin/analytics/customer-growth-chart');
   },
 
-  getFinanceOverview: async (): Promise<any> => {
-    return apiFetch('/api/admin/analytics/finance-overview');
+  getFinanceOverview: async (): Promise<FinanceOverviewSummary> => {
+    return apiFetch<FinanceOverviewSummary>('/api/admin/analytics/finance-overview');
   },
 
-  getTopProductsDetailed: async (limit: number = 10): Promise<any[]> => {
-    return apiFetch(`/api/admin/analytics/top-products-detailed?limit=${limit}`);
+  getTopProductsDetailed: async (limit = 10): Promise<TopProductDetail[]> => {
+    return apiFetch<TopProductDetail[]>(`/api/admin/analytics/top-products-detailed?limit=${limit}`);
   },
 
-  getCategoryDistribution: async (): Promise<any[]> => {
-    return apiFetch('/api/admin/analytics/category-distribution');
+  getCategoryDistribution: async (): Promise<CategoryDistributionItem[]> => {
+    return apiFetch<CategoryDistributionItem[]>('/api/admin/analytics/category-distribution');
   },
 
-  getSalesHeatmap: async (): Promise<any[]> => {
-    return apiFetch('/api/admin/analytics/sales-heatmap');
+  getSalesHeatmap: async (): Promise<HeatmapDataPoint[]> => {
+    return apiFetch<HeatmapDataPoint[]>('/api/admin/analytics/sales-heatmap');
   },
 
-  getRecentOrders: async (limit: number = 5): Promise<any[]> => {
-    return apiFetch(`/api/admin/analytics/recent-orders?limit=${limit}`);
+  getRecentOrders: async (limit = 5): Promise<RecentOrderSummary[]> => {
+    return apiFetch<RecentOrderSummary[]>(`/api/admin/analytics/recent-orders?limit=${limit}`);
   },
 
-  getMonthlyTarget: async (): Promise<any> => {
-    return apiFetch('/api/admin/analytics/monthly-target');
+  getMonthlyTarget: async (): Promise<MonthlyTargetSummary> => {
+    return apiFetch<MonthlyTargetSummary>('/api/admin/analytics/monthly-target');
   },
 
-  getCustomerDemographics: async (): Promise<any[]> => {
-    return apiFetch('/api/admin/analytics/customer-demographics');
+  getCustomerDemographics: async (): Promise<CustomerDemographic[]> => {
+    return apiFetch<CustomerDemographic[]>('/api/admin/analytics/customer-demographics');
   },
 };

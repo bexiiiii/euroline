@@ -144,4 +144,27 @@ export const ordersApi = {
     });
     return normalizeOrder(response);
   },
+
+  /**
+   * Export orders with applied filters as CSV
+   */
+  exportOrders: async (filters: OrderFilters = {}): Promise<Blob> => {
+    const params = new URLSearchParams();
+
+    if (filters.status) params.append('status', filters.status);
+    if (filters.paymentStatus) params.append('paymentStatus', filters.paymentStatus);
+    if (filters.search) params.append('q', filters.search);
+    if (filters.fromDate) params.append('from', filters.fromDate);
+    if (filters.toDate) params.append('to', filters.toDate);
+    if (filters.sort) params.append('sort', filters.sort);
+
+    return apiFetch<Blob>('/api/orders/export', {
+      method: 'POST',
+      body: params.toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      parseAs: 'blob',
+    });
+  },
 };

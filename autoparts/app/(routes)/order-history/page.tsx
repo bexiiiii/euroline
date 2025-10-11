@@ -6,7 +6,7 @@ const items = [
   { label: "История заказов", isCurrent: true },
 ];
 
-export function PartsCatalogPage() {
+export default function OrderHistoryPage() {
   return (
     <div className="bg-white min-h-screen pt-24">
       <div className="container mx-auto px-6 pt-5">
@@ -25,5 +25,3 @@ export function PartsCatalogPage() {
     </div>
   );
 }
-
-export default PartsCatalogPage;

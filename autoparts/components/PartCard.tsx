@@ -40,7 +40,7 @@ export function PartCard({ detail, className = "" }: PartCardProps) {
     setImageError(true)
   }
 
-  const hasImage = detail.imageUrl && !imageError
+  const hasImage = !!detail.imageUrl && !imageError
 
   return (
     <Card className={`w-full hover:shadow-lg transition-shadow ${className}`}>
@@ -62,7 +62,7 @@ export function PartCard({ detail, className = "" }: PartCardProps) {
 
       <CardContent className="space-y-3">
         {/* Изображение */}
-        {hasImage && (
+        {hasImage && detail.imageUrl && (
           <div className="relative">
             <Dialog open={isImageDialogOpen} onOpenChange={setIsImageDialogOpen}>
               <DialogTrigger asChild>

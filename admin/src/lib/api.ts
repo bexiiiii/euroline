@@ -2,9 +2,9 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080
 
 export class ApiError extends Error {
   status: number;
-  data?: any;
+  data?: unknown;
 
-  constructor(message: string, status: number, data?: any) {
+  constructor(message: string, status: number, data?: unknown) {
     super(message);
     this.status = status;
     this.data = data;
@@ -12,7 +12,12 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+type ApiFetchOptions = RequestInit & {
+  parseAs?: 'json' | 'text' | 'blob';
+};
+
+export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+  const { parseAs = 'json', ...requestInit } = options;
   let token: string | null | undefined;
 
   if (typeof window !== 'undefined') {
@@ -41,10 +46,30 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     token = undefined;
   }
 
-  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
-  const headers = new Headers(options.headers || {});
-  if (!isFormData) headers.set('Content-Type', 'application/json');
+  const isFormData = typeof FormData !== 'undefined' && requestInit.body instanceof FormData;
+  const isUrlEncoded =
+    typeof URLSearchParams !== 'undefined' && requestInit.body instanceof URLSearchParams;
+  const headers = new Headers(requestInit.headers || {});
+  if (!isFormData && !isUrlEncoded && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
   if (token) headers.set('Authorization', `Bearer ${token}`);
+
+  const extractMessage = (data: unknown): string | undefined => {
+    if (typeof data !== 'object' || data === null) {
+      return undefined;
+    }
+    const record = data as Record<string, unknown>;
+    const message = record.message;
+    if (typeof message === 'string') {
+      return message;
+    }
+    const errorText = record.error;
+    if (typeof errorText === 'string') {
+      return errorText;
+    }
+    return undefined;
+  };
 
   console.log(`API запрос к ${path}:`, { 
     hasToken: !!token,
@@ -57,7 +82,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   try {
     const res = await fetch(`${API_URL}${path}`, {
-      ...options,
+      ...requestInit,
       headers,
       credentials: 'include', // оставь, если используешь cookie для чего-то ещё
     });
@@ -85,8 +110,8 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
       const contentType = res.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         try {
-          const errorData = await res.clone().json();
-          const errorMsg = errorData?.message || errorData?.error || '';
+          const errorData = (await res.clone().json()) as unknown;
+          const errorMsg = extractMessage(errorData) ?? '';
           if (errorMsg.includes('JWT signature does not match') || errorMsg.includes('signature')) {
             if (typeof window !== 'undefined') {
               try {
@@ -97,7 +122,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
             }
             throw new ApiError('Не авторизован', 401);
           }
-        } catch (jsonError) {
+        } catch {
           // If we can't parse JSON, continue with regular 403 handling
         }
       }
@@ -107,15 +132,17 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
     if (!res.ok) {
       let errorMessage = `Ошибка запроса: ${res.status}`;
-      let errorData: any;
+      let errorData: unknown;
       let rawText = '';
 
       const contentType = res.headers.get('content-type');
       if (contentType && contentType.includes('application/json')) {
         try {
           errorData = await res.json();
-          if (errorData?.message) errorMessage = errorData.message;
-          else if (errorData?.error) errorMessage = errorData.error;
+          const extracted = extractMessage(errorData);
+          if (extracted) {
+            errorMessage = extracted;
+          }
         } catch {
           const text = await res.text();
           rawText = text;
@@ -147,6 +174,14 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
     if (res.status === 204) {
       return {} as T;
+    }
+
+    if (parseAs === 'blob') {
+      return (await res.blob()) as unknown as T;
+    }
+
+    if (parseAs === 'text') {
+      return (await res.text()) as unknown as T;
     }
 
     const contentType = res.headers.get('content-type');

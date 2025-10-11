@@ -38,6 +38,7 @@ public class OrderService {
     private final ObjectMapper objectMapper;
     private final FinanceService financeService;
     private final autoparts.kz.modules.telegram.service.TelegramNotificationService telegramNotificationService;
+    private final autoparts.kz.modules.cml.service.OneCBridgePublisher oneCBridgePublisher;
 
     @Transactional
     public Order createOrderFromCart(Long userId, CreateOrderRequest req) {
@@ -179,6 +180,7 @@ public class OrderService {
     public void confirmOrder(Long orderId) {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
+        OrderStatus previousStatus = order.getStatus();
         order.setStatus(OrderStatus.CONFIRMED);
         orderRepository.save(order);
         try {
@@ -193,6 +195,9 @@ public class OrderService {
                     Notification.Type.ORDER,
                     Notification.Severity.SUCCESS);
         } catch (Exception ignored) {}
+        if (previousStatus != OrderStatus.CONFIRMED) {
+            oneCBridgePublisher.publishOrderAfterCommit(order);
+        }
         log.info("Order confirmed: orderId={}", orderId);
     }
 

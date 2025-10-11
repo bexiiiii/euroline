@@ -49,7 +49,12 @@ const ViewBalanceModal: React.FC<ViewBalanceModalProps> = ({ isOpen, onClose, ac
         setLoading(true);
         setError(null);
         const response = await financeApi.getTransactionDetails(accountData.clientId, 0, 50);
-        setTransactions(response.content ?? []);
+        const normalized: TransactionDetail[] = (response.content ?? []).map((txn) => ({
+          ...txn,
+          amount: typeof txn.amount === "string" ? Number(txn.amount) : txn.amount,
+          products: txn.products ?? [],
+        }));
+        setTransactions(normalized);
       } catch (err) {
         console.error("Не удалось загрузить транзакции клиента", err);
         setTransactions([]);
@@ -177,7 +182,8 @@ const ViewBalanceModal: React.FC<ViewBalanceModalProps> = ({ isOpen, onClose, ac
                   </TableHeader>
                   <TableBody className="divide-y divide-gray-200 dark:divide-white/[0.04] bg-white dark:bg-white/[0.01]">
                     {transactions.map((txn) => {
-                      const hasProducts = txn.products && txn.products.length > 0;
+                      const products = txn.products ?? [];
+                      const hasProducts = products.length > 0;
                       const orderLabel = txn.orderPublicCode || (txn.orderId ? `Order #${txn.orderId}` : null);
                       return (
                         <React.Fragment key={txn.id}>
@@ -189,7 +195,7 @@ const ViewBalanceModal: React.FC<ViewBalanceModalProps> = ({ isOpen, onClose, ac
                                 </Badge>
                                 {hasProducts && (
                                   <span className="text-xs text-gray-400 dark:text-gray-500">
-                                    {txn.products.length} тов.
+                                    {products.length} тов.
                                   </span>
                                 )}
                               </div>
@@ -259,10 +265,10 @@ const ViewBalanceModal: React.FC<ViewBalanceModalProps> = ({ isOpen, onClose, ac
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.04]">
-                                      {txn.products.map((product, index) => (
-                                        <TableRow key={`${txn.id}-${product.productCode}-${index}`}>
+                                      {products.map((product, index) => (
+                                        <TableRow key={`${txn.id}-${product.productCode ?? index}-${index}`}>
                                           <TableCell className="px-4 py-2 text-sm text-gray-900 dark:text-white">
-                                            {product.productName}
+                                            {product.productName || product.name || "—"}
                                           </TableCell>
                                           <TableCell className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300">
                                             {product.productCode || "—"}
@@ -298,14 +304,16 @@ const ViewBalanceModal: React.FC<ViewBalanceModalProps> = ({ isOpen, onClose, ac
   );
 };
 
-function formatCurrency(amount: number | null | undefined): string {
+function formatCurrency(amount: number | string | null | undefined): string {
   if (amount === null || amount === undefined) return "—";
+  const numeric = typeof amount === "string" ? Number(amount) : amount;
+  if (Number.isNaN(numeric)) return "—";
   return new Intl.NumberFormat("kk-KZ", {
     style: "currency",
     currency: "KZT",
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(numeric);
 }
 
 function formatSignedCurrency(txn: TransactionDetail): string {

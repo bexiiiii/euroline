@@ -1,4 +1,6 @@
 import { apiFetch } from '../api';
+import { PageResponse } from './types';
+import type { Category } from './categories';
 
 export interface ProductProperty {
   propertyName: string;
@@ -20,11 +22,9 @@ export interface Product {
   imageUrl: string;
   properties: ProductProperty[];
   syncedWith1C: boolean;
-  // Данные из 1С
   price?: number;
   stock?: number;
   warehouses?: ProductWarehouse[];
-  // Weekly
   weekly?: boolean;
   weeklyStartAt?: string;
   weeklyEndAt?: string;
@@ -41,34 +41,184 @@ export interface ProductRequest {
 }
 
 export interface ProductFilters {
-  q?: string; // для поиска
+  q?: string;
+  brand?: string;
+  category?: string;
+  page?: number;
+  size?: number;
+  sort?: string;
 }
 
-export const productApi = {
-  /**
-   * Get all products
-   */
-  getProducts: async (): Promise<Product[]> => {
-    return apiFetch<Product[]>('/api/admin/products/all');
-  },
+const DEFAULT_PAGE_SIZE = 20;
 
-  /**
-   * Search products
-   */
+const normalizeQuery = (value?: string): string | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed.toLowerCase() : undefined;
+};
+
+const filterProducts = (products: Product[], filters: ProductFilters): Product[] => {
+  const query = normalizeQuery(filters.q);
+  const brand = normalizeQuery(filters.brand);
+
+  return products.filter((product) => {
+    if (query) {
+      const haystack = [
+        product.name,
+        product.code,
+        product.description,
+        product.brand,
+      ]
+        .filter(Boolean)
+        .map((part) => part!.toLowerCase());
+
+      const hasMatch = haystack.some((part) => part.includes(query));
+      if (!hasMatch) {
+        return false;
+      }
+    }
+
+    if (brand) {
+      const productBrand = normalizeQuery(product.brand);
+      if (!productBrand || productBrand !== brand) {
+        return false;
+      }
+    }
+
+    // category filter can be implemented once backend exposes category data per product
+    return true;
+  });
+};
+
+const getComparableValue = (product: Product, field?: string): string | number => {
+  switch (field) {
+    case 'brand':
+      return product.brand?.toLowerCase() ?? '';
+    case 'price':
+      return product.price ?? 0;
+    case 'stock':
+      return product.stock ?? 0;
+    case 'code':
+      return product.code?.toLowerCase() ?? '';
+    default:
+      return product.name?.toLowerCase() ?? '';
+  }
+};
+
+const sortProducts = (products: Product[], sort?: string): Product[] => {
+  if (!sort) return products;
+
+  const [field, direction] = sort.split(',');
+  const multiplier = direction?.toLowerCase() === 'desc' ? -1 : 1;
+
+  return [...products].sort((a, b) => {
+    const aValue = getComparableValue(a, field);
+    const bValue = getComparableValue(b, field);
+
+    if (aValue < bValue) return -1 * multiplier;
+    if (aValue > bValue) return 1 * multiplier;
+    return 0;
+  });
+};
+
+const clampPage = (page?: number): number => {
+  if (page === undefined || Number.isNaN(page) || page < 0) {
+    return 0;
+  }
+  return Math.floor(page);
+};
+
+const normalizePageSize = (size?: number): number => {
+  if (!size || Number.isNaN(size) || size <= 0) {
+    return DEFAULT_PAGE_SIZE;
+  }
+  return Math.floor(size);
+};
+
+async function fetchProducts(): Promise<Product[]>;
+async function fetchProducts(filters: ProductFilters): Promise<PageResponse<Product>>;
+async function fetchProducts(filters?: ProductFilters): Promise<Product[] | PageResponse<Product>> {
+  const allProducts = await apiFetch<Product[]>('/api/admin/products/all');
+
+  if (!filters || Object.keys(filters).length === 0) {
+    return allProducts;
+  }
+
+  const page = clampPage(filters.page);
+  const size = normalizePageSize(filters.size);
+  const filtered = filterProducts(allProducts, filters);
+  const sorted = sortProducts(filtered, filters.sort);
+
+  const totalElements = sorted.length;
+  const totalPages = size > 0 ? Math.ceil(totalElements / size) : 0;
+  const start = page * size;
+  const content = size > 0 ? sorted.slice(start, start + size) : sorted;
+
+  return {
+    content,
+    totalElements,
+    totalPages,
+    size,
+    number: page,
+  };
+}
+
+const uploadSingleFile = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await apiFetch<{ url?: string; id?: string }>(`/api/files/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (response?.url) {
+    return response.url;
+  }
+  if (response?.id) {
+    return `/api/files/${response.id}`;
+  }
+  throw new Error('Не удалось загрузить файл');
+};
+
+const collectCategoryNames = (items: Category[] = [], acc: string[]): void => {
+  for (const item of items) {
+    acc.push(item.name);
+    if (item.subcategories && item.subcategories.length > 0) {
+      collectCategoryNames(item.subcategories, acc);
+    }
+  }
+};
+
+const getCategoryNames = async (): Promise<string[]> => {
+  const tree = await apiFetch<Category[]>('/api/admin/categories/tree');
+  const names: string[] = [];
+  collectCategoryNames(tree, names);
+  return names;
+};
+
+const getBrandNames = async (): Promise<string[]> => {
+  const products = await apiFetch<Product[]>('/api/admin/products/all');
+  const brands = new Set<string>();
+  for (const product of products) {
+    const brand = normalizeQuery(product.brand);
+    if (brand) {
+      brands.add(brand);
+    }
+  }
+  return Array.from(brands).map((brand) => brand.charAt(0).toUpperCase() + brand.slice(1));
+};
+
+export const productApi = {
+  getProducts: fetchProducts,
+
   searchProducts: async (query: string): Promise<Product[]> => {
     return apiFetch<Product[]>(`/api/admin/products/search?q=${encodeURIComponent(query)}`);
   },
 
-  /**
-   * Get a specific product by ID
-   */
   getProductById: async (productId: number): Promise<Product> => {
     return apiFetch<Product>(`/api/admin/products/${productId}`);
   },
 
-  /**
-   * Create a new product
-   */
   createProduct: async (productData: ProductRequest): Promise<Product> => {
     return apiFetch<Product>('/api/admin/products/create', {
       method: 'POST',
@@ -76,28 +226,19 @@ export const productApi = {
     });
   },
 
-  /**
-   * Update product information
-   */
-  updateProduct: async (productId: number, productData: ProductRequest): Promise<Product> => {
+  updateProduct: async (productId: number, productData: ProductRequest | Partial<ProductRequest>): Promise<Product> => {
     return apiFetch<Product>(`/api/admin/products/update/${productId}`, {
       method: 'PUT',
       body: JSON.stringify(productData),
     });
   },
 
-  /**
-   * Delete a product
-   */
   deleteProduct: async (productId: number): Promise<void> => {
     return apiFetch<void>(`/api/admin/products/${productId}`, {
       method: 'DELETE',
     });
   },
 
-  /**
-   * Toggle or set weekly state for product
-   */
   setWeekly: async (
     productId: number,
     body: { value?: boolean; startAt?: string; endAt?: string; autoRange?: boolean }
@@ -107,4 +248,19 @@ export const productApi = {
       body: JSON.stringify(body),
     });
   },
+
+  uploadProductImages: async (productId: number, files: File[]): Promise<string[]> => {
+    if (!files.length) {
+      return [];
+    }
+
+    const uploads = await Promise.all(files.map((file) => uploadSingleFile(file)));
+
+    // TODO: integrate uploaded URLs with the product via a dedicated endpoint when available
+    return uploads;
+  },
+
+  getCategories: getCategoryNames,
+
+  getBrands: getBrandNames,
 };

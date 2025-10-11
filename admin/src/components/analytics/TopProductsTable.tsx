@@ -1,21 +1,11 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { analyticsApi } from "@/lib/api/analytics";
+import { analyticsApi, TopProductDetail } from "@/lib/api/analytics";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table";
 import Badge from "../ui/badge/Badge";
 
-interface ProductData {
-  id: number;
-  name: string;
-  category: string;
-  sales: number;
-  revenue: number;
-  stock: number;
-  trend: string;
-}
-
 export default function TopProductsTable() {
-  const [products, setProducts] = useState<ProductData[]>([]);
+  const [products, setProducts] = useState<TopProductDetail[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

@@ -22,11 +22,21 @@ public interface OneCIntegrationService {
      * @param orderId ID заказа для отправки
      */
     void sendOrderToOneC(Long orderId);
+
+    /**
+     * Отправить агрегированное сообщение заказа в 1С.
+     */
+    void sendOrderMessageToOneC(autoparts.kz.modules.cml.domain.dto.OneCOrderMessage message);
     
     /**
      * Отправить все ожидающие заказы в 1С
      */
     void sendPendingOrdersToOneC();
+
+    /**
+     * Отправить информацию о возврате в 1С.
+     */
+    void sendReturnMessageToOneC(autoparts.kz.modules.cml.domain.dto.OneCReturnMessage message);
     
     /**
      * Получить статус последней синхронизации

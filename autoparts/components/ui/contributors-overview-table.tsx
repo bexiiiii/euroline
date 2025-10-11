@@ -13,6 +13,9 @@ import {
 } from "@/components/ui/table";
 
 import { useState, useMemo, useEffect } from "react"
+import type { RangeValue } from "@react-types/shared"
+import type { DateValue } from "@react-types/datepicker"
+import { getLocalTimeZone } from "@internationalized/date"
 import { CalendarComponent } from "../CalendarComponent"
 import { getMyOrders, type OrderResponse } from "@/lib/api/orders"
 import { useNotificationsStore } from "@/lib/stores/notificationsStore"
@@ -92,15 +95,23 @@ export default function OrdersTable() {
 
   const totalSum = orders.reduce((acc, order) => acc + order.price, 0)
 
-  const [search, setSearch] = useState("")
+const [search, setSearch] = useState("")
 const [statusFilter, setStatusFilter] = useState("Все")
 const [warehouseFilter, setWarehouseFilter] = useState("Все")
-const [selectedRange, setSelectedRange] = useState<{ start: Date; end: Date } | null>(null)
+const [selectedRange, setSelectedRange] = useState<RangeValue<DateValue> | null>(null)
 
 
 
 
 const filteredOrders = useMemo(() => {
+  const timeZone = getLocalTimeZone()
+  const startDate = selectedRange?.start
+    ? selectedRange.start.toDate(timeZone)
+    : null
+  const endDate = selectedRange?.end
+    ? selectedRange.end.toDate(timeZone)
+    : null
+
   return orders.filter((order) => {
     const matchesSearch =
       order.id.includes(search) ||
@@ -114,9 +125,9 @@ const filteredOrders = useMemo(() => {
       warehouseFilter === "Все" || order.warehouse === warehouseFilter
 
     const matchesDate =
-      !selectedRange ||
-      (new Date(order.date) >= selectedRange.start &&
-       new Date(order.date) <= selectedRange.end)
+      !startDate || !endDate
+        ? true
+        : new Date(order.date) >= startDate && new Date(order.date) <= endDate
 
     return matchesSearch && matchesStatus && matchesWarehouse && matchesDate
   })

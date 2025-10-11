@@ -2,11 +2,13 @@ package autoparts.kz.modules.admin.Events.events;
 
 import autoparts.kz.modules.notifications.notifications.ReminderService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
+@ConditionalOnProperty(prefix = "integration.kafka", name = "enabled", havingValue = "true")
 public class OrderEventConsumer {
 
     private final ReminderService reminders;

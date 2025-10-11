@@ -1,5 +1,10 @@
 import { create } from 'zustand'
-import { ProfileUpdateRequest, UserProfile, profileApi, PasswordChangeRequest, ApiError } from '@/lib/api/profile'
+import { profileApi, ApiError } from '@/lib/api/profile'
+import type {
+  UserProfile,
+  UserProfileUpdateRequest,
+  PasswordChangeRequest,
+} from '@/lib/types/profile'
 import { toast } from 'sonner'
 
 interface ProfileState {
@@ -10,7 +15,7 @@ interface ProfileState {
 
   // Actions
   fetchProfile: () => Promise<void>
-  updateProfile: (data: ProfileUpdateRequest) => Promise<boolean>
+  updateProfile: (data: UserProfileUpdateRequest) => Promise<boolean>
   changePassword: (data: PasswordChangeRequest) => Promise<boolean>
   setProfile: (profile: UserProfile | null) => void
   setLoading: (loading: boolean) => void
@@ -43,7 +48,7 @@ export const useProfileStore = create<ProfileState>()((set, get) => ({
     }
   },
 
-  updateProfile: async (data: ProfileUpdateRequest): Promise<boolean> => {
+  updateProfile: async (data: UserProfileUpdateRequest): Promise<boolean> => {
     set({ isUpdating: true, error: null })
     
     try {

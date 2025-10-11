@@ -34,8 +34,6 @@ export function middleware(request: NextRequest) {
     const response = NextResponse.rewrite(targetUrl, {
       request: {
         headers: request.headers,
-        method: request.method,
-        body: request.body,
       },
     });
     

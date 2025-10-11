@@ -428,9 +428,9 @@ const ApiManagementPage: React.FC = () => {
               <h4 className="text-base font-semibold text-gray-900 dark:text-white mb-2">Базовые эндпоинты</h4>
               <ul className="list-disc list-inside space-y-2">
                 <li><code className="font-mono">GET /api/external/products</code> — список товаров</li>
-                <li><code className="font-mono">GET /api/external/products/{{id}}</code> — карточка товара</li>
+                <li><code className="font-mono">{`GET /api/external/products/{id}`}</code> — карточка товара</li>
                 <li><code className="font-mono">POST /api/external/orders</code> — создание заказа</li>
-                <li><code className="font-mono">GET /api/external/orders/{{id}}/status</code> — статус заказа</li>
+                <li><code className="font-mono">{`GET /api/external/orders/{id}/status`}</code> — статус заказа</li>
               </ul>
             </section>
 

@@ -23,7 +23,7 @@ export function ProfileDropDown() {
         href="/signin" 
         className="text-sm font-medium text-gray-700 hover:text-brand-600 dark:text-gray-300 dark:hover:text-brand-400"
       >
-        Sign In
+        Войти
       </Link>
     );
   }

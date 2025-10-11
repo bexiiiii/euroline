@@ -83,7 +83,7 @@ export default function CartTable() {
               <TableCell>
                 <Image
                   src={product.image || 'https://via.placeholder.com/64'}
-                  alt={product.name}
+                  alt={product.name ?? 'Изображение товара'}
                   width={64}
                   height={64}
                   className="rounded object-cover w-16 h-16"

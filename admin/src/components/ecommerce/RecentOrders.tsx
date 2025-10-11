@@ -8,27 +8,10 @@ import {
 } from "../ui/table";
 import Badge from "../ui/badge/Badge";
 import { useEffect, useState } from "react";
-import { analyticsApi } from "@/lib/api/analytics";
-
-interface OrderItem {
-  productName: string;
-  quantity: number;
-  price: number;
-  category: string;
-}
-
-interface Order {
-  id: number;
-  publicCode: string;
-  status: string;
-  totalPrice: number;
-  createdAt: string;
-  customerEmail: string;
-  items: OrderItem[];
-}
+import { analyticsApi, RecentOrderSummary } from "@/lib/api/analytics";
 
 export default function RecentOrders() {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<RecentOrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

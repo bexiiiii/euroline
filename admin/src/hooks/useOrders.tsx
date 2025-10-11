@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { orderApi, OrderFilters, Order, OrderStatus } from '@/lib/api/orders';
+import { ordersApi, OrderFilters, Order, OrderStatus } from '@/lib/api/orders';
 
 export function useOrders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -13,7 +13,7 @@ export function useOrders() {
     try {
       setLoading(true);
       setError(null);
-      const response = await orderApi.getOrders({
+      const response = await ordersApi.getOrders({
         ...filters,
         page: filters.page !== undefined ? filters.page : currentPage,
       });
@@ -35,7 +35,7 @@ export function useOrders() {
     try {
       setLoading(true);
       setError(null);
-      return await orderApi.getOrderById(orderId);
+      return await ordersApi.getOrder(orderId);
     } catch (err: any) {
       console.error('Error fetching order:', err);
       setError(err.message);
@@ -49,7 +49,7 @@ export function useOrders() {
     try {
       setLoading(true);
       setError(null);
-      const updatedOrder = await orderApi.updateOrderStatus(orderId, status);
+      const updatedOrder = await ordersApi.updateOrderStatus(orderId, status);
       // Update the order in the list if it exists
       setOrders(prevOrders => 
         prevOrders.map(order => order.id === orderId ? updatedOrder : order)
@@ -64,30 +64,11 @@ export function useOrders() {
     }
   }, []);
 
-  const updateOrder = useCallback(async (orderId: number, orderData: Partial<Order>) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const updatedOrder = await orderApi.updateOrder(orderId, orderData);
-      // Update the order in the list if it exists
-      setOrders(prevOrders => 
-        prevOrders.map(order => order.id === orderId ? updatedOrder : order)
-      );
-      return updatedOrder;
-    } catch (err: any) {
-      console.error('Error updating order:', err);
-      setError(err.message);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   const getOrderStats = useCallback(async (period: 'day' | 'week' | 'month' | 'year' = 'month') => {
     try {
       setLoading(true);
       setError(null);
-      return await orderApi.getOrderStats(period);
+      return await ordersApi.getStats();
     } catch (err: any) {
       console.error('Error fetching order stats:', err);
       setError(err.message);
@@ -101,7 +82,7 @@ export function useOrders() {
     try {
       setLoading(true);
       setError(null);
-      const blob = await orderApi.exportOrders(filters);
+      const blob = await ordersApi.exportOrders(filters);
       
       // Create a URL for the blob
       const url = window.URL.createObjectURL(blob);
@@ -137,7 +118,6 @@ export function useOrders() {
     fetchOrders,
     fetchOrderById,
     updateOrderStatus,
-    updateOrder,
     getOrderStats,
     exportOrders,
     setCurrentPage

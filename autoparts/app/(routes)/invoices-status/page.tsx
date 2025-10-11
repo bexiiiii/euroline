@@ -1,6 +1,6 @@
 import ReturnsStatusTable from "@/components/ReturnsStatusTable";
 
-export function invoicesStatus() {
+export default function InvoicesStatusPage() {
   return (
      <div className="bg-white min-h-screen pt-24">
       <main className="container mx-auto px-6">
@@ -16,5 +16,3 @@ export function invoicesStatus() {
     </div>  
   );
 }
-
-export default invoicesStatus;

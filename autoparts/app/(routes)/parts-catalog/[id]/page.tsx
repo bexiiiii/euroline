@@ -8,7 +8,7 @@ const items = [
   { label: "Kamaz", isCurrent: true },
 ];
 
-export function PartsCatalogPage() {
+export default function PartsCatalogPage() {
   return (
    <div className="bg-white min-h-screen pt-24">
       <main className="container mx-auto px-6">
@@ -30,5 +30,3 @@ export function PartsCatalogPage() {
    </div>
   );
 }
-
-export default PartsCatalogPage;

@@ -141,7 +141,7 @@ export interface CreateBannerRequest {
   status?: 'ACTIVE' | 'INACTIVE';
 }
 
-export interface UpdateBannerRequest extends CreateBannerRequest {}
+export type UpdateBannerRequest = CreateBannerRequest;
 
 function mapBannerFromBackend(b: any): Banner {
   return {

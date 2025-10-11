@@ -58,7 +58,10 @@ export function FileUploader({ onFileSelected }: FileUploaderProps) {
           target: {
             files: [file],
           },
-        } as React.ChangeEvent<HTMLInputElement>
+          currentTarget: {
+            files: [file],
+          },
+        } as unknown as React.ChangeEvent<HTMLInputElement>
         handleFileChange(fakeEvent)
       }
     },

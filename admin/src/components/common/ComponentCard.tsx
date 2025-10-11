@@ -221,7 +221,7 @@ const ComponentCard: React.FC<ComponentCardProps> = ({
         <span className="text-gray-500 dark:text-gray-400">Активные фильтры:</span>
         {searchQuery && (
           <span className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-md text-gray-700 dark:text-gray-300">
-            Поиск: "{searchQuery}"
+            Поиск: &quot;{searchQuery}&quot;
           </span>
         )}
         {activeFilter !== "Все" && (

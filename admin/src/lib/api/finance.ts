@@ -44,13 +44,32 @@ export interface BalanceAdjust {
   reason: string;
 }
 
-export interface FinanceTxn {
+export interface FinanceTransaction {
   id: number;
   clientId: number;
-  amount: number;
+  amount: number | string;
   type: string;
   description: string;
   createdAt: string;
+}
+
+export interface TransactionProduct {
+  productCode?: string;
+  productName?: string;
+  brand?: string;
+  productId?: number;
+  sku?: string;
+  name?: string;
+  quantity?: number;
+  price?: number | string;
+  total?: number | string;
+}
+
+export interface TransactionDetail extends FinanceTransaction {
+  orderId?: number;
+  orderPublicCode?: string;
+  refundRequestId?: number;
+  products?: TransactionProduct[];
 }
 
 export interface RefundRequest {
@@ -119,10 +138,27 @@ export const financeApi = {
   },
 
   // Transactions
-  getTransactions: async (clientId?: number, page = 0, size = 50): Promise<PageResponse<FinanceTxn>> => {
+  getTransactions: async (
+    clientId?: number,
+    page = 0,
+    size = 50
+  ): Promise<PageResponse<TransactionDetail>> => {
     const params = new URLSearchParams({ page: page.toString(), size: size.toString() });
     if (clientId) params.append('clientId', clientId.toString());
-    return apiFetch<PageResponse<FinanceTxn>>(`/api/finance/transactions?${params}`);
+    return apiFetch<PageResponse<TransactionDetail>>(`/api/finance/transactions?${params}`);
+  },
+
+  getTransactionDetails: async (
+    clientId: number,
+    page = 0,
+    size = 50
+  ): Promise<PageResponse<TransactionDetail>> => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      size: size.toString(),
+      clientId: clientId.toString(),
+    });
+    return apiFetch<PageResponse<TransactionDetail>>(`/api/finance/transactions?${params}`);
   },
 
   // Refunds
@@ -152,7 +188,7 @@ export const financeApi = {
   },
 
   // Stats
-  getStats: async (): Promise<Record<string, any>> => {
-    return apiFetch<Record<string, any>>('/api/finance/stats');
+  getStats: async (): Promise<Record<string, unknown>> => {
+    return apiFetch<Record<string, unknown>>('/api/finance/stats');
   },
 };

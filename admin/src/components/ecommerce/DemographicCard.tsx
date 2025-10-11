@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import CountryMap from "./CountryMap";
-import { analyticsApi } from "@/lib/api/analytics";
+import { analyticsApi, CustomerDemographic } from "@/lib/api/analytics";
 
 interface CountryData {
   country: string;
@@ -21,26 +21,23 @@ const DemographicCard = () => {
   useEffect(() => {
     const fetchDemographicData = async () => {
       try {
-        // Try to fetch demographic data from API
-        const result = await analyticsApi.getCustomerDemographics().catch(() => {
-          // Fallback data if API endpoint doesn't exist
-          return [
-            { country: "Казахстан", customers: 2450, percentage: 45.5 },
-            { country: "Россия", customers: 1580, percentage: 29.3 },
-          ];
-        });
-        
-        // Transform API response - convert 'customers' to 'visitors'
-        const countries = Array.isArray(result) 
-          ? result.map((item: any) => ({
-              country: item.country || "Unknown",
-              visitors: item.customers || item.visitors || 0,
-              percentage: item.percentage || 0
-            }))
-          : (result as any).countries || [];
-        
-        const totalVisitors = countries.reduce((sum: number, item: any) => sum + (item.visitors || 0), 0);
-        
+        const fallback: CustomerDemographic[] = [
+          { country: "Казахстан", customers: 2450, percentage: 45.5 },
+          { country: "Россия", customers: 1580, percentage: 29.3 },
+        ];
+
+        const raw = await analyticsApi
+          .getCustomerDemographics()
+          .catch(() => fallback);
+
+        const countries: CountryData[] = raw.map((item) => ({
+          country: item.country ?? "Unknown",
+          visitors: item.visitors ?? item.customers ?? 0,
+          percentage: item.percentage ?? 0,
+        }));
+
+        const totalVisitors = countries.reduce((sum, item) => sum + item.visitors, 0);
+
         setData({ countries, totalVisitors });
       } catch (error) {
         console.error("Failed to fetch demographic data:", error);

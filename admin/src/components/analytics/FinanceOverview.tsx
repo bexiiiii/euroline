@@ -1,20 +1,10 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { analyticsApi } from "@/lib/api/analytics";
+import { analyticsApi, FinanceOverviewSummary } from "@/lib/api/analytics";
 import { ArrowUpIcon, ArrowDownIcon } from "@/icons";
 
-interface FinanceOverviewData {
-  totalRevenue: number;
-  monthlyRevenue: number;
-  monthlyExpenses: number;
-  monthlyProfit: number;
-  averageOrderValue: number;
-  totalOrders: number;
-  profitMargin: number;
-}
-
 export default function FinanceOverview() {
-  const [data, setData] = useState<FinanceOverviewData | null>(null);
+  const [data, setData] = useState<FinanceOverviewSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

@@ -1,9 +1,7 @@
-import { CardComponent } from "@/components/CardComponent";
 import { GlobeComponent } from "@/components/ClobeComponent";
 import YandexMapShop from "@/components/YandexMapShop";
-import { de } from "zod/v4/locales";
 
-export function NewsComponent() {
+export default function ContactsPage() {
     return (
        <div className="flex flex-col min-h-screen container mx-auto px-4">
         <main className="flex-1 space-y-16 py-10">
@@ -33,8 +31,7 @@ export function NewsComponent() {
             <section>
                  <YandexMapShop />
             </section>
-        </main>
+       </main>
        </div>
     );
 }
-export default NewsComponent;
