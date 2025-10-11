@@ -6,6 +6,9 @@ databaseChangeLog:
       file: db/changelog/changes/02-create-basic-tables.sql
       relativeToChangelogFile: false
   - include:
+      file: db/changelog/changes/02a-add-user-profile-columns.sql
+      relativeToChangelogFile: false
+  - include:
       file: db/changelog/changes/03-create-api-keys.sql
       relativeToChangelogFile: false
   - include:

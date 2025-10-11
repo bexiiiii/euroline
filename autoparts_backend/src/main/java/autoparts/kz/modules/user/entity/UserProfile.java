@@ -11,25 +11,33 @@ import java.util.Objects;
 @Setter
 @NoArgsConstructor
 @Entity
-
-@Table(name = "user_profile")
+@Table(name = "user_profiles")
 @Data
-
-
 public class UserProfile {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    @Column(name = "client_name")
     private String clientName;
+    @Column(name = "country")
     private String country;
+    @Column(name = "state")
     private String state;
+    @Column(name = "city")
     private String city;
+    @Column(name = "office_address")
     private String officeAddress;
+    @Column(name = "type")
     private String type;
+    @Column(name = "surname")
     private String surname;
+    @Column(name = "name")
     private String name;
+    @Column(name = "fathername")
     private String fathername;
+    @Column(name = "email")
     private String email;
+    @Column(name = "phone")
     private String phone;
 
     @OneToOne
