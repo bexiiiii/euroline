@@ -5,6 +5,7 @@ import autoparts.kz.modules.cml.service.OneCQueueMonitoringService;
 import autoparts.kz.modules.stockOneC.service.OneCIntegrationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -23,11 +24,17 @@ public class OneCIntegrationScheduler {
     private final OneCQueueMonitoringService queueMonitoringService;
     private final OneCIntegrationPublisherService publisherService;
 
+    @Value("${integration.push.enabled:false}")
+    private boolean pushEnabled;
+
     /**
      * Периодическая проверка здоровья очередей интеграции (каждые 5 минут)
      */
     @Scheduled(fixedRate = 300_000) // 5 минут
     public void checkQueuesHealth() {
+        if (!pushEnabled) {
+            return;
+        }
         try {
             log.debug("Performing scheduled queue health check");
             
@@ -51,6 +58,9 @@ public class OneCIntegrationScheduler {
      */
     @Scheduled(fixedRate = 180_000) // 3 минуты
     public void sendPendingOrders() {
+        if (!pushEnabled) {
+            return;
+        }
         try {
             log.debug("Performing scheduled pending orders sync");
             
@@ -73,6 +83,9 @@ public class OneCIntegrationScheduler {
      */
     @Scheduled(fixedRate = 120_000) // 2 минуты
     public void checkOneCConnection() {
+        if (!pushEnabled) {
+            return;
+        }
         try {
             log.debug("Performing scheduled 1C connection check");
             
@@ -94,6 +107,9 @@ public class OneCIntegrationScheduler {
      */
     @Scheduled(fixedRate = 600_000) // 10 минут
     public void monitorDeadLetterQueues() {
+        if (!pushEnabled) {
+            return;
+        }
         try {
             log.debug("Performing scheduled DLQ monitoring");
             

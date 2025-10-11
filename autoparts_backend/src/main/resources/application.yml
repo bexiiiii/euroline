@@ -134,6 +134,8 @@ security:
 integration:
   kafka:
     enabled: false
+  push:
+    enabled: false
 
 aws:
   s3:

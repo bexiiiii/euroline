@@ -13,6 +13,7 @@ import autoparts.kz.modules.returns.status.ReturnStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -34,8 +35,14 @@ public class OneCBridgePublisher {
     private final CommerceMlProperties properties;
     private final UserRepository userRepository;
     private final OrderRepository orderRepository;
+    @Value("${integration.push.enabled:false}")
+    private boolean pushEnabled;
 
     public void publishOrderAfterCommit(Order order) {
+        if (!pushEnabled) {
+            log.debug("Push integration disabled, skip order {}", order.getId());
+            return;
+        }
         OneCOrderMessage payload = mapOrder(order);
         String routingKey = properties.getQueue().getOrdersIntegrationRoutingKey();
         sendAfterCommit(routingKey, payload,
@@ -43,6 +50,10 @@ public class OneCBridgePublisher {
     }
 
     public void publishReturnAfterCommit(ReturnRequest request) {
+        if (!pushEnabled) {
+            log.debug("Push integration disabled, skip return {}", request.getId());
+            return;
+        }
         OneCReturnMessage payload = mapReturn(request);
         String routingKey = properties.getQueue().getReturnsIntegrationRoutingKey();
         sendAfterCommit(routingKey, payload,

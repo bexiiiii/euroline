@@ -6,6 +6,7 @@ import autoparts.kz.modules.cml.domain.dto.OneCReturnMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
@@ -19,6 +20,8 @@ public class OneCIntegrationPublisherService {
 
     private final RabbitTemplate rabbitTemplate;
     private final CommerceMlProperties properties;
+    @Value("${integration.push.enabled:false}")
+    private boolean pushEnabled;
 
     /**
      * Публикует сообщение о заказе в очередь интеграции с 1C
@@ -26,6 +29,10 @@ public class OneCIntegrationPublisherService {
      * @param orderMessage сообщение о заказе
      */
     public void publishOrderMessage(OneCOrderMessage orderMessage) {
+        if (!pushEnabled) {
+            log.debug("Push integration disabled, skip publish order {}", orderMessage.getOrderId());
+            return;
+        }
         try {
             log.debug("Publishing order message for orderId={} to integration queue", orderMessage.getOrderId());
             
@@ -50,6 +57,10 @@ public class OneCIntegrationPublisherService {
      * @param returnMessage сообщение о возврате
      */
     public void publishReturnMessage(OneCReturnMessage returnMessage) {
+        if (!pushEnabled) {
+            log.debug("Push integration disabled, skip publish return {}", returnMessage.getReturnId());
+            return;
+        }
         try {
             log.debug("Publishing return message for returnId={} to integration queue", returnMessage.getReturnId());
             
@@ -75,6 +86,10 @@ public class OneCIntegrationPublisherService {
      * @param delayMs задержка доставки в миллисекундах (если поддерживается)
      */
     public void publishOrderMessageWithDelay(OneCOrderMessage orderMessage, long delayMs) {
+        if (!pushEnabled) {
+            log.debug("Push integration disabled, skip delayed order {}", orderMessage.getOrderId());
+            return;
+        }
         try {
             log.debug("Publishing delayed order message for orderId={} with delay={}ms", 
                 orderMessage.getOrderId(), delayMs);
@@ -108,6 +123,10 @@ public class OneCIntegrationPublisherService {
      * @param priority приоритет сообщения (0-255)
      */
     public void publishReturnMessageWithPriority(OneCReturnMessage returnMessage, int priority) {
+        if (!pushEnabled) {
+            log.debug("Push integration disabled, skip priority return {}", returnMessage.getReturnId());
+            return;
+        }
         try {
             log.debug("Publishing return message for returnId={} with priority={}", 
                 returnMessage.getReturnId(), priority);
