@@ -1,0 +1,102 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  main:
+    banner-mode: "off"
+  datasource:
+    url: jdbc:postgresql://127.0.0.1:5432/eurolinecloud
+    username: behruz
+    password: 234Bex456
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+      connection-timeout: 10000
+      idle-timeout: 180000
+      max-lifetime: 840000
+      validation-timeout: 5000
+      leak-detection-threshold: 0
+  servlet:
+    multipart:
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:30MB}
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:32MB}
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        order_inserts: true
+        order_updates: true
+        jdbc:
+          batch_size: 100
+          fetch_size: 50
+        connection.provider_disables_autocommit: true
+        generate_statistics: false
+  task:
+    execution:
+      pool:
+        core-size: 16
+        max-size: 64
+        queue-capacity: 1000
+      thread-name-prefix: async-
+    scheduling:
+      pool:
+        size: 8
+  mvc:
+    log-request-details: false
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  error:
+    include-message: never
+    include-binding-errors: never
+    include-stacktrace: never
+  tomcat:
+    threads:
+      max: ${SERVER_TOMCAT_MAX_THREADS:400}
+      min-spare: ${SERVER_TOMCAT_MIN_SPARE_THREADS:50}
+    accept-count: ${SERVER_TOMCAT_ACCEPT_COUNT:200}
+    connection-timeout: 15000
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/plain,text/css,text/javascript,application/javascript
+    min-response-size: 1024
+
+logging:
+  level:
+    root: INFO
+    org.springframework.web: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.type: WARN
+    autoparts.kz: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%X{traceId:-}] [%thread] %logger - %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+
+integration:
+  push:
+    enabled: false
+
+outbox:
+  publisher:
+    delay-ms: 15000
