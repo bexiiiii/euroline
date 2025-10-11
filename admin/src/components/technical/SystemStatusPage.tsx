@@ -4,6 +4,7 @@ import ComponentCard from "../common/ComponentCard";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
 import { Modal } from "../ui/modal";
+import { API_URL } from "@/lib/api";
 
 interface SystemService {
   id: string;
@@ -48,7 +49,7 @@ const SystemStatusPage = () => {
       setLoading(true);
       
       // Fetch services status
-      const servicesResponse = await fetch('http://localhost:8080/api/admin/system/services', {
+      const servicesResponse = await fetch(`${ADMIN_API_BASE}/system/services`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
           'Content-Type': 'application/json'
@@ -56,7 +57,7 @@ const SystemStatusPage = () => {
       });
       
       // Fetch metrics
-      const metricsResponse = await fetch('http://localhost:8080/api/admin/system/metrics', {
+      const metricsResponse = await fetch(`${ADMIN_API_BASE}/system/metrics`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
           'Content-Type': 'application/json'
@@ -282,7 +283,7 @@ const SystemStatusPage = () => {
     
     setIsActionLoading('restart');
     try {
-      const response = await fetch('http://localhost:8080/api/admin/system/restart', {
+      const response = await fetch(`${ADMIN_API_BASE}/system/restart`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
@@ -607,7 +608,7 @@ ${diagnosticResults.recommendations.join('\n')}`;
       // Re-fetch data
       const fetchData = async () => {
         try {
-          const servicesResponse = await fetch('http://localhost:8080/api/admin/system/services', {
+          const servicesResponse = await fetch(`${ADMIN_API_BASE}/system/services`, {
             headers: {
               'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
               'Content-Type': 'application/json'
@@ -1069,3 +1070,4 @@ ${diagnosticResults.recommendations.join('\n')}`;
 };
 
 export default SystemStatusPage;
+const ADMIN_API_BASE = `${API_URL}/api/admin`;

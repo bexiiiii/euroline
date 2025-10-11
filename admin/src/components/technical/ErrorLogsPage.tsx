@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table"
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Select from "../form/Select";
+import { API_URL } from "@/lib/api";
 
 interface ErrorLog {
   id: number;
@@ -43,7 +44,7 @@ const ErrorLogsPage = () => {
     const fetchErrorLogs = async () => {
       try {
         setLoading(true);
-        const response = await fetch('http://localhost:8080/api/admin/error-logs', {
+        const response = await fetch(`${API_URL}/api/admin/error-logs`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
             'Content-Type': 'application/json'
@@ -115,7 +116,7 @@ const ErrorLogsPage = () => {
 
   const markAsResolved = async (errorId: number) => {
     try {
-      const response = await fetch(`http://localhost:8080/api/admin/error-logs/${errorId}/resolve`, {
+      const response = await fetch(`${API_URL}/api/admin/error-logs/${errorId}/resolve`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,

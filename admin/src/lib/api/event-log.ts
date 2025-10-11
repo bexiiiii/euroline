@@ -1,3 +1,4 @@
+import { API_URL } from '../api';
 import { PageResponse } from './types';
 
 export interface EventLog {
@@ -43,7 +44,7 @@ export interface EventLogStats {
   recentErrorEvents: EventLog[];
 }
 
-const BASE_URL = 'http://localhost:8080/api/admin';
+const BASE_URL = `${API_URL}/api/admin`;
 
 export const eventLogApi = {
   getEventLogs: async (

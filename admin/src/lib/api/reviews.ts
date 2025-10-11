@@ -1,3 +1,4 @@
+import { API_URL } from '../api';
 import { PageResponse } from './types';
 
 export interface CustomerReview {
@@ -38,7 +39,7 @@ export interface ReviewStats {
   }[];
 }
 
-const BASE_URL = 'http://localhost:8080/api/admin';
+const BASE_URL = `${API_URL}/api/admin`;
 
 export const reviewsApi = {
   getReviews: async (page = 0, size = 10, sort = 'createdAt,desc', status?: 'PENDING' | 'APPROVED' | 'PUBLISHED'): Promise<PageResponse<CustomerReview>> => {

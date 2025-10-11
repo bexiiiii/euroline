@@ -1,7 +1,11 @@
+import { API_URL } from './api';
+
+const EVENT_LOG_URL = `${API_URL}/api/admin/event-logs`;
+
 // Event logging utility for frontend
 export const logPageView = async (pageName: string, pageUrl: string) => {
   try {
-    const response = await fetch('http://localhost:8080/api/admin/event-logs', {
+    const response = await fetch(EVENT_LOG_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
@@ -26,7 +30,7 @@ export const logPageView = async (pageName: string, pageUrl: string) => {
 
 export const logUserAction = async (action: string, details?: string) => {
   try {
-    const response = await fetch('http://localhost:8080/api/admin/event-logs', {
+    const response = await fetch(EVENT_LOG_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,

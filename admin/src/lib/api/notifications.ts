@@ -1,4 +1,4 @@
-import { apiFetch } from '../api';
+import { API_URL, apiFetch } from '../api';
 import { PageResponse } from './types';
 
 export interface Notification {
@@ -51,7 +51,7 @@ export const notificationsApi = {
    */
   getNotificationsStream: (): EventSource => {
     const token = localStorage.getItem('admin_token');
-    const url = new URL('/api/notifications/stream', process.env.NEXT_PUBLIC_API_URL);
+    const url = new URL('/api/notifications/stream', API_URL);
     if (token) {
       url.searchParams.append('token', token);
     }

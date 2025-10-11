@@ -1,5 +1,16 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## API configuration
+
+The storefront talks to the backend at `https://euroline.1edu.kz/api` by default.  
+Set `NEXT_PUBLIC_API_URL` if you need a different origin, for example:
+
+```bash
+NEXT_PUBLIC_API_URL="https://staging.example.com" npm run dev
+```
+
+Trailing `/api` is optional; the app will normalize it for you.
+
 ## Getting Started
 
 First, run the development server:

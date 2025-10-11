@@ -68,7 +68,9 @@ export interface ErrorSummary {
   endpoints: string[];
 }
 
-const BASE_URL = 'http://localhost:8080/api/admin';
+import { API_URL } from '../api';
+
+const BASE_URL = `${API_URL}/api/admin`;
 
 export const systemApi = {
   getSystemHealth: async (): Promise<SystemHealth> => {

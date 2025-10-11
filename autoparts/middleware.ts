@@ -25,10 +25,11 @@ export function middleware(request: NextRequest) {
   
   if (isApiRequest) {
     // Get the API base URL from environment variables
-    const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+    const apiBaseEnv = process.env.NEXT_PUBLIC_API_URL || 'https://euroline.1edu.kz';
+    const apiBaseUrl = apiBaseEnv.replace(/\/+$/, '');
     
     // Create the target URL by replacing the pathname
-    const targetUrl = new URL(pathname, apiBaseUrl);
+    const targetUrl = new URL(`${pathname}${request.nextUrl.search}`, `${apiBaseUrl}/`);
     
     // Forward the request to the backend
     const response = NextResponse.rewrite(targetUrl, {

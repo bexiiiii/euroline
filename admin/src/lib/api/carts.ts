@@ -1,4 +1,4 @@
-import { apiFetch } from '../api';
+import { API_URL, apiFetch } from '../api';
 import { PageResponse } from './types';
 
 export interface CartItem {
@@ -39,7 +39,7 @@ export interface CartStats {
   }[];
 }
 
-const BASE_URL = 'http://localhost:8080/api/admin';
+const BASE_URL = `${API_URL}/api/admin`;
 
 export const cartsApi = {
   getCarts: async (page = 0, size = 10, sort = 'lastUpdated,desc', status?: 'ACTIVE' | 'ABANDONED'): Promise<PageResponse<CustomerCart>> => {

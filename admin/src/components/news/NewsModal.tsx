@@ -4,6 +4,7 @@ import Label from "../form/Label";
 import { NewsItem, NewsRequest } from "@/lib/api/news";
 import { uploadFile } from "@/lib/api/files";
 import NewsPreviewCard from "@/components/news/NewsPreviewCard";
+import { API_URL } from "@/lib/api";
 
 interface NewsModalProps {
   isOpen: boolean;
@@ -17,7 +18,7 @@ type FormErrors = Partial<Record<"title" | "description" | "coverImageUrl" | "co
 
 const DESCRIPTION_LIMIT = 500;
 
-const API_ORIGIN = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+const API_ORIGIN = API_URL;
 
 const toPreviewUrl = (url?: string | null): string | undefined => {
   if (!url) return undefined;

@@ -53,7 +53,9 @@ export interface GeneralSettings {
   maintenanceMode: boolean;
 }
 
-const BASE_URL = 'http://localhost:8080/api/admin';
+import { API_URL } from '../api';
+
+const BASE_URL = `${API_URL}/api/admin`;
 
 export const settingsApi = {
   getAllSettings: async (): Promise<SiteSetting[]> => {

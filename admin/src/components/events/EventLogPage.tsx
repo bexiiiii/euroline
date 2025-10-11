@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table"
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Select from "../form/Select";
+import { API_URL } from "@/lib/api";
 import { eventLogApi, EventLog } from "@/lib/api/event-log";
 import { logPageView } from "@/lib/eventLogger";
 
@@ -44,7 +45,7 @@ const EventLogPage = () => {
 
   const createTestEvent = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/admin/event-logs/test-real-event', {
+      const response = await fetch(ADMIN_EVENT_TEST_URL, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
@@ -70,7 +71,7 @@ const EventLogPage = () => {
     }
     
     try {
-      const response = await fetch('http://localhost:8080/api/admin/event-logs', {
+      const response = await fetch(ADMIN_EVENT_LOG_URL, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
@@ -430,3 +431,5 @@ const EventLogPage = () => {
 };
 
 export default EventLogPage;
+const ADMIN_EVENT_LOG_URL = `${API_URL}/api/admin/event-logs`;
+const ADMIN_EVENT_TEST_URL = `${ADMIN_EVENT_LOG_URL}/test-real-event`;

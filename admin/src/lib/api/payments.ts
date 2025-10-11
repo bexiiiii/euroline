@@ -1,3 +1,4 @@
+import { API_URL } from '../api';
 import { PageResponse } from './types';
 
 export interface Payment {
@@ -69,7 +70,7 @@ export interface PaymentGateway {
   monthlyLimit?: number;
 }
 
-const BASE_URL = 'http://localhost:8080/api/admin';
+const BASE_URL = `${API_URL}/api/admin`;
 
 export const paymentsApi = {
   getPayments: async (

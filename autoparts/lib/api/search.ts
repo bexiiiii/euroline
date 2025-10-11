@@ -36,7 +36,7 @@ export interface SearchWarehouse {
   qty: number;
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = `${API_BASE}/api`;
 
 class SearchApiError extends Error {
   constructor(public status: number, message: string) {
@@ -49,7 +49,8 @@ async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const normalizedEndpoint = `/${endpoint.replace(/^\/+/, '')}`;
+  const url = `${API_BASE_URL}${normalizedEndpoint}`;
   
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
@@ -111,13 +112,13 @@ export const searchApi = {
   // OEM: применимые автомобили по выбранному каталогу и артикулу
   async getApplicableVehicles(catalog: string, oem: string): Promise<OemApplicableVehicle[]> {
     const params = new URLSearchParams({ catalog, oem });
-    return apiRequest<OemApplicableVehicle[]>(`/api/v1/search/oem/applicable-vehicles?${params.toString()}`);
+    return apiRequest<OemApplicableVehicle[]>(`/v1/search/oem/applicable-vehicles?${params.toString()}`);
   },
 
   // OEM: применимость (категории/узлы/детали)
   async getApplicability(catalog: string, ssd: string, oem: string): Promise<OemApplicabilityResponse> {
     const params = new URLSearchParams({ catalog, ssd, oem });
-    return apiRequest<OemApplicabilityResponse>(`/api/v1/search/oem/applicability?${params.toString()}`);
+    return apiRequest<OemApplicabilityResponse>(`/v1/search/oem/applicability?${params.toString()}`);
   },
 };
 
@@ -158,3 +159,4 @@ export interface OemApplicabilityCategory {
 export interface OemApplicabilityResponse {
   categories: OemApplicabilityCategory[];
 }
+import { API_BASE } from './base';

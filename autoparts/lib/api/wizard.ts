@@ -1,5 +1,6 @@
+import { API_BASE } from './base';
 import { VehicleDto, WizardStepDto } from './vehicle';
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_URL = `${API_BASE}/api`;
 
 export interface WizardStartBody {
   catalog: string;
@@ -27,7 +28,8 @@ class WizardApiError extends Error {
 }
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  const url = `${API_BASE}${endpoint}`;
+  const normalizedEndpoint = `/${endpoint.replace(/^\/+/, '')}`;
+  const url = `${API_URL}${normalizedEndpoint}`;
   try {
     const res = await fetch(url, {
       headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
@@ -53,21 +55,21 @@ async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
 
 export const wizardApi = {
   start(body: WizardStartBody): Promise<WizardStepDto> {
-    return request<WizardStepDto>(`/api/v1/wizard/start`, {
+    return request<WizardStepDto>(`/v1/wizard/start`, {
       method: 'POST',
       body: JSON.stringify(body),
     });
   },
 
   next(body: WizardNextBody): Promise<WizardStepDto> {
-    return request<WizardStepDto>(`/api/v1/wizard/next`, {
+    return request<WizardStepDto>(`/v1/wizard/next`, {
       method: 'POST',
       body: JSON.stringify(body),
     });
   },
 
   finish(body: WizardFinishBody): Promise<VehicleDto> {
-    return request<VehicleDto>(`/api/v1/wizard/finish`, {
+    return request<VehicleDto>(`/v1/wizard/finish`, {
       method: 'POST',
       body: JSON.stringify(body),
     });

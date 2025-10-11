@@ -1,6 +1,5 @@
-import { ApiError } from './types';
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+import { API_BASE } from './base';
+const API_URL = `${API_BASE}/api`;
 
 export interface VehicleDto {
   vehicleId: string;
@@ -175,7 +174,8 @@ export class VehicleApiError extends Error {
 class VehicleApi {
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     try {
-      const url = `${API_BASE}${endpoint}`;
+      const normalizedEndpoint = `/${endpoint.replace(/^\/+/, '')}`;
+      const url = `${API_URL}${normalizedEndpoint}`;
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
@@ -418,7 +418,7 @@ class VehicleApi {
     const params = new URLSearchParams({ query });
     if (catalog) params.append('catalog', catalog);
     
-    return this.request<DetailDto[]>(`//v1/cat/search-by-text?${params.toString()}`);
+    return this.request<DetailDto[]>(`/v1/cat/search-by-text?${params.toString()}`);
   }
 
 }

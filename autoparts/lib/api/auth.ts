@@ -1,6 +1,7 @@
+import { API_BASE } from './base'
 import { LoginRequest, RegisterRequest, AuthResponse, User } from '@/lib/types/auth'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/'
+const API_BASE_URL = `${API_BASE}/api`
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -13,7 +14,8 @@ async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+  const url = `${API_BASE_URL}${normalizedEndpoint}`
   
   const defaultHeaders: HeadersInit = {
     'Content-Type': 'application/json',
