@@ -3,6 +3,7 @@
 ## Active profile
 - Use Spring profile `prod` for production deployments.  
   Example: `java -jar autoparts-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod`
+- Liquibase migrations are executed automatically on startup; no manual `liquibase:update` is required.
 
 ## Required environment variables
 - `DATABASE_URL`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`
