@@ -105,32 +105,34 @@ public class ImportExportService {
         List<Product> products = productRepository.findAll();
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-             CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
-                     "ID", "Название", "Код", "Бренд", "Внешний код", "Цена", "Склад", "Товар недели",
-                     "Период недели с", "Период недели по", "Категория"
-        ))) {
-            for (Product product : products) {
-                if (!window.isWithin(product.getWeeklyStartAt())) {
-                    // если задан диапазон и weeklyStartAt не попадает, продолжаем
-                    if (window.hasRange() && product.getWeeklyStartAt() != null) {
-                        continue;
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
+            writer.write('\ufeff');
+            try (CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
+                    "ID", "Название", "Код", "Бренд", "Внешний код", "Цена", "Склад", "Товар недели",
+                    "Период недели с", "Период недели по", "Категория"
+            ))) {
+                for (Product product : products) {
+                    if (!window.isWithin(product.getWeeklyStartAt())) {
+                        // если задан диапазон и weeklyStartAt не попадает, продолжаем
+                        if (window.hasRange() && product.getWeeklyStartAt() != null) {
+                            continue;
+                        }
                     }
-                }
 
-                printer.printRecord(
-                        product.getId(),
-                        product.getName(),
-                        product.getCode(),
-                        product.getBrand(),
-                        product.getExternalCode(),
-                        product.getPrice(),
-                        product.getStock(),
-                        Boolean.TRUE.equals(product.getIsWeekly()) ? "Да" : "Нет",
-                        formatInstant(product.getWeeklyStartAt()),
-                        formatInstant(product.getWeeklyEndAt()),
-                        product.getCategory() != null ? product.getCategory().getName() : ""
-                );
+                    printer.printRecord(
+                            product.getId(),
+                            product.getName(),
+                            product.getCode(),
+                            product.getBrand(),
+                            product.getExternalCode(),
+                            product.getPrice(),
+                            product.getStock(),
+                            Boolean.TRUE.equals(product.getIsWeekly()) ? "Да" : "Нет",
+                            formatInstant(product.getWeeklyStartAt()),
+                            formatInstant(product.getWeeklyEndAt()),
+                            product.getCategory() != null ? product.getCategory().getName() : ""
+                    );
+                }
             }
         }
 
@@ -142,27 +144,29 @@ public class ImportExportService {
         List<FlattenedCategory> flat = flattenCategories(tree);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-             CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
-                     "ID", "Название", "Уровень", "Родитель ID", "Slug", "Активна", "Сортировка",
-                     "Количество товаров", "Создана", "Обновлена"
-             ))) {
-            for (FlattenedCategory category : flat) {
-                if (window.hasRange() && !window.isWithin(category.createdAt())) {
-                    continue;
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
+            writer.write('\ufeff');
+            try (CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
+                    "ID", "Название", "Уровень", "Родитель ID", "Slug", "Активна", "Сортировка",
+                    "Количество товаров", "Создана", "Обновлена"
+            ))) {
+                for (FlattenedCategory category : flat) {
+                    if (window.hasRange() && !window.isWithin(category.createdAt())) {
+                        continue;
+                    }
+                    printer.printRecord(
+                            category.id(),
+                            category.name(),
+                            category.level(),
+                            category.parentId(),
+                            category.slug(),
+                            category.isActive() ? "Да" : "Нет",
+                            category.sortOrder(),
+                            category.productCount(),
+                            formatInstant(category.createdAt()),
+                            formatInstant(category.updatedAt())
+                    );
                 }
-                printer.printRecord(
-                        category.id(),
-                        category.name(),
-                        category.level(),
-                        category.parentId(),
-                        category.slug(),
-                        category.isActive() ? "Да" : "Нет",
-                        category.sortOrder(),
-                        category.productCount(),
-                        formatInstant(category.createdAt()),
-                        formatInstant(category.updatedAt())
-                );
             }
         }
 
@@ -173,31 +177,33 @@ public class ImportExportService {
         List<Cart> carts = cartRepository.findAllWithItems();
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-             CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
-                     "ID корзины", "Покупатель", "Email", "Телефон", "Всего товаров",
-                     "Сумма", "Статус", "Обновлена", "Товары"
-             ))) {
-            for (Cart cart : carts) {
-                AdminCartResponse response = AdminCartMapper.toResponse(cart);
-                if (window.hasRange() && !window.isWithin(response.getLastUpdated())) {
-                    continue;
-                }
-                String items = response.getItems().stream()
-                        .map(item -> item.getProductName() + " x" + item.getQuantity())
-                        .collect(Collectors.joining("; "));
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
+            writer.write('\ufeff');
+            try (CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
+                    "ID корзины", "Покупатель", "Email", "Телефон", "Всего товаров",
+                    "Сумма", "Статус", "Обновлена", "Товары"
+            ))) {
+                for (Cart cart : carts) {
+                    AdminCartResponse response = AdminCartMapper.toResponse(cart);
+                    if (window.hasRange() && !window.isWithin(response.getLastUpdated())) {
+                        continue;
+                    }
+                    String items = response.getItems().stream()
+                            .map(item -> item.getProductName() + " x" + item.getQuantity())
+                            .collect(Collectors.joining("; "));
 
-                printer.printRecord(
-                        response.getId(),
-                        response.getCustomerName(),
-                        response.getCustomerEmail(),
-                        response.getCustomerPhone(),
-                        response.getTotalItems(),
-                        response.getTotalAmount(),
-                        response.isAbandoned() ? "Брошенная" : "Активная",
-                        formatInstant(response.getLastUpdated()),
-                        items
-                );
+                    printer.printRecord(
+                            response.getId(),
+                            response.getCustomerName(),
+                            response.getCustomerEmail(),
+                            response.getCustomerPhone(),
+                            response.getTotalItems(),
+                            response.getTotalAmount(),
+                            response.isAbandoned() ? "Брошенная" : "Активная",
+                            formatInstant(response.getLastUpdated()),
+                            items
+                    );
+                }
             }
         }
 
@@ -217,24 +223,26 @@ public class ImportExportService {
         List<EventLog> events = eventLogRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-             CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
-                     "ID", "Тип события", "Сущность", "Пользователь", "Описание",
-                     "Успешно", "Ошибка", "IP", "User Agent", "Создано"
-             ))) {
-            for (EventLog event : events) {
-                printer.printRecord(
-                        event.getId(),
-                        event.getEventType(),
-                        event.getEntityType(),
-                        event.getUserName(),
-                        event.getDescription(),
-                        Boolean.TRUE.equals(event.getSuccess()) ? "Да" : "Нет",
-                        Optional.ofNullable(event.getErrorMessage()).orElse(""),
-                        event.getIpAddress(),
-                        event.getUserAgent(),
-                        formatInstant(event.getCreatedAt())
-                );
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
+            writer.write('\ufeff');
+            try (CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
+                    "ID", "Тип события", "Сущность", "Пользователь", "Описание",
+                    "Успешно", "Ошибка", "IP", "User Agent", "Создано"
+            ))) {
+                for (EventLog event : events) {
+                    printer.printRecord(
+                            event.getId(),
+                            event.getEventType(),
+                            event.getEntityType(),
+                            event.getUserName(),
+                            event.getDescription(),
+                            Boolean.TRUE.equals(event.getSuccess()) ? "Да" : "Нет",
+                            Optional.ofNullable(event.getErrorMessage()).orElse(""),
+                            event.getIpAddress(),
+                            event.getUserAgent(),
+                            formatInstant(event.getCreatedAt())
+                    );
+                }
             }
         }
 
@@ -254,24 +262,26 @@ public class ImportExportService {
         List<UserActivity> activities = userActivityRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-             CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
-                     "ID", "ID пользователя", "Пользователь", "Модуль", "Действие",
-                     "Статус", "IP", "User Agent", "Описание", "Создано"
-             ))) {
-            for (UserActivity activity : activities) {
-                printer.printRecord(
-                        activity.getId(),
-                        activity.getUserId(),
-                        activity.getUserName(),
-                        activity.getModule(),
-                        activity.getAction(),
-                        activity.getStatus(),
-                        activity.getIpAddress(),
-                        activity.getUserAgent(),
-                        Optional.ofNullable(activity.getDetails()).orElse(""),
-                        formatInstant(activity.getCreatedAt())
-                );
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
+            writer.write('\ufeff');
+            try (CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
+                    "ID", "ID пользователя", "Пользователь", "Модуль", "Действие",
+                    "Статус", "IP", "User Agent", "Описание", "Создано"
+            ))) {
+                for (UserActivity activity : activities) {
+                    printer.printRecord(
+                            activity.getId(),
+                            activity.getUserId(),
+                            activity.getUserName(),
+                            activity.getModule(),
+                            activity.getAction(),
+                            activity.getStatus(),
+                            activity.getIpAddress(),
+                            activity.getUserAgent(),
+                            Optional.ofNullable(activity.getDetails()).orElse(""),
+                            formatInstant(activity.getCreatedAt())
+                    );
+                }
             }
         }
 
@@ -285,22 +295,24 @@ public class ImportExportService {
         ).stream().collect(Collectors.toMap(User::getId, user -> user));
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8));
-             CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
-                     "ID клиента", "Имя клиента", "Email", "Баланс", "Обновлен"
-             ))) {
-            for (ClientBalance balance : balances) {
-                if (window.hasRange() && !window.isWithin(balance.getUpdatedAt())) {
-                    continue;
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(outputStream, StandardCharsets.UTF_8))) {
+            writer.write('\ufeff');
+            try (CSVPrinter printer = new CSVPrinter(writer, CSVFormat.DEFAULT.withHeader(
+                    "ID клиента", "Имя клиента", "Email", "Баланс", "Обновлен"
+            ))) {
+                for (ClientBalance balance : balances) {
+                    if (window.hasRange() && !window.isWithin(balance.getUpdatedAt())) {
+                        continue;
+                    }
+                    User user = users.get(balance.getClientId());
+                    printer.printRecord(
+                            balance.getClientId(),
+                            user != null ? resolveUserName(user) : "",
+                            user != null ? user.getEmail() : "",
+                            balance.getBalance(),
+                            formatInstant(balance.getUpdatedAt())
+                    );
                 }
-                User user = users.get(balance.getClientId());
-                printer.printRecord(
-                        balance.getClientId(),
-                        user != null ? resolveUserName(user) : "",
-                        user != null ? user.getEmail() : "",
-                        balance.getBalance(),
-                        formatInstant(balance.getUpdatedAt())
-                );
             }
         }
 

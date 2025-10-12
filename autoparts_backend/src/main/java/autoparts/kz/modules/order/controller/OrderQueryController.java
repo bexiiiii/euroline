@@ -20,11 +20,17 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
-import java.io.StringWriter;
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -58,29 +64,32 @@ public class OrderQueryController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<InputStreamResource> export(OrderFilter f) throws Exception {
         var data = list(f, 0, Integer.MAX_VALUE, "createdAt,desc").getContent();
-        StringWriter sw = new StringWriter();
-        
-        // Use builder() instead of deprecated withHeader() method
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
         CSVFormat csvFormat = CSVFormat.DEFAULT.builder()
                 .setHeader("orderId", "customer", "total", "status", "paymentStatus", "createdAt")
                 .build();
-                
-        try (CSVPrinter csv = new CSVPrinter(sw, csvFormat)) {
-            for (OrderResponse o : data) {
-                csv.printRecord(
-                        o.getId(),
-                        o.getCustomerEmail(),
-                        o.getTotalAmount(),
-                        o.getStatus(),
-                        o.getPaymentStatus(),
-                        o.getCreatedAt()
-                );
+
+        try (OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8)) {
+            writer.write('\ufeff');
+            try (CSVPrinter csv = new CSVPrinter(writer, csvFormat)) {
+                for (OrderResponse o : data) {
+                    csv.printRecord(
+                            o.getId(),
+                            o.getCustomerEmail(),
+                            o.getTotalAmount(),
+                            o.getStatus(),
+                            o.getPaymentStatus(),
+                            o.getCreatedAt()
+                    );
+                }
             }
         }
-        byte[] bytes = sw.toString().getBytes();
+
+        byte[] bytes = outputStream.toByteArray();
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=orders.csv")
-                .contentType(MediaType.parseMediaType("text/csv"))
+                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
                 .contentLength(bytes.length)
                 .body(new InputStreamResource(new ByteArrayInputStream(bytes)));
     }

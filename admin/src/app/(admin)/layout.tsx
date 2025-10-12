@@ -7,7 +7,6 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/layout/AppHeader";
 import AppSidebar from "@/layout/AppSidebar";
 import Backdrop from "@/layout/Backdrop";
-import SidebarWidget from "@/layout/SidebarWidget";
 import React from "react";
 
 export default function AdminLayout({
@@ -90,13 +89,8 @@ export default function AdminLayout({
         <AppHeader />
         {/* Page Content */}
         <div className="p-4 md:p-6">
-          <div className="mx-auto flex w-full max-w-(--breakpoint-2xl) flex-col gap-6 xl:flex-row">
-            <div className="flex-1 min-w-0">
-              {children}
-            </div>
-            <aside className="xl:w-[340px] xl:flex-shrink-0">
-              <SidebarWidget />
-            </aside>
+          <div className="mx-auto flex w-full max-w-(--breakpoint-2xl) flex-col gap-6">
+            <div className="flex-1 min-w-0">{children}</div>
           </div>
         </div>
       </div>

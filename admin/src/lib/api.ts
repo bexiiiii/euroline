@@ -1,6 +1,7 @@
 const DEFAULT_API_URL = "https://euroline.1edu.kz";
 
 export const API_URL = (process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/+$/, "");
+const API_DEBUG_ENABLED = process.env.NEXT_PUBLIC_DEBUG_API === "true";
 
 export class ApiError extends Error {
   status: number;
@@ -73,13 +74,17 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     return undefined;
   };
 
-  console.log(`API запрос к ${path}:`, { 
-    hasToken: !!token,
-    method: options.method || 'GET',
-    url: `${API_URL}${path}`
-  });
-  if (token) {
-    try { console.log('Authorization preview:', (token as string).slice(0, 16) + '...'); } catch {}
+  if (API_DEBUG_ENABLED) {
+    console.log(`API запрос к ${path}:`, {
+      hasToken: !!token,
+      method: options.method || 'GET',
+      url: `${API_URL}${path}`,
+    });
+    if (token) {
+      try {
+        console.log("Authorization preview:", (token as string).slice(0, 16) + "...");
+      } catch {}
+    }
   }
 
   try {
@@ -89,11 +94,13 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
       credentials: 'include', // оставь, если используешь cookie для чего-то ещё
     });
 
-    console.log(`Ответ от ${path}:`, {
-      status: res.status,
-      statusText: res.statusText,
-      ok: res.ok
-    });
+    if (API_DEBUG_ENABLED) {
+      console.log(`Ответ от ${path}:`, {
+        status: res.status,
+        statusText: res.statusText,
+        ok: res.ok,
+      });
+    }
 
     // Авторизация: при 401 очищаем токен и кидаем ошибку
     // При 403 не выходим из аккаунта (может быть недостаточно прав на эндпоинт)

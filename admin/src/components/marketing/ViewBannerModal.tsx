@@ -3,6 +3,7 @@ import React from "react";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
+import ImageWithFallback from "@/components/common/ImageWithFallback";
 
 interface ProductBanner {
   id: number;
@@ -203,14 +204,10 @@ const ViewBannerModal: React.FC<ViewBannerModalProps> = ({
                     Изображение
                   </label>
                   <div className="aspect-video w-full max-w-xs bg-gray-100 dark:bg-gray-700 rounded-lg overflow-hidden">
-                    <img
+                    <ImageWithFallback
                       src={bannerData.imageUrl}
                       alt={bannerData.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        const target = e.target as HTMLImageElement;
-                        target.src = "/images/placeholder.png";
-                      }}
+                      className="h-full w-full object-cover"
                     />
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 break-all">

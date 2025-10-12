@@ -446,7 +446,7 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
               >
                 Закрыть
               </button>
-              <Button variant="primary" size="sm" disabled={loading}>
+              <Button type="submit" variant="primary" size="sm" disabled={loading}>
                 {loading ? "Сохраняем…" : "Сохранить изменения"}
               </Button>
             </div>

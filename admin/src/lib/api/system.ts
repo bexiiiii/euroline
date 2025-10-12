@@ -45,18 +45,33 @@ interface BackupResponse {
   timestamp?: number;
 }
 
-const authHeaders = () => ({
-  Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("token") ?? "" : ""}`,
-});
+const resolveToken = (): string | null => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return localStorage.getItem("admin_token") ?? localStorage.getItem("token") ?? null;
+};
+
+const authHeaders = (): Record<string, string> => {
+  const token = resolveToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
 
 async function getJson<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const headers = new Headers(options.headers as HeadersInit | undefined);
+
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+
+  const tokenHeader = authHeaders();
+  Object.entries(tokenHeader).forEach(([key, value]) => {
+    headers.set(key, value);
+  });
+
   const response = await fetch(url, {
     ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {

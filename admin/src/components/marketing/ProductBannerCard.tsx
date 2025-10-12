@@ -4,7 +4,7 @@ import React from "react";
 import Button from "@/components/ui/button/Button";
 import Badge from "@/components/ui/badge/Badge";
 import { Banner } from "@/lib/api/promotions";
-import { API_URL } from "@/lib/api";
+import ImageWithFallback from "@/components/common/ImageWithFallback";
 
 interface ProductBannerCardProps {
   banner: Banner;
@@ -27,51 +27,18 @@ const ProductBannerCard: React.FC<ProductBannerCardProps> = ({
     <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition hover:shadow-md dark:border-white/[0.06] dark:bg-white/[0.02]">
       <div className="flex items-center gap-4">
         <div className="relative h-16 w-28 overflow-hidden rounded-xl border border-gray-100 bg-gray-100 dark:border-white/[0.05] dark:bg-white/[0.04]">
-          {banner.imageUrl ? (
-            <img
-              src={banner.imageUrl.startsWith('http') ? banner.imageUrl : `${API_URL}${banner.imageUrl}`}
-              alt={banner.title}
-              className="h-full w-full object-cover"
-              onError={(event) => {
-                const target = event.target as HTMLImageElement;
-                console.error('Ошибка загрузки изображения баннера:', target.src);
-
-                if (!banner.imageUrl) {
-                  target.style.opacity = "0.3";
-                  target.style.display = "none";
-                  target.nextElementSibling?.classList.remove('hidden');
-                  return;
-                }
-
-                if (!target.dataset.retry) {
-                  const baseUrl = banner.imageUrl.startsWith('http') ? '' : API_URL;
-                  const rawPath = banner.imageUrl.startsWith('http')
-                    ? (banner.imageUrl.includes('/files/') ? banner.imageUrl.split('/files/')[1] : null)
-                    : banner.imageUrl.replace(/^\/+/, '').replace('files/', '');
-
-                  if (rawPath) {
-                    const sanitizedPath = rawPath
-                      .replace(/[^a-zA-Z0-9._/\-]/g, '_')
-                      .replace(/_+/g, '_')
-                      .replace(/^_+|_+$/g, '');
-
-                    target.dataset.retry = 'sanitized';
-                    target.src = `${baseUrl}/files/${sanitizedPath}?fallback=1`;
-                    return;
-                  }
-                }
-
-                target.style.opacity = "0.3";
-                target.style.display = "none";
-                target.nextElementSibling?.classList.remove('hidden');
-              }}
-            />
-          ) : null}
-          <div className="flex h-full w-full items-center justify-center text-gray-400 hidden">
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
+          <ImageWithFallback
+            src={banner.imageUrl}
+            alt={banner.title}
+            className="h-full w-full object-cover"
+            fallback={
+              <div className="flex h-full w-full items-center justify-center text-gray-400">
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+            }
+          />
         </div>
         <div>
           <h3 className="text-base font-semibold text-gray-900 dark:text-white">

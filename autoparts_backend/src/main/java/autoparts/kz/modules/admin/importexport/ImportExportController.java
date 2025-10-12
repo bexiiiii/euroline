@@ -39,6 +39,7 @@ public class ImportExportController {
             var result = importExportService.exportData(type, from, to);
             return ResponseEntity.ok()
                     .header("Content-Disposition", "attachment; filename=" + result.fileName())
+                    .header("Content-Type", "text/csv; charset=UTF-8")
                     .body(result.content());
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.io.BufferedWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -33,7 +34,8 @@ public class ReportController {
         String format = body.getOrDefault("format","CSV");
         Path dir = Paths.get("storage/reports"); Files.createDirectories(dir);
         Path file = dir.resolve(type+"_"+System.currentTimeMillis()+".csv");
-        try (BufferedWriter w = Files.newBufferedWriter(file)) {
+        try (BufferedWriter w = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
+            w.write('\ufeff');
             if ("PRODUCTS".equalsIgnoreCase(type)) {
                 w.write("id,name,price,stock\n");
                 for (var p: products.findAll()) w.write(p.getId()+","+p.getName()+","+p.getPrice()+","+p.getStock()+"\n");
@@ -52,7 +54,7 @@ public class ReportController {
         ByteArrayResource res = new ByteArrayResource(Files.readAllBytes(path));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename="+path.getFileName())
-                .contentType(MediaType.parseMediaType("text/csv"))
+                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
                 .contentLength(res.contentLength())
                 .body(res);
     }
