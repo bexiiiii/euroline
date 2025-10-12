@@ -19,4 +19,5 @@ public class NotificationResponse {
     private String createdAt;
     private String imageUrl;
     private String target;
+    private boolean status;
 }

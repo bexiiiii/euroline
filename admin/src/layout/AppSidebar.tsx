@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
   BoxCubeIcon,
+  BellIcon,
   CalenderIcon,
   ChevronDownIcon,
   DollarLineIcon,
@@ -33,6 +34,11 @@ const navItems: NavItem[] = [
     name: "Дешборд",
     subItems: [{ name: "Статистика", path: "/", pro: false }, { name: "Аналитика", path: "/analytics", pro: false }],
 
+  },
+  {
+    icon: <BellIcon />,
+    name: "Уведомления",
+    path: "/notifications",
   },
   // {
   //   icon: <CalenderIcon />,

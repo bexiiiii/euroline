@@ -19,6 +19,7 @@ export * from './search-history';
 export * from './types';
 export * from './news';
 export * from './settings';
+export * from './importExport';
 
 // Specific exports to avoid naming conflicts
 export { returnsApi } from './returns';

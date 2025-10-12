@@ -2,18 +2,22 @@
 import React, { useState } from "react";
 import ComponentCard from "../common/ComponentCard";
 import Button from "../ui/button/Button";
+import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
 import Badge from "../ui/badge/Badge";
 import { Modal } from "../ui/modal";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Select from "../form/Select";
+import { exportAdminData } from "@/lib/api/importExport";
+import { useToast } from "@/context/ToastContext";
 
 const MarketingPage = () => {
   const [activeTab, setActiveTab] = useState("history");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState("promotion");
   const [selectedItem, setSelectedItem] = useState(null);
+  const { success: showSuccess, error: showError } = useToast();
 
   // Данные для истории акций
   const promotionHistory = [
@@ -148,6 +152,28 @@ const MarketingPage = () => {
     { value: "cash", label: "Наличные" }
   ];
 
+  const buildFileName = (base: string, from?: string, to?: string) => {
+    const parts = [base];
+    if (from) parts.push(from);
+    if (to && to !== from) parts.push(to);
+    return `${parts.join("-")}.csv`;
+  };
+
+  const handleExportReport = async ({ from, to }: ExportDateRange) => {
+    try {
+      await exportAdminData({
+        type: "products",
+        from: from || undefined,
+        to: to || undefined,
+        fileName: buildFileName("marketing-report", from, to),
+      });
+      showSuccess("Маркетинговый отчёт экспортирован");
+    } catch (error) {
+      console.error("Не удалось экспортировать маркетинговый отчёт", error);
+      showError("Не удалось экспортировать маркетинговый отчёт");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Статистика */}
@@ -231,7 +257,14 @@ const MarketingPage = () => {
         description="Управление промо-акциями, скидками на товары и рекламными баннерами"
         action={
           <div className="flex space-x-2">
-            <Button size="sm" variant="outline">Экспорт отчета</Button>
+            <ExportWithDateRange
+              triggerLabel="Экспорт отчета"
+              variant="outline"
+              size="sm"
+              onConfirm={handleExportReport}
+              title="Экспорт маркетингового отчета"
+              description="Выберите период для выгрузки отчета по акциям и баннерам."
+            />
             <Button size="sm">Аналитика</Button>
           </div>
         }

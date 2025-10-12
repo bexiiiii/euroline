@@ -5,6 +5,7 @@ import { ShoppingCart, Package, MapPin, Info } from 'lucide-react';
 import { SearchItem, SearchWarehouse, SearchVehicle } from '@/lib/api/search';
 import { useSearchStore } from '@/lib/stores/searchStore';
 import { useCartStore } from '@/lib/stores/cartStore';
+import { toast } from 'sonner';
 
 interface SearchResultsTableProps {
   className?: string;
@@ -113,7 +114,13 @@ export default function SearchResultsTable({
         )}
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="space-y-4 p-4 md:hidden">
+        {itemsToRender.map((item, index) => (
+          <MobileSearchResultCard key={`${item.oem}-${index}`} item={item} />
+        ))}
+      </div>
+
+      <div className="hidden md:block overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
@@ -238,7 +245,11 @@ function SearchResultRow({ item }: SearchResultRowProps) {
               onClick={async () => {
                 try {
                   await addByOem(item.oem, item.name, item.brand || 'UNKNOWN', 1, item.price, item.imageUrl);
-                } catch {}
+                  toast.success('Товар добавлен в корзину');
+                } catch (error) {
+                  console.error('Не удалось добавить товар в корзину', error);
+                  toast.error('Не удалось добавить товар в корзину');
+                }
               }}
               disabled={!hasStock}
               className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
@@ -268,6 +279,93 @@ function SearchResultRow({ item }: SearchResultRowProps) {
         </tr>
       )}
     </>
+  );
+}
+
+interface MobileSearchResultCardProps {
+  item: SearchItem;
+}
+
+function MobileSearchResultCard({ item }: MobileSearchResultCardProps) {
+  const { addByOem } = useCartStore();
+  const [showWarehouses, setShowWarehouses] = useState(false);
+  const hasStock = item.quantity && item.quantity > 0;
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
+      <div className="flex items-start gap-3">
+        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-gray-100">
+          {item.imageUrl ? (
+            <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-xs text-gray-500">
+              Изображение
+            </div>
+          )}
+        </div>
+        <div className="flex-1 space-y-2">
+          <div>
+            <h4 className="text-sm font-semibold text-gray-900">{item.name}</h4>
+            {item.catalog && <p className="text-xs text-gray-500 mt-1">Каталог: {item.catalog}</p>}
+          </div>
+          <div className="text-xs text-gray-600 space-y-1">
+            <div className="font-mono text-sm text-gray-900">{item.oem}</div>
+            {item.brand && <div>Бренд: {item.brand}</div>}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-sm">
+          <span className={`inline-flex h-2 w-2 rounded-full ${hasStock ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span className="font-medium">
+            {hasStock ? `${item.quantity} шт.` : 'Нет в наличии'}
+          </span>
+        </div>
+        <div className="text-right text-base font-semibold text-gray-900">
+          {item.price ? `${formatPrice(item.price)} ${item.currency || 'тг'}` : 'Цена по запросу'}
+        </div>
+      </div>
+
+      {item.warehouses && item.warehouses.length > 0 && (
+        <button
+          onClick={() => setShowWarehouses((prev) => !prev)}
+          className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800"
+        >
+          <MapPin className="h-4 w-4" />
+          {showWarehouses ? 'Скрыть склады' : `${item.warehouses.length} склада`}
+          <Info className="h-4 w-4" />
+        </button>
+      )}
+
+      <button
+        onClick={async () => {
+          try {
+            await addByOem(item.oem, item.name, item.brand || 'UNKNOWN', 1, item.price, item.imageUrl);
+            toast.success('Товар добавлен в корзину');
+          } catch (error) {
+            console.error('Не удалось добавить товар в корзину', error);
+            toast.error('Не удалось добавить товар в корзину');
+          }
+        }}
+        disabled={!hasStock}
+        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-300"
+      >
+        <ShoppingCart className="h-4 w-4" />
+        В корзину
+      </button>
+
+      {showWarehouses && item.warehouses && (
+        <div className="space-y-2 rounded-lg border bg-gray-50 p-3">
+          <h5 className="text-xs font-semibold uppercase text-gray-600">Наличие на складах</h5>
+          <div className="space-y-2">
+            {item.warehouses.map((warehouse, idx) => (
+              <WarehouseItem key={`${warehouse.code}-${idx}`} warehouse={warehouse} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

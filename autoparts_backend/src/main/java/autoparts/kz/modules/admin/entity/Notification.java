@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-@ToString
+@ToString(exclude = {"recipient", "campaign"})
 @Entity(name = "AdminNotification")
 @Table(name = "admin_notifications")
 public class Notification {
@@ -32,4 +32,8 @@ public class Notification {
     @ManyToOne
     @JoinColumn(name = "user_id")
     private User recipient;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "campaign_id")
+    private NotificationCampaign campaign;
 }

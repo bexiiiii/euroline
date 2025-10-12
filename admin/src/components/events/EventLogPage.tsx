@@ -12,6 +12,9 @@ import Select from "../form/Select";
 import { API_URL } from "@/lib/api";
 import { eventLogApi, EventLog } from "@/lib/api/event-log";
 import { logPageView } from "@/lib/eventLogger";
+import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
+import { exportAdminData } from "@/lib/api/importExport";
+import { useToast } from "@/context/ToastContext";
 
 const EventLogPage = () => {
   const [activeTab, setActiveTab] = useState("all");
@@ -22,6 +25,7 @@ const EventLogPage = () => {
   const [eventLogs, setEventLogs] = useState<EventLog[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { success: showSuccess, error: showError } = useToast();
 
   useEffect(() => {
     loadEventLogs();
@@ -88,6 +92,28 @@ const EventLogPage = () => {
     } catch (error) {
       console.error('Failed to clear data:', error);
       alert('Ошибка очистки данных');
+    }
+  };
+
+  const buildFileName = (base: string, from?: string, to?: string) => {
+    const parts = [base];
+    if (from) parts.push(from);
+    if (to && to !== from) parts.push(to);
+    return `${parts.join("-")}.csv`;
+  };
+
+  const handleExportEventLogs = async ({ from, to }: ExportDateRange) => {
+    try {
+      await exportAdminData({
+        type: "event_logs",
+        from: from || undefined,
+        to: to || undefined,
+        fileName: buildFileName("event-logs", from, to),
+      });
+      showSuccess("Экспорт журнала событий сформирован");
+    } catch (err) {
+      console.error("Не удалось экспортировать журнал событий", err);
+      showError("Не удалось экспортировать журнал событий");
     }
   };
 
@@ -264,7 +290,14 @@ const EventLogPage = () => {
                 <Button size="sm" variant="outline" onClick={loadEventLogs}>Обновить</Button>
                 <Button size="sm" variant="outline" onClick={createTestEvent}>Создать тестовое событие</Button>
                 <Button size="sm" variant="outline" onClick={clearSampleData}>Очистить все</Button>
-                <Button size="sm" variant="outline">Экспорт</Button>
+                <ExportWithDateRange
+                  triggerLabel="Экспорт"
+                  size="sm"
+                  variant="outline"
+                  onConfirm={handleExportEventLogs}
+                  title="Экспорт журнала событий"
+                  description="Укажите период для выгрузки событий в CSV."
+                />
               </div>
             }
           >

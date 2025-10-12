@@ -32,12 +32,18 @@ public class ImportExportController {
     }
 
     @GetMapping("/export")
-    public ResponseEntity<byte[]> exportData() {
+    public ResponseEntity<byte[]> exportData(@RequestParam("type") String type,
+                                             @RequestParam(value = "from", required = false) String from,
+                                             @RequestParam(value = "to", required = false) String to) {
         try {
-            byte[] data = importExportService.exportData();
-            return ResponseEntity.ok().header("Content-Disposition", "attachment; filename=data.csv").body(data);
+            var result = importExportService.exportData(type, from, to);
+            return ResponseEntity.ok()
+                    .header("Content-Disposition", "attachment; filename=" + result.fileName())
+                    .body(result.content());
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         } catch (IOException e) {
-            return new ResponseEntity<>(null, HttpStatus.INTERNAL_SERVER_ERROR);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 }

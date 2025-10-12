@@ -18,7 +18,15 @@ const audienceOptions: { value: NotificationAudience; label: string }[] = [
   { value: "ADMINS", label: "Только администраторам" },
 ];
 
-const NotificationComposerWidget: React.FC = () => {
+interface NotificationComposerWidgetProps {
+  onSent?: () => void;
+  className?: string;
+}
+
+const NotificationComposerWidget: React.FC<NotificationComposerWidgetProps> = ({
+  onSent,
+  className,
+}) => {
   const { success: showSuccess, error: showError } = useToast();
   const [audience, setAudience] = useState<NotificationAudience>("ALL");
   const [title, setTitle] = useState("");
@@ -85,6 +93,7 @@ const NotificationComposerWidget: React.FC = () => {
       });
       showSuccess("Уведомление отправлено");
       resetForm();
+      onSent?.();
     } catch (err) {
       console.error("Failed to send notification", err);
       showError("Не удалось отправить уведомление");
@@ -93,8 +102,15 @@ const NotificationComposerWidget: React.FC = () => {
     }
   };
 
+  const containerClassName = [
+    "rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900",
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <div className={containerClassName}>
       <div className="mb-4 space-y-1">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Отправка уведомления</h3>
         <p className="text-sm text-gray-500 dark:text-gray-400">Разошлите системное сообщение выбранной аудитории</p>

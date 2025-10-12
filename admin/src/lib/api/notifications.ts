@@ -23,6 +23,20 @@ export interface SendNotificationPayload {
   status?: boolean;
 }
 
+export interface AdminNotificationHistoryItem {
+  id: number;
+  title: string;
+  message: string;
+  status: boolean;
+  target: NotificationAudience | string;
+  imageUrl?: string | null;
+  createdAt: string | null;
+  senderId?: number | null;
+  senderEmail?: string | null;
+  senderName?: string | null;
+  recipientCount: number;
+}
+
 export const notificationsApi = {
   /**
    * Get notifications with pagination
@@ -72,6 +86,13 @@ export const notificationsApi = {
         imageUrl: payload.imageUrl ?? null,
       }),
     });
+  },
+
+  /**
+   * Fetch admin notification history
+   */
+  getAdminNotificationHistory: async (): Promise<AdminNotificationHistoryItem[]> => {
+    return apiFetch<AdminNotificationHistoryItem[]>('/api/admin/notifications/history');
   },
 
   /**

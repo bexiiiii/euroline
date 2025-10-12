@@ -12,6 +12,9 @@ import Badge from "@/components/ui/badge/Badge";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
 import Form from "@/components/form/Form";
+import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
+import { exportAdminData } from "@/lib/api/importExport";
+import { useToast } from "@/context/ToastContext";
 
 interface BalanceTransaction {
   id: number;
@@ -77,6 +80,7 @@ const BalanceManagementPage = () => {
   const [amount, setAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<string>("Наличные");
   const [description, setDescription] = useState<string>("");
+  const { success: showSuccess, error: showError } = useToast();
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('ru-RU', {
@@ -159,6 +163,28 @@ const BalanceManagementPage = () => {
     setAmount("");
     setDescription("");
     setIsPaymentModalOpen(false);
+  };
+
+  const buildFileName = (base: string, from?: string, to?: string) => {
+    const parts = [base];
+    if (from) parts.push(from);
+    if (to && to !== from) parts.push(to);
+    return `${parts.join("-")}.csv`;
+  };
+
+  const handleExportTransactions = async ({ from, to }: ExportDateRange) => {
+    try {
+      await exportAdminData({
+        type: "balances",
+        from: from || undefined,
+        to: to || undefined,
+        fileName: buildFileName("client-balances", from, to),
+      });
+      showSuccess("Экспорт балансов сформирован");
+    } catch (err) {
+      console.error("Не удалось экспортировать данные по балансам", err);
+      showError("Не удалось экспортировать данные по балансам");
+    }
   };
 
   // Статистика баланса
@@ -257,9 +283,13 @@ const BalanceManagementPage = () => {
           <Button variant="outline">
             📊 Отчет по операциям
           </Button>
-          <Button variant="outline">
-            📤 Экспорт данных
-          </Button>
+          <ExportWithDateRange
+            triggerLabel="📤 Экспорт данных"
+            variant="outline"
+            size="sm"
+            onConfirm={handleExportTransactions}
+            description="Выберите период для выгрузки операций по балансам клиентов."
+          />
         </div>
 
         {/* Таблица транзакций */}

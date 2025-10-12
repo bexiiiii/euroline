@@ -1,6 +1,7 @@
 package autoparts.kz.modules.admin.controller;
 
 
+import autoparts.kz.modules.admin.dto.NotificationHistoryResponse;
 import autoparts.kz.modules.admin.dto.NotificationRequest;
 import autoparts.kz.modules.admin.dto.NotificationResponse;
 import autoparts.kz.modules.admin.service.NotificationSenderService;
@@ -23,8 +24,10 @@ public class AdminNotificationController {
 
     @PostMapping("/send")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> send(@RequestBody NotificationRequest request) {
-        notificationSenderService.sendNotification(request);
+    public ResponseEntity<?> send(@RequestBody NotificationRequest request,
+                                  @AuthenticationPrincipal(errorOnInvalidType = false) SimplePrincipal principal) {
+        Long senderId = principal != null ? principal.id() : null;
+        notificationSenderService.sendNotification(request, senderId);
         return ResponseEntity.ok().build();
     }
 
@@ -34,6 +37,12 @@ public class AdminNotificationController {
         Long userId = principal != null ? principal.id() : null;
         if (userId == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized principal");
         return notificationSenderService.getUserNotifications(userId);
+    }
+
+    @GetMapping("/history")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<NotificationHistoryResponse> getNotificationHistory() {
+        return notificationSenderService.getNotificationHistory();
     }
 
     @PostMapping("/{id}/read")

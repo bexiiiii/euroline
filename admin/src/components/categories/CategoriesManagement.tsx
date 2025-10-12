@@ -7,6 +7,9 @@ import CategoriesTable from "@/components/categories/CategoriesTable";
 import CategoryModal, { CategoryFormValues, CategoryModalMode } from "@/components/categories/CategoryModal";
 import { categoriesApi, Category } from "@/lib/api/categories";
 import { ApiError } from "@/lib/api";
+import { ExportDateRange } from "@/components/common/ExportWithDateRange";
+import { exportAdminData } from "@/lib/api/importExport";
+import { useToast } from "@/context/ToastContext";
 
 const flattenCategories = (items: Category[]): Category[] => {
   const result: Category[] = [];
@@ -35,6 +38,7 @@ const CategoriesManagement: React.FC = () => {
   const [modalError, setModalError] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [isOptionsLoading, setIsOptionsLoading] = useState(false);
+  const { success: showSuccess, error: showError } = useToast();
 
   useEffect(() => {
     loadCategoryOptions();
@@ -177,13 +181,35 @@ const CategoriesManagement: React.FC = () => {
     return categoryOptions;
   }, [categoryOptions, modalMode, parentCategory]);
 
+  const buildFileName = (base: string, from?: string, to?: string) => {
+    const parts = [base];
+    if (from) parts.push(from);
+    if (to && to !== from) parts.push(to);
+    return `${parts.join("-")}.csv`;
+  };
+
+  const handleExportCategories = async ({ from, to }: ExportDateRange) => {
+    try {
+      await exportAdminData({
+        type: "categories",
+        from: from || undefined,
+        to: to || undefined,
+        fileName: buildFileName("categories", from, to),
+      });
+      showSuccess("Экспорт категорий сформирован");
+    } catch (error) {
+      console.error("Не удалось экспортировать категории", error);
+      showError("Не удалось экспортировать категории");
+    }
+  };
+
   return (
     <div className="space-y-6">
       <CategoriesStats refreshKey={refreshKey} />
 
       <CategoriesToolbar
         onAddCategory={openCreateModal}
-        onExport={() => console.log("Экспорт категорий")}
+        onExport={handleExportCategories}
         onImport={() => console.log("Импорт категорий")}
       />
 

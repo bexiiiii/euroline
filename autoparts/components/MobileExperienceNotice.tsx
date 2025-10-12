@@ -1,11 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
-import { toast } from 'sonner';
+import { useEffect, useState } from 'react';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 const STORAGE_KEY = 'mobile-desktop-preference';
 
 export function MobileExperienceNotice() {
+  const [open, setOpen] = useState(false);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -16,23 +27,33 @@ export function MobileExperienceNotice() {
       return;
     }
 
-    const toastId = toast.info(
-      'Для полного функционала интернет-магазина рекомендуем перейти на десктопную версию сайта.',
-      {
-        duration: 9000,
-        action: {
-          label: 'Хорошо',
-          onClick: () => toast.dismiss(toastId),
-        },
-      }
-    );
+    const timer = window.setTimeout(() => {
+      setOpen(true);
+      sessionStorage.setItem(STORAGE_KEY, '1');
+    }, 400);
 
-    sessionStorage.setItem(STORAGE_KEY, '1');
-
-    return () => {
-      toast.dismiss(toastId);
-    };
+    return () => window.clearTimeout(timer);
   }, []);
 
-  return null;
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-sm text-left">
+        <DialogHeader className="space-y-2">
+          <DialogTitle>Попробуйте мобильную версию</DialogTitle>
+          <DialogDescription>
+            Мы заметили, что вы заходите с телефона. Для удобства пользуйтесь мобильным интерфейсом —
+            все основные функции работают здесь полностью.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogBody className="space-y-3 pt-0 text-sm text-gray-600">
+          <p>Если что-то выглядит некорректно, обновите страницу или переключитесь на десктопную версию сайта.</p>
+        </DialogBody>
+        <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" onClick={() => setOpen(false)} className="w-full sm:w-auto">
+            Продолжить
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }

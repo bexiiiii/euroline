@@ -4,6 +4,7 @@ import ComponentCard from "@/components/common/ComponentCard";
 import MarketingStats from "../MarketingStats";
 import MarketingToolbar from "../MarketingToolbar";
 import ProductBannersTable from "../ProductBannersTable";
+import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
 
 const ProductBannersPageSimple = () => {
   const toolbarActions = [
@@ -14,14 +15,11 @@ const ProductBannersPageSimple = () => {
         console.log("Create banner");
       },
     },
-    {
-      label: "Экспорт",
-      variant: "outline" as const,
-      onClick: () => {
-        console.log("Экспорт данных баннеров");
-      },
-    },
   ];
+
+  const handleExportBanners = async ({ from, to }: ExportDateRange) => {
+    console.log("Экспорт данных баннеров за период", from, to);
+  };
 
   const handleEditBanner = (banner: any) => {
     console.log("Edit banner:", banner);
@@ -80,7 +78,16 @@ const ProductBannersPageSimple = () => {
           <MarketingToolbar
             title="Баннеры"
             actions={toolbarActions}
-          />
+          >
+            <ExportWithDateRange
+              triggerLabel="Экспорт"
+              size="sm"
+              variant="outline"
+              onConfirm={handleExportBanners}
+              title="Экспорт баннеров"
+              description="Выберите период для экспорта рекламных баннеров."
+            />
+          </MarketingToolbar>
         }
       >
         <ProductBannersTable

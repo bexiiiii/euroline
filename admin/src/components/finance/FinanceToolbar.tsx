@@ -1,6 +1,7 @@
 "use client";
 import React from "react";
 import Button from "../ui/button/Button";
+import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
 
 interface FinanceToolbarProps {
   title?: string;
@@ -8,7 +9,7 @@ interface FinanceToolbarProps {
   showAddButton?: boolean;
   addButtonText?: string;
   onAddClick?: () => void;
-  onExport?: () => void;
+  onExport?: (range: ExportDateRange) => Promise<void> | void;
   onRefresh?: () => void;
   onGenerateReport?: () => void;
 }
@@ -23,12 +24,12 @@ const FinanceToolbar: React.FC<FinanceToolbarProps> = ({
   onRefresh,
   onGenerateReport,
 }) => {
-  const handleExportFinance = () => {
+  const handleExportFinance = (range: ExportDateRange) => {
     if (onExport) {
-      onExport();
-    } else {
-      console.log("Экспорт финансовых данных");
+      return onExport(range);
     }
+    console.log("Экспорт финансовых данных", range);
+    return undefined;
   };
 
   const handleRefreshData = () => {
@@ -107,18 +108,19 @@ const FinanceToolbar: React.FC<FinanceToolbarProps> = ({
             Отчет
           </Button>
           
-          <Button
+          <ExportWithDateRange
+            triggerLabel="Экспорт"
             variant="outline"
             size="sm"
-            onClick={handleExportFinance}
-            startIcon={
+            onConfirm={handleExportFinance}
+            title="Экспорт финансов"
+            description="Выберите период для экспорта финансовых операций в CSV."
+            icon={
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             }
-          >
-            Экспорт
-          </Button>
+          />
         </div>
       </div>
     </div>

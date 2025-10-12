@@ -7,12 +7,16 @@ import ProductsTable from "@/components/products/ProductsTable";
 import ViewProductModal from "@/components/products/ViewProductModal";
 import EditProductModal from "@/components/products/EditProductModal";
 import { Product } from "@/lib/api/products";
+import { ExportDateRange } from "@/components/common/ExportWithDateRange";
+import { exportAdminData } from "@/lib/api/importExport";
+import { useToast } from "@/context/ToastContext";
 
 const ProductsManagement: React.FC = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const { success: showSuccess, error: showError } = useToast();
 
   const triggerRefresh = () => setRefreshKey((prev) => prev + 1);
 
@@ -36,8 +40,26 @@ const ProductsManagement: React.FC = () => {
     setIsEditModalOpen(false);
   };
 
-  const handleExportProducts = () => {
-    console.log("Экспорт продуктов");
+  const buildFileName = (base: string, from?: string, to?: string) => {
+    const parts = [base];
+    if (from) parts.push(from);
+    if (to && to !== from) parts.push(to);
+    return `${parts.join("-")}.csv`;
+  };
+
+  const handleExportProducts = async ({ from, to }: ExportDateRange) => {
+    try {
+      await exportAdminData({
+        type: "products",
+        from: from || undefined,
+        to: to || undefined,
+        fileName: buildFileName("products", from, to),
+      });
+      showSuccess("Экспорт продуктов сформирован");
+    } catch (error) {
+      console.error("Не удалось экспортировать продукты", error);
+      showError("Не удалось экспортировать продукты");
+    }
   };
 
   const handleImportProducts = () => {

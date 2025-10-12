@@ -80,3 +80,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/19-add-notification-fields.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/20-create-admin-notification-campaigns.sql
+      relativeToChangelogFile: false

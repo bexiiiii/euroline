@@ -2,9 +2,10 @@
 import React from "react";
 import Button from "../ui/button/Button";
 import ProductsModal from "./productsmodal";
+import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
 
 interface ProductsToolbarProps {
-  onExport: () => void;
+  onExport: (range: ExportDateRange) => Promise<void> | void;
   onImport: () => void;
   onSyncWith1C: () => void;
   onProductCreated: () => void;
@@ -16,10 +17,6 @@ const ProductsToolbar: React.FC<ProductsToolbarProps> = ({
   onSyncWith1C,
   onProductCreated,
 }) => {
-  const handleExport = () => {
-    onExport();
-  };
-
   const handleImport = () => {
     onImport();
   };
@@ -51,19 +48,19 @@ const ProductsToolbar: React.FC<ProductsToolbarProps> = ({
             Импорт Excel
           </Button>
 
-          {/* Export Button */}
-          <Button
-            size="sm"
+          <ExportWithDateRange
+            triggerLabel="Экспорт Excel"
             variant="outline"
-            onClick={handleExport}
-            startIcon={
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            size="sm"
+            onConfirm={onExport}
+            icon={
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             }
-          >
-            Экспорт Excel
-          </Button>
+            title="Экспорт каталога товаров"
+            description="Укажите период, за который нужно выгрузить товары в CSV-файл."
+          />
           <ProductsModal onCreated={onProductCreated} />
 
           <Button

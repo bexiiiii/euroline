@@ -12,6 +12,9 @@ import { userApi, User as ApiUser } from "@/lib/api/users";
 import { userActivityApi, UserActivity as ApiUserActivity } from "@/lib/api/userActivity";
 import { PageResponse } from "@/lib/api/types";
 import { apiFetch } from "@/lib/api";
+import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
+import { exportAdminData } from "@/lib/api/importExport";
+import { useToast } from "@/context/ToastContext";
 
 // Локальный тип для UI с дополнительными полями
 interface User extends ApiUser {
@@ -49,6 +52,7 @@ const UsersManagement = () => {
   const [loading, setLoading] = useState(false);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { success: showSuccess, error: showError } = useToast();
 
   useEffect(() => {
     loadUsers();
@@ -102,6 +106,28 @@ const UsersManagement = () => {
       setUserActivities([]); // оставляем пустой список
     } finally {
       setActivitiesLoading(false);
+    }
+  };
+
+  const buildExportFileName = (base: string, from?: string, to?: string) => {
+    const parts = [base];
+    if (from) parts.push(from);
+    if (to && to !== from) parts.push(to);
+    return `${parts.join("-")}.csv`;
+  };
+
+  const handleExportUserActivity = async ({ from, to }: ExportDateRange) => {
+    try {
+      await exportAdminData({
+        type: "user_activity",
+        from: from || undefined,
+        to: to || undefined,
+        fileName: buildExportFileName("user-activity", from, to),
+      });
+      showSuccess("Экспорт активности пользователей сформирован");
+    } catch (err) {
+      console.error("Не удалось экспортировать активность", err);
+      showError("Не удалось экспортировать активность");
     }
   };
 
@@ -286,7 +312,15 @@ const UsersManagement = () => {
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white">Активность пользователей</h3>
                 <div className="flex flex-col sm:flex-row gap-2">
                   <Button size="sm" variant="outline" className="w-full sm:w-auto">Фильтры</Button>
-                  <Button size="sm" variant="outline" className="w-full sm:w-auto">Экспорт</Button>
+                  <ExportWithDateRange
+                    triggerLabel="Экспорт CSV"
+                    size="sm"
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    title="Экспорт активности"
+                    description="Укажите период для выгрузки событий активности пользователей."
+                    onConfirm={handleExportUserActivity}
+                  />
                 </div>
               </div>
               <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">

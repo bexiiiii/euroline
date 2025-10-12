@@ -35,26 +35,35 @@ const ProductBannerCard: React.FC<ProductBannerCardProps> = ({
               onError={(event) => {
                 const target = event.target as HTMLImageElement;
                 console.error('Ошибка загрузки изображения баннера:', target.src);
-                // Попробовать резервный вариант с URL кодированием
-                if (!target.src.includes('fallback')) {
-                  // Get the base URL and path
-                  const baseUrl = banner.imageUrl.startsWith('http') ? '' : API_URL;
-                  const imagePath = banner.imageUrl.startsWith('http') ? 
-                    banner.imageUrl.split('/files/')[1] : 
-                    banner.imageUrl.replace('/files/', '');
-                  
-                  // Try with sanitized filename (spaces and special chars -> underscores)
-                  const sanitizedPath = imagePath
-                    .replace(/[^a-zA-Z0-9._-]/g, '_')
-                    .replace(/_+/g, '_');
-                  
-                  target.src = `${baseUrl}/files/${sanitizedPath}?fallback=1`;
-                } else {
-                  // Если все еще не загружается, показать заглушку
+
+                if (!banner.imageUrl) {
                   target.style.opacity = "0.3";
                   target.style.display = "none";
                   target.nextElementSibling?.classList.remove('hidden');
+                  return;
                 }
+
+                if (!target.dataset.retry) {
+                  const baseUrl = banner.imageUrl.startsWith('http') ? '' : API_URL;
+                  const rawPath = banner.imageUrl.startsWith('http')
+                    ? (banner.imageUrl.includes('/files/') ? banner.imageUrl.split('/files/')[1] : null)
+                    : banner.imageUrl.replace(/^\/+/, '').replace('files/', '');
+
+                  if (rawPath) {
+                    const sanitizedPath = rawPath
+                      .replace(/[^a-zA-Z0-9._/\-]/g, '_')
+                      .replace(/_+/g, '_')
+                      .replace(/^_+|_+$/g, '');
+
+                    target.dataset.retry = 'sanitized';
+                    target.src = `${baseUrl}/files/${sanitizedPath}?fallback=1`;
+                    return;
+                  }
+                }
+
+                target.style.opacity = "0.3";
+                target.style.display = "none";
+                target.nextElementSibling?.classList.remove('hidden');
               }}
             />
           ) : null}
