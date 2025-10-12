@@ -103,3 +103,7 @@ integration:
 outbox:
   publisher:
     delay-ms: 15000
+
+app:
+  cors:
+    allowed-origins: https://admin.euroline.1edu.kz,https://euroline.1edu.kz
