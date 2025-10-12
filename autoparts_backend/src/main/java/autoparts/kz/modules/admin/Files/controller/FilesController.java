@@ -30,7 +30,7 @@ public class FilesController {
 
     @PostMapping("/upload")
     public Map<String, String> upload(@RequestParam("file") MultipartFile file) throws IOException {
-        var stored = storageService.store(file, "admin/files/");
+        var stored = storageService.store(file, "images/uploads/");
         String encoded = storageService.encodeKey(stored.key());
         Map<String, String> response = new HashMap<>();
         response.put("id", encoded);

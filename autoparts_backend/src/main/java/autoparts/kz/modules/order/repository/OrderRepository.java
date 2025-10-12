@@ -2,6 +2,7 @@ package autoparts.kz.modules.order.repository;
 
 
 import autoparts.kz.modules.order.entity.Order;
+import autoparts.kz.modules.order.orderStatus.OrderStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -40,4 +41,31 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
 
     @EntityGraph(attributePaths = {"user", "items", "items.product"})
     Page<Order> findByUser_Id(Long userId, Pageable pageable);
+
+    @Query("""
+           select count(o)
+           from Order o
+           where o.createdAt >= :start and o.createdAt < :end
+           """)
+    long countCreatedBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    long countByStatus(OrderStatus status);
+
+    @Query("""
+           select count(o)
+           from Order o
+           where o.status = :status
+             and o.createdAt >= :start and o.createdAt < :end
+           """)
+    long countByStatusAndCreatedBetween(@Param("status") OrderStatus status,
+                                        @Param("start") LocalDateTime start,
+                                        @Param("end") LocalDateTime end);
+
+    @Query("""
+           select coalesce(sum(oi.price * oi.quantity), 0)
+           from Order o
+           join o.items oi
+           where o.createdAt >= :start and o.createdAt < :end
+           """)
+    BigDecimal sumTotalBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

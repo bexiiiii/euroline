@@ -4,12 +4,16 @@ import autoparts.kz.modules.admin.dto.NotificationRequest;
 import autoparts.kz.modules.admin.dto.NotificationResponse;
 import autoparts.kz.modules.admin.entity.Notification;
 import autoparts.kz.modules.admin.repository.NotificationRepository;
+import autoparts.kz.modules.auth.Roles.Role;
 import autoparts.kz.modules.auth.entity.User;
 import autoparts.kz.modules.auth.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.Collectors;
 @Service
 public class NotificationSenderService {
@@ -21,25 +25,20 @@ public class NotificationSenderService {
     private UserRepository userRepository;
 
     public void sendNotification(NotificationRequest request) {
-        if (request.getUserId() != null) {
-            User user = userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new RuntimeException("User not found"));
+        List<User> recipients = resolveRecipients(request);
+        if (recipients.isEmpty()) {
+            throw new RuntimeException("No recipients resolved for target audience");
+        }
 
+        for (User user : recipients) {
             Notification notification = new Notification();
             notification.setTitle(request.getTitle());
             notification.setMessage(request.getMessage());
+            notification.setStatus(request.isStatus());
             notification.setRecipient(user);
+            notification.setImageUrl(Optional.ofNullable(request.getImageUrl()).map(String::trim).filter(s -> !s.isEmpty()).orElse(null));
+            notification.setTarget(resolveTargetLabel(request));
             notificationRepository.save(notification);
-        } else {
-            // отправить всем
-            List<User> allUsers = userRepository.findAll();
-            for (User user : allUsers) {
-                Notification n = new Notification();
-                n.setTitle(request.getTitle());
-                n.setMessage(request.getMessage());
-                n.setRecipient(user);
-                notificationRepository.save(n);
-            }
         }
     }
     public List<NotificationResponse> getUserNotifications(Long userId) {
@@ -49,7 +48,9 @@ public class NotificationSenderService {
                         n.getTitle(),
                         n.getMessage(),
                         n.isRead(),
-                        n.getCreatedAt().toString()
+                        n.getCreatedAt().toString(),
+                        n.getImageUrl(),
+                        n.getTarget()
                 ))
                 .collect(Collectors.toList());
     }
@@ -68,4 +69,36 @@ public class NotificationSenderService {
         notificationRepository.deleteById(id);
     }
 
+    private List<User> resolveRecipients(NotificationRequest request) {
+        if (request.getUserId() != null) {
+            User user = userRepository.findById(request.getUserId())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            return List.of(user);
+        }
+
+        String target = resolveTargetLabel(request);
+        List<User> recipients = new ArrayList<>();
+        switch (target) {
+            case "ADMINS" -> recipients.addAll(userRepository.findByRole(Role.ADMIN));
+            case "USERS" -> recipients.addAll(userRepository.findByRole(Role.USER));
+            case "ALL" -> recipients.addAll(userRepository.findAll());
+            default -> {
+                if (request.getUserId() != null) {
+                    User user = userRepository.findById(request.getUserId())
+                            .orElseThrow(() -> new RuntimeException("User not found"));
+                    recipients.add(user);
+                } else {
+                    recipients.addAll(userRepository.findAll());
+                }
+            }
+        }
+        return recipients;
+    }
+
+    private String resolveTargetLabel(NotificationRequest request) {
+        return Optional.ofNullable(request.getTarget())
+                .map(t -> t.trim().toUpperCase(Locale.ROOT))
+                .filter(t -> !t.isEmpty())
+                .orElse("ALL");
+    }
 }

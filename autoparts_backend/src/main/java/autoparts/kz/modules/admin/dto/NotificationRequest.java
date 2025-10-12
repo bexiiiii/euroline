@@ -14,5 +14,7 @@ public class NotificationRequest {
     private String message;
     private boolean status;
     private Long userId;
+    private String target;
+    private String imageUrl;
 
 }

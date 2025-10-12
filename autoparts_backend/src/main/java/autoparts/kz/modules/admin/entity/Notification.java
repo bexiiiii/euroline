@@ -22,6 +22,10 @@ public class Notification {
     private String message;
     private boolean status;
     private boolean read = false;
+    @Column(name = "image_url", length = 512)
+    private String imageUrl;
+    @Column(name = "target", length = 32)
+    private String target;
 
     private LocalDateTime createdAt = LocalDateTime.now();
 

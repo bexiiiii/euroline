@@ -2,6 +2,7 @@ package autoparts.kz.modules.promotions.controller;
 
 import autoparts.kz.modules.promotions.entity.Banner;
 import autoparts.kz.modules.promotions.repository.BannerRepository;
+import autoparts.kz.modules.common.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,16 +14,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 
 @RestController
 @RequestMapping("/api/banners")
 @RequiredArgsConstructor
 public class BannerController {
     private final BannerRepository repo;
+    private final FileStorageService storageService;
 
     @GetMapping
     public Page<Banner> list(@RequestParam(required=false) String status, @RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="20") int size){
@@ -40,20 +38,9 @@ public class BannerController {
     @PostMapping("/{id}/upload") @PreAuthorize("hasRole('ADMIN')")
     public Banner upload(@PathVariable Long id, @RequestParam("file") MultipartFile file) throws IOException {
         var b = repo.findById(id).orElseThrow();
-        Path dir = Paths.get("storage/images/banners"); Files.createDirectories(dir);
-        
-        // Sanitize filename to avoid URL encoding issues
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null) originalFilename = "banner.png";
-        String sanitizedFilename = originalFilename
-            .replaceAll("[^a-zA-Z0-9._-]", "_") // Replace special chars with underscore
-            .replaceAll("_+", "_"); // Replace multiple underscores with single
-        
-        Path path = dir.resolve("banner_"+id+"_"+System.currentTimeMillis()+"_"+sanitizedFilename);
-        Files.copy(file.getInputStream(), path, StandardCopyOption.REPLACE_EXISTING);
-        
-        // Store relative path from banners directory for better URL construction
-        b.setImageUrl("/files/"+path.getFileName());
+
+        var stored = storageService.store(file, "images/banners/");
+        b.setImageUrl(stored.url());
         return repo.save(b);
     }
     

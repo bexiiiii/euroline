@@ -70,6 +70,11 @@ public class AdminAnalyticsController {
         return analyticsService.getMonthlyRevenueChart();
     }
 
+    @GetMapping("/orders-summary")
+    public ResponseEntity<Map<String, Object>> getOrdersSummary() {
+        return ResponseEntity.ok(analyticsService.getOrdersSummary());
+    }
+
     @GetMapping("/customer-growth")
     public ResponseEntity<Map<String, Object>> getCustomerGrowth() {
         return ResponseEntity.ok(analyticsService.getCustomerGrowthStats());

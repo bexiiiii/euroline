@@ -8,6 +8,7 @@ import autoparts.kz.modules.auth.repository.UserRepository;
 import autoparts.kz.modules.manualProducts.entity.Product;
 import autoparts.kz.modules.order.entity.Order;
 import autoparts.kz.modules.order.entity.OrderItem;
+import autoparts.kz.modules.order.orderStatus.OrderStatus;
 import autoparts.kz.modules.order.repository.OrderRepository;
 import autoparts.kz.modules.manualProducts.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -106,7 +108,7 @@ public class AdminAnalyticsService {
     public List<ChartDataPoint> getMonthlyRevenueChart() {
         LocalDate endDate = LocalDate.now();
         LocalDate startDate = endDate.minusMonths(11).withDayOfMonth(1);
-        
+
         List<Order> orders = orderRepository.findByCreatedAtBetween(
                 startDate.atStartOfDay(), 
                 endDate.plusDays(1).atStartOfDay()
@@ -123,6 +125,60 @@ public class AdminAnalyticsService {
                 .map(entry -> new ChartDataPoint(entry.getKey(), entry.getValue().doubleValue()))
                 .sorted((a, b) -> a.getDate().compareTo(b.getDate()))
                 .collect(Collectors.toList());
+    }
+
+    public Map<String, Object> getOrdersSummary() {
+        LocalDate today = LocalDate.now();
+        LocalDate firstDayOfMonth = today.withDayOfMonth(1);
+        LocalDate previousMonthStart = firstDayOfMonth.minusMonths(1);
+
+        LocalDateTime currentStart = firstDayOfMonth.atStartOfDay();
+        LocalDateTime currentEnd = today.plusDays(1).atStartOfDay();
+        LocalDateTime previousStart = previousMonthStart.atStartOfDay();
+        LocalDateTime previousEnd = firstDayOfMonth.atStartOfDay();
+
+        long totalOrders = orderRepository.count();
+        long currentNew = orderRepository.countCreatedBetween(currentStart, currentEnd);
+        long previousNew = orderRepository.countCreatedBetween(previousStart, previousEnd);
+
+        long processing = orderRepository.countByStatus(OrderStatus.PENDING);
+        long previousProcessing = orderRepository.countByStatusAndCreatedBetween(OrderStatus.PENDING, previousStart, previousEnd);
+
+        long completed = orderRepository.countByStatus(OrderStatus.CONFIRMED);
+        long previousCompleted = orderRepository.countByStatusAndCreatedBetween(OrderStatus.CONFIRMED, previousStart, previousEnd);
+
+        BigDecimal revenueCurrent = orderRepository.sumTotalBetween(currentStart, currentEnd);
+        if (revenueCurrent == null) {
+            revenueCurrent = BigDecimal.ZERO;
+        }
+        BigDecimal revenuePrevious = orderRepository.sumTotalBetween(previousStart, previousEnd);
+        if (revenuePrevious == null) {
+            revenuePrevious = BigDecimal.ZERO;
+        }
+
+        return Map.of(
+                "total", Map.of(
+                        "value", totalOrders,
+                        "changePercent", roundPercent(percentChange(currentNew, previousNew))
+                ),
+                "newOrders", Map.of(
+                        "value", currentNew,
+                        "changePercent", roundPercent(percentChange(currentNew, previousNew))
+                ),
+                "processing", Map.of(
+                        "value", processing,
+                        "delta", processing - previousProcessing
+                ),
+                "completed", Map.of(
+                        "value", completed,
+                        "changePercent", roundPercent(percentChange(completed, previousCompleted))
+                ),
+                "revenue", Map.of(
+                        "current", revenueCurrent,
+                        "previous", revenuePrevious,
+                        "changePercent", roundPercent(percentChange(revenueCurrent, revenuePrevious))
+                )
+        );
     }
 
     public Map<String, Object> getCustomerGrowthStats() {
@@ -489,8 +545,30 @@ public class AdminAnalyticsService {
         
         return demographics;
     }
+
+    private double percentChange(long current, long previous) {
+        if (previous == 0) {
+            return current > 0 ? 100.0 : 0.0;
+        }
+        return ((double) current - previous) / previous * 100.0;
+    }
+
+    private double percentChange(BigDecimal current, BigDecimal previous) {
+        if (previous == null || previous.compareTo(BigDecimal.ZERO) == 0) {
+            return current != null && current.compareTo(BigDecimal.ZERO) > 0 ? 100.0 : 0.0;
+        }
+        if (current == null) {
+            current = BigDecimal.ZERO;
+        }
+        return current.subtract(previous)
+                .divide(previous, 4, RoundingMode.HALF_UP)
+                .multiply(BigDecimal.valueOf(100))
+                .doubleValue();
+    }
+
+    private double roundPercent(double value) {
+        return BigDecimal.valueOf(value).setScale(1, RoundingMode.HALF_UP).doubleValue();
+    }
 }
-
-
 
 

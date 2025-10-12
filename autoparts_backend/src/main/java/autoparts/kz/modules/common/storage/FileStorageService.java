@@ -19,7 +19,16 @@ public class FileStorageService {
 
     private final S3Storage s3Storage;
 
+    private String normalizePrefix(String prefix) {
+        String normalized = (prefix == null || prefix.isBlank()) ? "images/" : prefix.trim();
+        if (!normalized.endsWith("/")) {
+            normalized = normalized + "/";
+        }
+        return normalized;
+    }
+
     public StoredObject store(MultipartFile file, String prefix) throws IOException {
+        String resolvedPrefix = normalizePrefix(prefix);
         String originalName = StringUtils.hasText(file.getOriginalFilename())
                 ? Paths.get(file.getOriginalFilename()).getFileName().toString()
                 : "file";
@@ -29,7 +38,7 @@ public class FileStorageService {
             extension = originalName.substring(idx);
         }
 
-        String key = (prefix != null ? prefix : "") +
+        String key = resolvedPrefix +
                 Instant.now().toEpochMilli() + "_" + UUID.randomUUID() + extension;
 
         String contentType = file.getContentType();
@@ -43,6 +52,7 @@ public class FileStorageService {
     }
 
     public StoredObject store(byte[] content, String contentType, String prefix, String filenameHint) {
+        String resolvedPrefix = normalizePrefix(prefix);
         String safeName = StringUtils.hasText(filenameHint)
                 ? Paths.get(filenameHint).getFileName().toString()
                 : "object";
@@ -52,7 +62,7 @@ public class FileStorageService {
             extension = safeName.substring(idx);
         }
 
-        String key = (prefix != null ? prefix : "") +
+        String key = resolvedPrefix +
                 Instant.now().toEpochMilli() + "_" + UUID.randomUUID() + extension;
 
         String type = StringUtils.hasText(contentType) ? contentType : MediaType.APPLICATION_OCTET_STREAM_VALUE;

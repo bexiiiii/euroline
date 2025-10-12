@@ -25,7 +25,7 @@ public class ImagesController {
 
     @PostMapping("/upload")
     public Map<String,String> upload(@RequestParam("image") MultipartFile image) throws IOException {
-        var stored = storageService.store(image, "admin/images/");
+        var stored = storageService.store(image, "images/");
         return Map.of(
                 "url", stored.url(),
                 "id", storageService.encodeKey(stored.key())
@@ -41,7 +41,7 @@ public class ImagesController {
         ImageIO.write(out, "png", baos);
 
         var stored = storageService.store(baos.toByteArray(), MediaType.IMAGE_PNG_VALUE,
-                "admin/images/resized/", image.getOriginalFilename());
+                "images/resized/", image.getOriginalFilename());
         return Map.of(
                 "url", stored.url(),
                 "id", storageService.encodeKey(stored.key())

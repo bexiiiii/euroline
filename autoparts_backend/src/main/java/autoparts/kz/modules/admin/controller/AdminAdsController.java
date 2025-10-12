@@ -31,7 +31,7 @@ public class AdminAdsController {
 
     @PostMapping("/upload")
     public ResponseEntity<String> upload(@RequestParam("file") MultipartFile file) throws IOException {
-        var stored = storageService.store(file, "admin/ads/");
+        var stored = storageService.store(file, "images/ads/");
         return ResponseEntity.ok(stored.url());
     }
 
