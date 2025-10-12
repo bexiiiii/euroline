@@ -1,6 +1,7 @@
 package autoparts.kz.modules.admin.settings.controller;
 
 import autoparts.kz.modules.admin.Events.service.EventLogService;
+import autoparts.kz.modules.stockOneC.service.OneCIntegrationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.boot.actuate.metrics.MetricsEndpoint;
@@ -19,6 +20,7 @@ public class AdminSystemController {
     private final HealthEndpoint healthEndpoint;
     private final MetricsEndpoint metricsEndpoint;
     private final EventLogService eventLogService;
+    private final OneCIntegrationService oneCIntegrationService;
     private final AtomicBoolean maintenanceMode = new AtomicBoolean(false);
 
     @GetMapping("/status") 
@@ -99,5 +101,23 @@ public class AdminSystemController {
                 enabled ? "Включен режим обслуживания" : "Выключен режим обслуживания"
         );
         return maintenanceStatus();
+    }
+
+    @GetMapping("/onec/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public Map<String, Object> oneCStatus() {
+        boolean connected = false;
+        String message = "Соединение не установлено";
+        try {
+            connected = oneCIntegrationService.testConnection();
+            message = connected ? "Соединение успешно" : "1С недоступна";
+        } catch (Exception ex) {
+            message = "Ошибка проверки: " + ex.getMessage();
+        }
+        return Map.of(
+                "connected", connected,
+                "message", message,
+                "timestamp", Instant.now().toEpochMilli()
+        );
     }
 }
