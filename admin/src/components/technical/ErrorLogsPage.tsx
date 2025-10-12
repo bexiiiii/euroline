@@ -8,6 +8,9 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table"
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Select from "../form/Select";
+import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
+import { downloadCsv } from "@/lib/utils/export";
+import { useToast } from "@/context/ToastContext";
 import { API_URL } from "@/lib/api";
 
 interface ErrorLog {
@@ -38,6 +41,7 @@ const ErrorLogsPage = () => {
   const [errorLogs, setErrorLogs] = useState<ErrorLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { success: showSuccess, error: showError } = useToast();
 
   // Fetch error logs from API
   useEffect(() => {
@@ -165,6 +169,37 @@ const ErrorLogsPage = () => {
     { value: "WARN", label: "Предупреждения" },
     { value: "INFO", label: "Информационные" }
   ];
+
+  const handleExportLogs = async ({ from, to }: ExportDateRange) => {
+    const fromDate = new Date(from);
+    const toDate = new Date(to);
+    toDate.setHours(23, 59, 59, 999);
+
+    const filtered = errorLogs.filter((log) => {
+      const logDate = new Date(log.timestamp);
+      return logDate >= fromDate && logDate <= toDate;
+    });
+
+    if (filtered.length === 0) {
+      showError("За выбранный период нет логов ошибок");
+      return;
+    }
+
+    const header = ["ID", "Время", "Уровень", "Сообщение", "Логгер", "Класс", "Метод", "Решена"];
+    const rows = filtered.map((log) => [
+      log.id,
+      formatDateTime(log.timestamp),
+      log.level,
+      log.message,
+      log.logger,
+      log.className ?? "",
+      log.methodName ?? "",
+      log.resolved ? "Да" : "Нет",
+    ]);
+
+    downloadCsv(`error-logs-${from}-${to}`, [header, ...rows]);
+    showSuccess(`Экспортировано ${rows.length} записей`);
+  };
 
   const getErrorStats = () => {
     const total = errorLogs.length;
@@ -304,7 +339,16 @@ const ErrorLogsPage = () => {
             action={
               <div className="flex space-x-2">
                 <Button size="sm" variant="outline">Очистить старые логи</Button>
-                <Button size="sm" variant="outline">Экспорт логов</Button>
+                <ExportWithDateRange
+                  triggerLabel="Экспорт логов"
+                  variant="outline"
+                  onConfirm={handleExportLogs}
+                  icon={
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                  }
+                />
                 <Button size="sm">Настройки логирования</Button>
               </div>
             }
@@ -357,9 +401,9 @@ const ErrorLogsPage = () => {
 
             {/* Таблица ошибок */}
             <div className="mt-6">
-              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+              <div className="mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/[0.05] dark:bg-white/[0.03] xl:max-w-[960px]">
                 <div className="max-w-full overflow-x-auto">
-                  <div className="min-w-[1400px]">
+                  <div className="min-w-[820px]">
                     <Table>
                       <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
                         <TableRow>

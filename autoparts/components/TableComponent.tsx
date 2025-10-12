@@ -554,22 +554,26 @@ const AutoPartsTable = React.forwardRef<
       >
     
 
-      <div className="bg-container px-6 py-3 text-sm flex items-center text-muted-foreground border-b sticky top-0 z-10 font-medium">
-            <div className="w-20 shrink-0">Фото</div>
+      <div className="overflow-x-auto">
+        <div className="min-w-[960px]">
+          <div className="bg-container px-4 md:px-6 py-3 text-xs md:text-sm flex items-center text-muted-foreground border-b sticky top-0 z-10 font-medium">
+            <div className="w-16 md:w-20 shrink-0">Фото</div>
             <div className="w-24 shrink-0">Бренд</div>
-            <div className="w-32 shrink-0">Артикул</div>
+            <div className="w-28 md:w-32 shrink-0">Артикул</div>
             <div className="flex-grow px-2">Наименование</div>
             <div className="w-20 shrink-0 text-center">Кол-во</div>
-            <div className="w-32 shrink-0">Склад</div>
-            <div className="w-32 shrink-0">Поставка</div>
-            <div className="w-28 shrink-0 text-right">Цена</div>
-            <div className="w-40 shrink-0 text-center">Действия</div>
-         </div>
-         <div className="w-full min-w-[1000px]">
+            <div className="w-28 md:w-32 shrink-0">Склад</div>
+            <div className="w-28 md:w-32 shrink-0">Поставка</div>
+            <div className="w-24 md:w-28 shrink-0 text-right">Цена</div>
+            <div className="w-36 md:w-40 shrink-0 text-center">Действия</div>
+          </div>
+          <div className="w-full">
             {parts.map((part) => (
-               <AutoPartLine key={part.id} part={part} onImageClick={setSelectedImage} />
+              <AutoPartLine key={part.id} part={part} onImageClick={setSelectedImage} />
             ))}
-         </div>
+          </div>
+        </div>
+      </div>
 
          {selectedImage && (
             <ImageModal src={selectedImage} onClose={() => setSelectedImage(null)} />

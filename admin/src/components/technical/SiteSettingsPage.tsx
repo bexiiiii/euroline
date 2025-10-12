@@ -55,14 +55,6 @@ interface SiteSettings {
     whatsapp: string;
     youtube: string;
   };
-  integrations: {
-    emailProvider: string;
-    smsProvider: string;
-    paymentGateways: string[];
-    deliveryServices: string[];
-    crmSystem: string;
-    analyticsServices: string[];
-  };
 }
 
 const SiteSettingsPage = () => {
@@ -119,14 +111,6 @@ const SiteSettingsPage = () => {
       telegram: "",
       whatsapp: "",
       youtube: ""
-    },
-    integrations: {
-      emailProvider: "smtp",
-      smsProvider: "smsc",
-      paymentGateways: [],
-      deliveryServices: [],
-      crmSystem: "1c",
-      analyticsServices: []
     }
   });
 
@@ -200,14 +184,6 @@ const SiteSettingsPage = () => {
         telegram: settingsMap.get('social.telegram') || '',
         whatsapp: settingsMap.get('social.whatsapp') || '',
         youtube: settingsMap.get('social.youtube') || ''
-      },
-      integrations: {
-        emailProvider: settingsMap.get('integrations.email_provider') || 'smtp',
-        smsProvider: settingsMap.get('integrations.sms_provider') || 'smsc',
-        paymentGateways: JSON.parse(settingsMap.get('integrations.payment_gateways') || '[]'),
-        deliveryServices: JSON.parse(settingsMap.get('integrations.delivery_services') || '[]'),
-        crmSystem: settingsMap.get('integrations.crm_system') || '1c',
-        analyticsServices: JSON.parse(settingsMap.get('integrations.analytics_services') || '[]')
       }
     };
   };
@@ -297,14 +273,6 @@ const SiteSettingsPage = () => {
         { key: 'social.telegram', value: settings.social.telegram },
         { key: 'social.whatsapp', value: settings.social.whatsapp },
         { key: 'social.youtube', value: settings.social.youtube },
-        
-        // Integrations settings
-        { key: 'integrations.email_provider', value: settings.integrations.emailProvider },
-        { key: 'integrations.sms_provider', value: settings.integrations.smsProvider },
-        { key: 'integrations.payment_gateways', value: JSON.stringify(settings.integrations.paymentGateways) },
-        { key: 'integrations.delivery_services', value: JSON.stringify(settings.integrations.deliveryServices) },
-        { key: 'integrations.crm_system', value: settings.integrations.crmSystem },
-        { key: 'integrations.analytics_services', value: JSON.stringify(settings.integrations.analyticsServices) }
       ];
 
       await settingsApi.updateBulk(settingsToSave.map(setting => ({
@@ -400,7 +368,7 @@ const SiteSettingsPage = () => {
       {/* Основной контент */}
       <ComponentCard
         title="Настройки сайта"
-        description="Конфигурация основных параметров и интеграций сайта"
+        description="Конфигурация основных параметров сайта"
         action={
           <div className="flex space-x-2">
             <Button size="sm" variant="outline" onClick={resetSettings} disabled={saving || resetLoading}>
@@ -420,8 +388,7 @@ const SiteSettingsPage = () => {
               { id: "appearance", name: "Внешний вид" },
               { id: "seo", name: "SEO" },
               { id: "business", name: "Организация" },
-              { id: "social", name: "Соц. сети" },
-              { id: "integrations", name: "Интеграции" }
+              { id: "social", name: "Соц. сети" }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -757,114 +724,6 @@ const SiteSettingsPage = () => {
                   onChange={(e) => updateSetting("social", "youtube", e.target.value)}
                   placeholder="https://youtube.com/c/username"
                 />
-              </div>
-            </div>
-          )}
-
-          {activeTab === "integrations" && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label>Провайдер email</Label>
-                <Select
-                  options={[
-                    { value: "smtp", label: "SMTP" },
-                    { value: "sendgrid", label: "SendGrid" },
-                    { value: "mailgun", label: "Mailgun" }
-                  ]}
-                  value={settings.integrations.emailProvider}
-                  onChange={(value) => updateSetting("integrations", "emailProvider", value)}
-                  placeholder="Выберите провайдера"
-                />
-              </div>
-              <div>
-                <Label>Провайдер SMS</Label>
-                <Select
-                  options={[
-                    { value: "smsc", label: "SMSC.ru" },
-                    { value: "sms_aero", label: "SMS Aero" },
-                    { value: "twilio", label: "Twilio" }
-                  ]}
-                  value={settings.integrations.smsProvider}
-                  onChange={(value) => updateSetting("integrations", "smsProvider", value)}
-                  placeholder="Выберите провайдера"
-                />
-              </div>
-              </div>
-              
-              <div>
-                <Label>Платежные системы</Label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-                  {["sberbank", "tinkoff", "yandex_money", "paypal", "stripe", "alfa_bank"].map(gateway => (
-                    <label key={gateway} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={settings.integrations.paymentGateways.includes(gateway)}
-                        onChange={(e) => {
-                          const current = settings.integrations.paymentGateways;
-                          const updated = e.target.checked
-                            ? [...current, gateway]
-                            : current.filter(g => g !== gateway);
-                          setSettings(prev => ({
-                            ...prev,
-                            integrations: { ...prev.integrations, paymentGateways: updated }
-                          }));
-                          setHasUnsavedChanges(true);
-                        }}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300 capitalize">
-                        {gateway.replace('_', ' ')}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <Label>Службы доставки</Label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-                  {["cdek", "post_russia", "courier", "pickpoint", "boxberry", "dpd"].map(service => (
-                    <label key={service} className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={settings.integrations.deliveryServices.includes(service)}
-                        onChange={(e) => {
-                          const current = settings.integrations.deliveryServices;
-                          const updated = e.target.checked
-                            ? [...current, service]
-                            : current.filter(s => s !== service);
-                          setSettings(prev => ({
-                            ...prev,
-                            integrations: { ...prev.integrations, deliveryServices: updated }
-                          }));
-                          setHasUnsavedChanges(true);
-                        }}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700 dark:text-gray-300 capitalize">
-                        {service.replace('_', ' ')}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label>CRM система</Label>
-                <Select
-                  options={[
-                    { value: "1c", label: "1С:Предприятие" },
-                    { value: "amoCRM", label: "amoCRM" },
-                    { value: "bitrix24", label: "Битрикс24" },
-                    { value: "custom", label: "Собственная разработка" }
-                  ]}
-                  value={settings.integrations.crmSystem}
-                  onChange={(value) => updateSetting("integrations", "crmSystem", value)}
-                  placeholder="Выберите CRM"
-                />
-                </div>
               </div>
             </div>
           )}

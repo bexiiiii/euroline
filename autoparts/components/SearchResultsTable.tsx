@@ -1,17 +1,43 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ShoppingCart, Package, MapPin, Clock, Info } from 'lucide-react';
-import { SearchItem, SearchWarehouse } from '@/lib/api/search';
+import { ShoppingCart, Package, MapPin, Info } from 'lucide-react';
+import { SearchItem, SearchWarehouse, SearchVehicle } from '@/lib/api/search';
 import { useSearchStore } from '@/lib/stores/searchStore';
 import { useCartStore } from '@/lib/stores/cartStore';
 
 interface SearchResultsTableProps {
   className?: string;
+  items?: SearchItem[];
+  isLoading?: boolean;
+  detectedType?: 'VIN' | 'FRAME' | 'PLATE' | 'OEM' | 'TEXT' | null;
+  vehicle?: SearchVehicle | null;
+  total?: number;
+  page?: number;
+  pageSize?: number;
+  emptyMessage?: string;
 }
 
-export default function SearchResultsTable({ className }: SearchResultsTableProps) {
-  const { results, isLoading, detectedType, vehicle } = useSearchStore();
+export default function SearchResultsTable({
+  className,
+  items,
+  isLoading: isLoadingProp,
+  detectedType: detectedTypeProp,
+  vehicle: vehicleProp,
+  total,
+  page,
+  pageSize,
+  emptyMessage,
+}: SearchResultsTableProps) {
+  const store = useSearchStore();
+  const results = items ?? store.results;
+  const isLoading = isLoadingProp ?? store.isLoading;
+  const detectedType = detectedTypeProp ?? store.detectedType;
+  const vehicle = vehicleProp ?? store.vehicle;
+  const itemsToRender = results ?? [];
+  const totalCount = typeof total === 'number' ? total : itemsToRender.length;
+  const currentPage = page ?? 0;
+  const currentPageSize = pageSize ?? (itemsToRender.length || 1);
 
   if (isLoading) {
     return (
@@ -54,13 +80,16 @@ export default function SearchResultsTable({ className }: SearchResultsTableProp
   }
 
   // Если результаты не найдены
-  if (!results || results.length === 0) {
+  if (!itemsToRender || itemsToRender.length === 0) {
+    const message =
+      emptyMessage ??
+      'Попробуйте изменить поисковый запрос или проверить правильность написания артикула.';
     return (
       <div className="bg-white rounded-lg border shadow-sm p-8">
         <div className="text-center text-gray-600">
           <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">Ничего не найдено</h3>
-          <p>Попробуйте изменить поисковый запрос или проверить правильность написания артикула.</p>
+          <p>{message}</p>
         </div>
       </div>
     );
@@ -70,12 +99,17 @@ export default function SearchResultsTable({ className }: SearchResultsTableProp
     <div className={`bg-white rounded-lg border shadow-sm ${className}`}>
       <div className="p-4 border-b border-gray-100">
         <h3 className="text-lg font-semibold text-gray-900">
-          Найдено {results.length} автозапчастей
+          {totalCount > 0 ? `Найдено ${totalCount} автозапчастей` : 'Результаты поиска'}
         </h3>
-        {detectedType && (
-          <p className="text-sm text-gray-600 mt-1">
-            Тип поиска: {getSearchTypeLabel(detectedType)}
-          </p>
+        {(detectedType || (totalCount > itemsToRender.length && itemsToRender.length > 0)) && (
+          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
+            {detectedType && <span>Тип поиска: {getSearchTypeLabel(detectedType)}</span>}
+            {totalCount > itemsToRender.length && itemsToRender.length > 0 && (
+              <span>
+                Показано {formatRange(currentPage, currentPageSize, itemsToRender.length, totalCount)}
+              </span>
+            )}
+          </div>
         )}
       </div>
 
@@ -101,7 +135,7 @@ export default function SearchResultsTable({ className }: SearchResultsTableProp
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {results.map((item, index) => (
+            {itemsToRender.map((item, index) => (
               <SearchResultRow key={`${item.oem}-${index}`} item={item} />
             ))}
           </tbody>
@@ -254,6 +288,16 @@ function WarehouseItem({ warehouse }: WarehouseItemProps) {
       </div>
     </div>
   );
+}
+
+function formatRange(page: number, pageSize: number, displayed: number, total: number): string {
+  if (total <= 0 || displayed <= 0) {
+    return '0 из 0';
+  }
+  const safePageSize = pageSize > 0 ? pageSize : displayed;
+  const start = page * safePageSize + 1;
+  const end = Math.min(total, start + displayed - 1);
+  return `${start}–${end} из ${total}`;
 }
 
 function getSearchTypeLabel(type: string): string {

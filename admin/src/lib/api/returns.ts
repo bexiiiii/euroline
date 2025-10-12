@@ -1,7 +1,37 @@
 import { apiFetch } from '../api';
 import { PageResponse } from './types';
 
-export type ReturnStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
+export type ReturnStatus = 'NEW' | 'APPROVED' | 'REJECTED' | 'REFUNDED' | 'PROCESSED';
+
+export interface SummaryMetric {
+  value: number;
+  changePercent: number;
+}
+
+export interface ProcessingMetric {
+  value: number;
+  delta: number;
+}
+
+export interface RevenueMetric {
+  current: number;
+  previous: number;
+  changePercent: number;
+}
+
+export interface ReturnRateMetric {
+  value: number;
+  previous: number;
+  change: number;
+}
+
+export interface ReturnSummary {
+  total: SummaryMetric;
+  newReturns: SummaryMetric;
+  processing: ProcessingMetric;
+  amount: RevenueMetric;
+  returnRate: ReturnRateMetric;
+}
 
 interface ReturnApiResponse {
   id: number;
@@ -112,12 +142,12 @@ export const returnsApi = {
     });
   },
 
-  getStats: async (): Promise<Record<string, unknown>> => {
-    return apiFetch<Record<string, unknown>>('/api/returns/stats');
+  getStats: async (): Promise<ReturnSummary> => {
+    return apiFetch<ReturnSummary>('/api/returns/stats');
   },
 
   getPendingReturns: async (): Promise<Return[]> => {
-    const response = await returnsApi.getReturns({ status: 'PENDING', size: 100 });
+    const response = await returnsApi.getReturns({ status: 'NEW', size: 100 });
     return response.content;
   },
 };

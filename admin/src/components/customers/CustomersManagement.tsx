@@ -4,11 +4,15 @@ import CustomersStats from "./CustomersStats";
 import CustomersToolbar from "./CustomersToolbar";
 import CustomersTable from "./CustomersTable";
 import SearchHistoryTable from "./SearchHistoryTable";
-import { customersApi } from "@/lib/api/customers";
+import { customersApi, Customer } from "@/lib/api/customers";
+import { useToast } from "@/context/ToastContext";
+import { ExportDateRange } from "@/components/common/ExportWithDateRange";
+import { downloadCsv } from "@/lib/utils/export";
 
 const CustomersManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'customers' | 'search-history'>('customers');
   const [refreshToken, setRefreshToken] = useState(() => Date.now());
+  const { success: showSuccess, error: showError } = useToast();
 
   const triggerRefresh = () => setRefreshToken(Date.now());
 
@@ -17,8 +21,67 @@ const CustomersManagement: React.FC = () => {
     console.log('Add customer modal');
   };
 
-  const handleExport = () => {
-    console.log('Export customers data');
+  const handleExport = async ({ from, to }: ExportDateRange) => {
+    try {
+      const fromDate = new Date(from);
+      const toDate = new Date(to);
+      toDate.setHours(23, 59, 59, 999);
+
+      const pageSize = 200;
+      let pageIndex = 0;
+      let totalPages = 1;
+      const collected: Customer[] = [];
+
+      while (pageIndex < totalPages && pageIndex < 20) {
+        const response = await customersApi.getCustomers({ page: pageIndex, size: pageSize, sort: "createdAt,desc" });
+        collected.push(...response.content);
+        totalPages = response.totalPages || 1;
+        pageIndex += 1;
+      }
+
+      const filtered = collected.filter((customer) => {
+        if (!customer.createdAt) {
+          return true;
+        }
+        const createdAt = new Date(customer.createdAt);
+        return createdAt >= fromDate && createdAt <= toDate;
+      });
+
+      if (filtered.length === 0) {
+        showError('За выбранный период клиенты не найдены');
+        return;
+      }
+
+      const header = [
+        'ID',
+        'Email',
+        'Имя',
+        'Фамилия',
+        'Компания',
+        'Телефон',
+        'Роль',
+        'Заблокирован',
+        'Дата регистрации',
+      ];
+
+      const rows = filtered.map((customer) => [
+        customer.id,
+        customer.email,
+        customer.name ?? '',
+        customer.surname ?? '',
+        customer.clientName ?? '',
+        customer.phone ?? '',
+        customer.role,
+        customer.banned ? 'Да' : 'Нет',
+        customer.createdAt ? new Date(customer.createdAt).toLocaleString('ru-RU') : '',
+      ]);
+
+      downloadCsv(`customers-${from}-${to}`, [header, ...rows]);
+      showSuccess(`Экспортировано ${rows.length} клиентов`);
+    } catch (error) {
+      console.error('Не удалось экспортировать клиентов', error);
+      showError('Не удалось экспортировать клиентов');
+    }
   };
 
   const handleRefresh = () => {

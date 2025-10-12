@@ -58,7 +58,7 @@ export function useReturns() {
       );
       
       // If it was in pending returns, update or remove as needed
-      if (status !== 'PENDING') {
+      if (status !== 'NEW') {
         setPendingReturns(prevPending => prevPending.filter(returnItem => returnItem.id !== returnId));
       } else {
         setPendingReturns(prevPending => {

@@ -1,23 +1,16 @@
 'use client';
- 
+
+import { useCallback, useState } from 'react';
 import {
   CreditCard,
   HelpCircle,
-  Keyboard,
   LogOut,
-  LucideListOrdered,
   Mail,
-  MessageSquare,
-  Plus,
-  PlusCircle,
   RotateCcw,
   Search,
-  Settings,
   User,
   UserPlus,
-  Users,
 } from 'lucide-react';
-import { motion } from 'motion/react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,142 +26,155 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/radix-dropdown-menu';
 import AvatarComponent from './AvatarComponent';
-import Link from 'next/link';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useNotificationsStore } from '@/lib/stores/notificationsStore';
 import { useRouter } from 'next/navigation';
  
 export const RadixDropdownMenu = () => {
   const { logout, user } = useAuthStore();
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
   const router = useRouter();
+  const [open, setOpen] = useState(false);
 
-  const handleLogout = () => {
+  const navigate = useCallback(
+    (href: string) => {
+      setOpen(false);
+      router.push(href);
+    },
+    [router]
+  );
+
+  const handleLogout = useCallback(() => {
+    setOpen(false);
     logout();
     router.push('/');
-  };
+  }, [logout, router]);
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <motion.button
-          
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
+        <button
+          type="button"
+          aria-label="Меню пользователя"
+          aria-expanded={open}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
         >
-          <AvatarComponent />
-        </motion.button>
+          <AvatarComponent className="h-10 w-10" />
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56">
+      <DropdownMenuContent className="w-60" align="end">
         <DropdownMenuLabel>
           {user?.name ? `${user.name} ${user.surname || ''}`.trim() : 'Мой аккаунт'}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <User />
-          <Link href="/profile">
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              navigate('/profile');
+            }}
+          >
+            <User className="mr-2 h-4 w-4" />
             <span>Профиль</span>
-            </Link>
-            <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
           </DropdownMenuItem>
-          <DropdownMenuItem>
-            <User />
-            <Link href="/cabinet">
-              <span>Личный кабинет </span>
-            </Link>
-            <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              navigate('/cabinet');
+            }}
+          >
+            <User className="mr-2 h-4 w-4" />
+            <span>Личный кабинет</span>
           </DropdownMenuItem>
-          <DropdownMenuItem>
-            <CreditCard />
-            <Link href="/finances">
-              <span>Финансы</span>
-            </Link>
-            <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              navigate('/finances');
+            }}
+          >
+            <CreditCard className="mr-2 h-4 w-4" />
+            <span>Финансы</span>
           </DropdownMenuItem>
           <DropdownMenuSub>
             <DropdownMenuSubTrigger>
-              <UserPlus />
+              <UserPlus className="mr-2 h-4 w-4" />
               <span>Заказы</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent>
-                <DropdownMenuItem>
-                  <Mail />
-                   <Link href="/order-history">
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    navigate('/order-history');
+                  }}
+                >
+                  <Mail className="mr-2 h-4 w-4" />
                   <span>Мои заказы</span>
-                  </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Link href="/order-returns">
-                    <RotateCcw />
-                    <span>Оформление возврата</span>
-                  </Link>
+                <DropdownMenuItem
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    navigate('/order-returns');
+                  }}
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  <span>Оформление возврата</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                
               </DropdownMenuSubContent>
             </DropdownMenuPortal>
           </DropdownMenuSub>
-          <DropdownMenuItem>
-            <Mail />
-            
-            <Link href="/notifications">
-              <span>Уведомление</span>
-            </Link>
-            <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              navigate('/notifications');
+            }}
+          >
+            <div className="flex w-full items-center justify-between">
+              <span className="flex items-center">
+                <Mail className="mr-2 h-4 w-4" />
+                <span>Уведомления</span>
+              </span>
+              {unreadCount > 0 && (
+                <span className="relative inline-flex items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-500 opacity-70"></span>
+                  <span className="relative inline-flex min-w-[24px] justify-center rounded-full bg-orange-500 px-2 text-xs font-semibold text-white">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                </span>
+              )}
+            </div>
           </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Search />
-            <Link href="/search-history">
-              <span>История Поиска</span>
-            </Link>
-            <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              navigate('/search-history');
+            }}
+          >
+            <Search className="mr-2 h-4 w-4" />
+            <span>История поиска</span>
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem>
-            <HelpCircle />
-            <Link href="/help">
-              <span>Помощь</span>
-            </Link>
-            <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
+          <DropdownMenuItem
+            onSelect={(event) => {
+              event.preventDefault();
+              navigate('/help');
+            }}
+          >
+            <HelpCircle className="mr-2 h-4 w-4" />
+            <span>Помощь</span>
           </DropdownMenuItem>
-          
-          
-          {/* <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <UserPlus />
-              <span>Invite users</span>
-            </DropdownMenuSubTrigger>
-            <DropdownMenuPortal>
-              <DropdownMenuSubContent>
-                <DropdownMenuItem>
-                  <Mail />
-                  <span>Email</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <MessageSquare />
-                  <span>Message</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <PlusCircle />
-                  <span>More...</span>
-                </DropdownMenuItem>
-              </DropdownMenuSubContent>
-            </DropdownMenuPortal>
-          </DropdownMenuSub> */}
-          {/* <DropdownMenuItem disabled>
-            <Plus />
-            <span>New Team</span>
-            <DropdownMenuShortcut>⌘+T</DropdownMenuShortcut>
-          </DropdownMenuItem> */}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout}>
-          <LogOut />
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault();
+            handleLogout();
+          }}
+        >
+          <LogOut className="mr-2 h-4 w-4" />
           <span>Выйти</span>
-          <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

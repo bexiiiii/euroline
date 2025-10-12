@@ -49,6 +49,30 @@ export interface OrderStats {
   averageOrderValue: number;
 }
 
+export interface SummaryMetric {
+  value: number;
+  changePercent: number;
+}
+
+export interface ProcessingMetric {
+  value: number;
+  delta: number;
+}
+
+export interface RevenueMetric {
+  current: number;
+  previous: number;
+  changePercent: number;
+}
+
+export interface OrderSummary {
+  total: SummaryMetric;
+  newOrders: SummaryMetric;
+  processing: ProcessingMetric;
+  completed: SummaryMetric;
+  revenue: RevenueMetric;
+}
+
 type OrderItemApiResponse = Omit<OrderItem, 'price' | 'total'> & {
   price: number | string | null;
   total: number | string | null;
@@ -132,6 +156,10 @@ export const ordersApi = {
    */
   getStats: async (): Promise<OrderStats> => {
     return apiFetch<OrderStats>('/api/orders/stats');
+  },
+
+  getSummary: async (): Promise<OrderSummary> => {
+    return apiFetch<OrderSummary>('/api/admin/analytics/orders-summary');
   },
 
   /**

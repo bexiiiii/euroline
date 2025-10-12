@@ -14,6 +14,8 @@ interface SearchState {
     brands: string[];
     photoOnly: boolean;
   };
+  page: number;
+  pageSize: number;
   
   search: (query: string, catalog?: string) => Promise<SearchResponse | null>;
   setQuery: (query: string) => void;
@@ -24,6 +26,8 @@ interface SearchState {
   clearBrands: () => void;
   setPhotoOnly: (v: boolean) => void;
   resetFilters: () => void;
+  setPage: (page: number) => void;
+  setPageSize: (size: number) => void;
 
   // OEM multi-step flow
   oemStep: 'catalog' | 'vehicles' | 'details' | null;
@@ -43,6 +47,8 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
   vehicle: null,
   results: [],
   filters: { brands: [], photoOnly: false },
+  page: 0,
+  pageSize: 20,
   oemStep: null,
   selectedCatalog: null,
   applicableVehicles: [],
@@ -70,6 +76,7 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
       selectedCatalog: null,
       applicableVehicles: [],
       // keep filters but clear brands that no longer relevant later if needed
+      page: 0,
     });
 
     try {
@@ -130,7 +137,8 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
       results: [], 
       vehicle: null, 
       detectedType: null, 
-      error: null 
+      error: null,
+      page: 0,
     });
   },
 
@@ -142,22 +150,33 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
   toggleBrand: (brand: string) => {
     const brands = new Set(get().filters.brands);
     if (brands.has(brand)) brands.delete(brand); else brands.add(brand);
-    set({ filters: { ...get().filters, brands: Array.from(brands) } });
+    set({ filters: { ...get().filters, brands: Array.from(brands) }, page: 0 });
   },
-  clearBrands: () => set({ filters: { ...get().filters, brands: [] } }),
-  setPhotoOnly: (v: boolean) => set({ filters: { ...get().filters, photoOnly: v } }),
-  resetFilters: () => set({ filters: { brands: [], photoOnly: false } }),
+  clearBrands: () => set({ filters: { ...get().filters, brands: [] }, page: 0 }),
+  setPhotoOnly: (v: boolean) => set({ filters: { ...get().filters, photoOnly: v }, page: 0 }),
+  resetFilters: () => set({ filters: { brands: [], photoOnly: false }, page: 0 }),
+  setPage: (page: number) => {
+    const safePage = Number.isFinite(page) ? Math.max(0, Math.floor(page)) : 0;
+    const { results, pageSize } = get();
+    const maxPage = Math.max(0, Math.ceil((results?.length || 0) / pageSize) - 1);
+    set({ page: Math.min(safePage, maxPage) });
+  },
+  setPageSize: (size: number) => {
+    const fallback = 20;
+    const nextSize = Number.isFinite(size) && size > 0 ? Math.floor(size) : fallback;
+    set({ pageSize: nextSize, page: 0 });
+  },
 
   // ===== OEM flow =====
   setSelectedCatalog: (pair) => {
-    set({ selectedCatalog: pair, oemStep: pair ? 'vehicles' : 'catalog', applicableVehicles: [], results: [] });
+    set({ selectedCatalog: pair, oemStep: pair ? 'vehicles' : 'catalog', applicableVehicles: [], results: [], page: 0 });
   },
 
   loadOemApplicableVehicles: async (catalog: string, oem: string, brand?: string) => {
     try {
       set({ isLoading: true, error: null });
       const vehicles = await searchApi.getApplicableVehicles(catalog, oem);
-      set({ applicableVehicles: vehicles, isLoading: false, oemStep: 'vehicles', selectedCatalog: { brand: brand || '', catalog } });
+      set({ applicableVehicles: vehicles, isLoading: false, oemStep: 'vehicles', selectedCatalog: { brand: brand || '', catalog }, page: 0 });
     } catch (error) {
       const message = error instanceof SearchApiError ? error.message : 'Не удалось загрузить применимость (авто)';
       set({ error: message, isLoading: false });
@@ -191,12 +210,12 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
         }
       }
 
-      set({ results: items, isLoading: false, oemStep: 'details' });
+      set({ results: items, isLoading: false, oemStep: 'details', page: 0 });
     } catch (error) {
       const message = error instanceof SearchApiError ? error.message : 'Не удалось загрузить детали применимости';
       set({ error: message, isLoading: false });
     }
   },
 
-  resetOemFlow: () => set({ oemStep: null, selectedCatalog: null, applicableVehicles: [] }),
+  resetOemFlow: () => set({ oemStep: null, selectedCatalog: null, applicableVehicles: [], results: [], page: 0 }),
 }));

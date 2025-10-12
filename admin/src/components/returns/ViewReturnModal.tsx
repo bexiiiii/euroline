@@ -2,27 +2,12 @@
 import React from "react";
 import { Modal } from "../ui/modal";
 import Badge from "../ui/badge/Badge";
-
-interface Return {
-  id: number;
-  returnNumber: string;
-  originalOrderNumber: string;
-  customer: {
-    name: string;
-    email: string;
-    phone: string;
-  };
-  totalRefund: number;
-  status: "Запрос на возврат" | "В обработке" | "Одобрен" | "Отклонен" | "Возврат завершен";
-  returnType: "Полный возврат" | "Частичный возврат" | "Обмен";
-  requestDate: string;
-  reason: string;
-}
+import type { ReturnTableItem } from "./ReturnsTable";
 
 interface ViewReturnModalProps {
   isOpen: boolean;
   onClose: () => void;
-  returnData: Return | null;
+  returnData: ReturnTableItem | null;
 }
 
 const ViewReturnModal: React.FC<ViewReturnModalProps> = ({
@@ -32,13 +17,12 @@ const ViewReturnModal: React.FC<ViewReturnModalProps> = ({
 }) => {
   if (!returnData) return null;
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'RUB',
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("ru-RU", {
+      style: "currency",
+      currency: "KZT",
       minimumFractionDigits: 0,
     }).format(amount);
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleString('ru-RU');
@@ -130,7 +114,7 @@ const ViewReturnModal: React.FC<ViewReturnModalProps> = ({
             <div>
               <span className="text-sm text-gray-500 dark:text-gray-400">Email:</span>
               <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                {returnData.customer.email}
+                {returnData.customer.email || "—"}
               </span>
             </div>
             <div>

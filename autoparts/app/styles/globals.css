@@ -215,6 +215,25 @@
   --component-active-color-default: var(--accent-foreground);
 }
 
+@media (max-width: 640px) {
+  body {
+    font-size: 0.9375rem;
+    line-height: 1.55;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  h3 {
+    font-size: 1.125rem;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

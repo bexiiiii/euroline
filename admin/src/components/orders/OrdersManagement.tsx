@@ -2,11 +2,13 @@
 import React, { useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import OrdersStats from "@/components/orders/OrdersStats";
-import OrdersToolbar from "@/components/orders/OrdersToolbar"
+import OrdersToolbar from "@/components/orders/OrdersToolbar";
 import ViewOrderModal from "@/components/orders/ViewOrderModal";
 import EditOrderModal from "@/components/orders/EditOrderModal";
 import OrdersTable from "./OrdersTable";
 import { Order as ApiOrder, ordersApi, OrderStatus, PaymentStatus } from "@/lib/api/orders";
+import { useToast } from "@/context/ToastContext";
+import { ExportDateRange } from "@/components/common/ExportWithDateRange";
 
 const OrdersManagement: React.FC = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
@@ -14,6 +16,7 @@ const OrdersManagement: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<ApiOrder | null>(null);
   const [isLoadingOrder, setIsLoadingOrder] = useState(false);
   const [refreshToken, setRefreshToken] = useState<string>(`${Date.now()}`);
+  const { success: showSuccess, error: showError } = useToast();
 
   const updateSelectedOrder = (order: ApiOrder | null) => {
     setSelectedOrder(order);
@@ -67,8 +70,22 @@ const OrdersManagement: React.FC = () => {
     }
   };
 
-  const handleExportOrders = () => {
-    console.log("Экспорт заказов");
+  const handleExportOrders = async ({ from, to }: ExportDateRange) => {
+    try {
+      const blob = await ordersApi.exportOrders({ fromDate: from, toDate: to, sort: "createdAt,desc" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `orders-${from}-${to}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showSuccess("Экспорт заказов сформирован");
+    } catch (error) {
+      console.error("Не удалось экспортировать заказы", error);
+      showError("Не удалось экспортировать заказы");
+    }
   };
 
   const handleRefreshOrders = () => {

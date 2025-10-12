@@ -2,24 +2,14 @@
 import React, { useState, useEffect } from "react";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
-
-interface Return {
-  id: number;
-  returnNumber: string;
-  customer: {
-    name: string;
-    email: string;
-    phone: string;
-  };
-  totalRefund: number;
-  status: "Запрос на возврат" | "В обработке" | "Одобрен" | "Отклонен" | "Возврат завершен";
-}
+import { ReturnStatus } from "@/lib/api/returns";
+import type { ReturnTableItem, ReturnStatusLabel } from "./ReturnsTable";
 
 interface ProcessReturnModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (returnId: number, status: "Запрос на возврат" | "В обработке" | "Одобрен" | "Отклонен" | "Возврат завершен", refundAmount?: number, notes?: string) => void;
-  returnData: Return | null;
+  onSave: (returnId: number, status: ReturnStatusLabel, refundAmount?: number, notes?: string) => void;
+  returnData: ReturnTableItem | null;
 }
 
 const ProcessReturnModal: React.FC<ProcessReturnModalProps> = ({
@@ -28,7 +18,7 @@ const ProcessReturnModal: React.FC<ProcessReturnModalProps> = ({
   onSave,
   returnData,
 }) => {
-  const [status, setStatus] = useState<"Запрос на возврат" | "В обработке" | "Одобрен" | "Отклонен" | "Возврат завершен">("В обработке");
+  const [status, setStatus] = useState<ReturnStatusLabel>("В обработке");
   const [refundAmount, setRefundAmount] = useState(0);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
@@ -65,13 +55,12 @@ const ProcessReturnModal: React.FC<ProcessReturnModalProps> = ({
     { value: "Возврат завершен", label: "Возврат завершен", disabled: false },
   ];
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ru-RU', {
-      style: 'currency',
-      currency: 'RUB',
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat("ru-RU", {
+      style: "currency",
+      currency: "KZT",
       minimumFractionDigits: 0,
     }).format(amount);
-  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="md">
@@ -110,7 +99,7 @@ const ProcessReturnModal: React.FC<ProcessReturnModalProps> = ({
             <select
               id="status"
               value={status}
-              onChange={(e) => setStatus(e.target.value as "Запрос на возврат" | "В обработке" | "Одобрен" | "Отклонен" | "Возврат завершен")}
+              onChange={(e) => setStatus(e.target.value as ReturnStatusLabel)}
               required
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
             >
@@ -141,7 +130,7 @@ const ProcessReturnModal: React.FC<ProcessReturnModalProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white pr-12"
                 />
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 dark:text-gray-400 text-sm">₽</span>
+                  <span className="text-gray-500 dark:text-gray-400 text-sm">₸</span>
                 </div>
               </div>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">

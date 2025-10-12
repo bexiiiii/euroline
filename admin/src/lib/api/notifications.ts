@@ -12,6 +12,17 @@ export interface Notification {
   readAt?: string;
 }
 
+export type NotificationAudience = 'ALL' | 'USERS' | 'ADMINS';
+
+export interface SendNotificationPayload {
+  title: string;
+  message: string;
+  audience: NotificationAudience;
+  imageUrl?: string | null;
+  userId?: number | null;
+  status?: boolean;
+}
+
 export const notificationsApi = {
   /**
    * Get notifications with pagination
@@ -43,6 +54,23 @@ export const notificationsApi = {
   markAllAsRead: async (): Promise<void> => {
     return apiFetch<void>('/api/notifications/read-all', {
       method: 'POST',
+    });
+  },
+
+  /**
+   * Send notification to selected audience
+   */
+  sendAdminNotification: async (payload: SendNotificationPayload): Promise<void> => {
+    return apiFetch<void>('/api/admin/notifications/send', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: payload.title,
+        message: payload.message,
+        status: payload.status ?? true,
+        userId: payload.userId ?? null,
+        target: payload.audience,
+        imageUrl: payload.imageUrl ?? null,
+      }),
     });
   },
 

@@ -12,6 +12,8 @@ export interface NotificationEntity {
   severity: NotificationSeverity
   createdAt: string
   readFlag: boolean
+  imageUrl?: string
+  target?: string
 }
 
 export interface PageResponse<T> {
@@ -53,4 +55,3 @@ export async function getUnreadCount(): Promise<number> {
   const data = await res.json() as { count: number }
   return data.count
 }
-

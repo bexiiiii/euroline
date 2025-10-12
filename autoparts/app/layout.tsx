@@ -7,6 +7,7 @@ import MobileMenu from "@/components/PhoneHeader";
 import { Toaster } from "sonner";
 import { AuthInitializer } from "@/components/AuthInitializer";
 import { VehicleProvider } from "@/context/VehicleContext";
+import { MobileExperienceNotice } from "@/components/MobileExperienceNotice";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,7 @@ export default function RootLayout({
       >
         <VehicleProvider>
           <AuthInitializer />
+          <MobileExperienceNotice />
           <Header />
           <main className="flex-1 flex flex-col">
             {children}

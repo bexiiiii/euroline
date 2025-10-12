@@ -1,206 +1,111 @@
-export interface SystemStatus {
-  status: 'HEALTHY' | 'WARNING' | 'CRITICAL';
-  timestamp: string;
-  uptime: number;
-  version: string;
-  environment: string;
+import { API_URL } from "../api";
+
+const BASE_URL = `${API_URL}/api/admin/system`;
+
+export interface ActuatorComponent {
+  status: string;
+  details?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
-export interface DatabaseStatus {
-  status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
-  connectionCount: number;
-  activeConnections: number;
-  responseTime: number;
-  lastBackup?: string;
-  databaseSize: number;
+export interface ActuatorHealth {
+  status: string;
+  components?: Record<string, ActuatorComponent>;
+  details?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
-export interface CacheStatus {
-  status: 'CONNECTED' | 'DISCONNECTED' | 'ERROR';
-  hitRate: number;
-  missRate: number;
-  evictionCount: number;
-  memoryUsage: number;
-  keyCount: number;
+export interface DiagnosticsResult {
+  status: string;
+  timestamp: number;
+  health: ActuatorHealth;
+  metrics: string[];
 }
 
-export interface ServerMetrics {
-  cpuUsage: number;
-  memoryUsage: number;
-  diskUsage: number;
-  networkIn: number;
-  networkOut: number;
-  loadAverage: number[];
-  activeThreads: number;
+export interface MaintenanceStatus {
+  enabled: boolean;
+  timestamp: number;
 }
 
-export interface ApiEndpointHealth {
-  endpoint: string;
-  status: 'UP' | 'DOWN' | 'SLOW';
-  responseTime: number;
-  lastChecked: string;
-  errorCount: number;
+export interface OneCStatus {
+  connected: boolean;
+  message?: string;
+  timestamp: number;
 }
 
-export interface SystemHealth {
-  overall: SystemStatus;
-  database: DatabaseStatus;
-  cache: CacheStatus;
-  metrics: ServerMetrics;
-  endpoints: ApiEndpointHealth[];
+interface RestartResponse {
+  accepted: boolean;
+  timestamp: number;
 }
 
-export interface LogEntry {
-  id: string;
-  timestamp: string;
-  level: 'ERROR' | 'WARN' | 'INFO' | 'DEBUG';
-  logger: string;
-  message: string;
-  exception?: string;
-  userId?: number;
-  requestId?: string;
+interface BackupResponse {
+  accepted: boolean;
+  message?: string;
+  backupId?: string;
+  timestamp?: number;
 }
 
-export interface ErrorSummary {
-  errorType: string;
-  count: number;
-  lastOccurrence: string;
-  endpoints: string[];
+const authHeaders = () => ({
+  Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("token") ?? "" : ""}`,
+});
+
+async function getJson<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(errorText || `Request failed with status ${response.status}`);
+  }
+
+  if (response.status === 204) {
+    return {} as T;
+  }
+
+  return response.json();
 }
-
-import { API_URL } from '../api';
-
-const BASE_URL = `${API_URL}/api/admin`;
 
 export const systemApi = {
-  getSystemHealth: async (): Promise<SystemHealth> => {
-    const response = await fetch(`${BASE_URL}/system/health`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to fetch system health');
-    return response.json();
+  async getSystemStatus(): Promise<ActuatorHealth> {
+    return getJson<ActuatorHealth>(`${BASE_URL}/status`);
   },
 
-  getSystemStatus: async (): Promise<SystemStatus> => {
-    const response = await fetch(`${BASE_URL}/system/status`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to fetch system status');
-    return response.json();
+  async getMetrics(): Promise<string[]> {
+    return getJson<string[]>(`${BASE_URL}/metrics`);
   },
 
-  getDatabaseStatus: async (): Promise<DatabaseStatus> => {
-    const response = await fetch(`${BASE_URL}/system/database`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to fetch database status');
-    return response.json();
+  async runDiagnostics(): Promise<DiagnosticsResult> {
+    return getJson<DiagnosticsResult>(`${BASE_URL}/diagnostics`, { method: "POST" });
   },
 
-  getCacheStatus: async (): Promise<CacheStatus> => {
-    const response = await fetch(`${BASE_URL}/system/cache`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to fetch cache status');
-    return response.json();
+  async createBackup(): Promise<BackupResponse> {
+    return getJson<BackupResponse>(`${BASE_URL}/backup`, { method: "POST" });
   },
 
-  getServerMetrics: async (): Promise<ServerMetrics> => {
-    const response = await fetch(`${BASE_URL}/system/metrics`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to fetch server metrics');
-    return response.json();
+  async restartApplication(): Promise<RestartResponse> {
+    return getJson<RestartResponse>(`${BASE_URL}/restart`, { method: "POST" });
   },
 
-  getApiEndpointsHealth: async (): Promise<ApiEndpointHealth[]> => {
-    const response = await fetch(`${BASE_URL}/system/endpoints`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to fetch API endpoints health');
-    return response.json();
+  async getMaintenanceStatus(): Promise<MaintenanceStatus> {
+    return getJson<MaintenanceStatus>(`${BASE_URL}/maintenance`);
   },
 
-  getSystemLogs: async (page = 0, size = 100, level?: string, startDate?: string, endDate?: string): Promise<{ content: LogEntry[], totalElements: number }> => {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      size: size.toString(),
+  async setMaintenanceMode(enabled: boolean): Promise<MaintenanceStatus> {
+    const params = new URLSearchParams({ enabled: String(enabled) });
+    return getJson<MaintenanceStatus>(`${BASE_URL}/maintenance?${params.toString()}`, {
+      method: "POST",
     });
-    
-    if (level) params.append('level', level);
-    if (startDate) params.append('startDate', startDate);
-    if (endDate) params.append('endDate', endDate);
-
-    const response = await fetch(`${BASE_URL}/system/logs?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to fetch system logs');
-    return response.json();
   },
 
-  getErrorSummary: async (hours = 24): Promise<ErrorSummary[]> => {
-    const response = await fetch(`${BASE_URL}/system/errors/summary?hours=${hours}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to fetch error summary');
-    return response.json();
-  },
-
-  clearCache: async (): Promise<void> => {
-    const response = await fetch(`${BASE_URL}/system/cache/clear`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to clear cache');
-  },
-
-  restartApplication: async (): Promise<void> => {
-    const response = await fetch(`${BASE_URL}/system/restart`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to restart application');
-  },
-
-  performHealthCheck: async (): Promise<SystemHealth> => {
-    const response = await fetch(`${BASE_URL}/system/health-check`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to perform health check');
-    return response.json();
-  },
-
-  backupDatabase: async (): Promise<{ backupId: string, fileName: string }> => {
-    const response = await fetch(`${BASE_URL}/system/database/backup`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('token')}`,
-      },
-    });
-    if (!response.ok) throw new Error('Failed to backup database');
-    return response.json();
+  async checkOneCConnection(): Promise<OneCStatus> {
+    return getJson<OneCStatus>(`${BASE_URL}/onec/status`);
   },
 };
+
+export type { ActuatorHealth as SystemHealth };

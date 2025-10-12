@@ -102,10 +102,7 @@ export const searchApi = {
     if (catalog) {
       params.append('catalog', catalog);
     }
-    
-    // Add a small delay to ensure proper request handling
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
+
     return apiRequest<SearchResponse>(`/search?${params.toString()}`);
   },
   

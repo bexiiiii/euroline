@@ -1,10 +1,10 @@
 "use client"
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useSearchStore } from "@/lib/stores/searchStore";
-import AutoPartsTable, { convertSearchItemToAutoPart } from "@/components/TableComponent";
+import SearchResultsTable from "@/components/SearchResultsTable";
 import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import FiltersSidebar from "@/components/FiltersSidebar";
 import PaginationButton from "@/components/PaginationWithPrimaryButton";
@@ -18,11 +18,16 @@ function SearchPage() {
   const searchParams = useSearchParams();
   const { 
     search, results, isLoading, query, error,
-    detectedType, applicableVehicles, selectedCatalog, setSelectedCatalog,
+    detectedType, vehicle, applicableVehicles, selectedCatalog, setSelectedCatalog,
     loadOemApplicableVehicles, loadOemApplicability, resetOemFlow,
     filters, clearResults,
-    resetFilters: resetSearchFilters
+    resetFilters: resetSearchFilters,
+    page, pageSize, setPage
   } = useSearchStore();
+  const queryParamValue = searchParams?.get('q') ?? '';
+  const normalizedQueryParam = queryParamValue.trim();
+  const normalizedStoreQuery = (query ?? '').trim();
+  const lastExecutedQueryRef = useRef<string | null>(null);
 
   const { brands, photoOnly } = filters;
   const activeFiltersCount = useMemo(() => {
@@ -33,32 +38,67 @@ function SearchPage() {
 
   // Выполняем поиск при загрузке страницы, если есть параметр q
   useEffect(() => {
-    const queryParam = searchParams?.get('q');
-    if (queryParam) {
-      // Only search if the query parameter has actually changed
-      if (queryParam !== query) {
-        search(queryParam);
-      }
-    } else {
-      // Clear results when there's no query parameter
-      clearResults();
+    if (
+      normalizedStoreQuery === normalizedQueryParam &&
+      results.length > 0 &&
+      lastExecutedQueryRef.current === null
+    ) {
+      lastExecutedQueryRef.current = normalizedQueryParam;
+      return;
     }
-  }, [searchParams, search, query, clearResults]);
 
-  // Применяем клиентские фильтры и конвертируем в AutoPart
-  const parts = results
-    .filter(r => {
-      // brand filter
-      if (filters.brands.length > 0 && !filters.brands.includes(r.brand)) {
-        return false;
+    if (!normalizedQueryParam) {
+      if (lastExecutedQueryRef.current !== null) {
+        clearResults();
+        resetOemFlow();
+        lastExecutedQueryRef.current = null;
       }
-      // photo only
-      if (filters.photoOnly && !r.imageUrl) {
+      return;
+    }
+
+    if (
+      lastExecutedQueryRef.current === normalizedQueryParam &&
+      normalizedStoreQuery === normalizedQueryParam
+    ) {
+      return;
+    }
+
+    lastExecutedQueryRef.current = normalizedQueryParam;
+    void search(normalizedQueryParam);
+  }, [normalizedQueryParam, normalizedStoreQuery, results.length, search, clearResults, resetOemFlow]);
+
+  // Применяем клиентские фильтры
+  const filteredResults = useMemo(() => {
+    return results.filter((r) => {
+      if (brands.length > 0) {
+        const brand = (r.brand || '').trim();
+        if (!brand || !brands.includes(brand)) {
+          return false;
+        }
+      }
+      if (photoOnly && !r.imageUrl) {
         return false;
       }
       return true;
-    })
-    .map(convertSearchItemToAutoPart);
+    });
+  }, [results, brands, photoOnly]);
+
+  const totalResults = filteredResults.length;
+  const totalPages = totalResults > 0 ? Math.ceil(totalResults / pageSize) : 0;
+  const effectivePage = totalPages === 0 ? 0 : Math.min(page, totalPages - 1);
+
+  const paginatedResults = useMemo(() => {
+    if (totalResults === 0) return [];
+    const start = effectivePage * pageSize;
+    const end = start + pageSize;
+    return filteredResults.slice(start, end);
+  }, [filteredResults, effectivePage, pageSize, totalResults]);
+
+  useEffect(() => {
+    if (page !== effectivePage) {
+      setPage(effectivePage);
+    }
+  }, [page, effectivePage, setPage]);
 
   // OEM flow helpers
   const isOem = detectedType === 'OEM';
@@ -115,8 +155,8 @@ function SearchPage() {
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-slate-900">
                   Результаты поиска
-                  {results && results.length > 0 && (
-                    <span className="ml-2 text-sm font-normal text-slate-500">({results.length})</span>
+                  {totalResults > 0 && (
+                    <span className="ml-2 text-sm font-normal text-slate-500">({totalResults})</span>
                   )}
                 </h2>
                 <Button
@@ -215,7 +255,7 @@ function SearchPage() {
               )}
 
               {/* OEM step 2: применимые автомобили */}
-              {isOem && selectedCatalog && applicableVehicles.length > 0 && parts.length === 0 && (
+              {isOem && selectedCatalog && applicableVehicles.length > 0 && filteredResults.length === 0 && (
                 <div className="rounded-lg border overflow-hidden mb-4">
                   <div className="flex items-center justify-between px-4 py-3 bg-gray-100 text-gray-700 text-sm font-medium">
                     <div className="w-1/4">Бренд</div>
@@ -253,21 +293,27 @@ function SearchPage() {
                 </div>
               )}
 
-              {/* Таблица показываем по умолчанию и на финальном шаге OEM */}
-              {(!isOem || (isOem && selectedCatalog && parts.length > 0)) && (
-                <div className="rounded-lg border overflow-hidden">
-                  <AutoPartsTable
-                    parts={parts}
-                    isLoading={isLoading}
-                    emptyMessage={query ? `По запросу "${query}" ничего не найдено` : 'Введите поисковый запрос'}
-                  />
-                </div>
-              )}
+              {/* Таблица результатов */}
+              <SearchResultsTable
+                className="overflow-hidden"
+                items={paginatedResults}
+                total={totalResults}
+                page={effectivePage}
+                pageSize={pageSize}
+                isLoading={isLoading}
+                detectedType={detectedType ?? undefined}
+                vehicle={vehicle}
+                emptyMessage={query ? `По запросу "${query}" ничего не найдено` : "Введите поисковый запрос"}
+              />
               
               {/* Пагинация показываем только если есть результаты */}
-              {results && results.length > 0 && (
+              {totalPages > 1 && (
                 <div className="flex justify-center mt-6 md:mt-8 p-4">
-                  <PaginationButton />
+                  <PaginationButton
+                    page={effectivePage}
+                    totalPages={totalPages}
+                    onPageChange={(next) => setPage(next)}
+                  />
                 </div>
               )}
             </section>

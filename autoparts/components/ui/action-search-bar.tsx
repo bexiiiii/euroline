@@ -93,27 +93,27 @@ function ActionSearchBar() {
 
     // Debounced search effect - triggers search when user stops typing (both adding and deleting)
     useEffect(() => {
-        // Clear any existing timeout
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
         }
-        
-        // If query is empty, do nothing (don't redirect)
-        if (query.trim().length === 0) {
+
+        const trimmed = query.trim();
+
+        if (trimmed.length === 0) {
+            clearResults();
             return;
         }
-        
-        // Don't trigger search for queries that are too short
-        if (query.trim().length < 3) {
+
+        if (trimmed.length < 3) {
+            clearResults();
             return;
         }
-        
-        // Set new timeout to perform search
+
         searchTimeoutRef.current = setTimeout(() => {
-            performSearch(query);
-        }, 1000); // Wait 1 second after user stops typing (adding or deleting)
+            void performSearch(trimmed);
+        }, 450);
         
-    }, [query]); // Trigger this effect whenever query changes
+    }, [query, clearResults]); // Trigger this effect whenever query changes
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -129,27 +129,28 @@ function ActionSearchBar() {
     };
 
     const performSearch = async (searchQuery: string) => {
-        if (!searchQuery.trim()) {
+        const normalized = searchQuery.trim();
+        if (!normalized) {
             return;
         }
 
         // Минимальная длина для поиска - 3 символа
-        if (searchQuery.trim().length < 3) {
+        if (normalized.length < 3) {
             return;
         }
 
         // Добавляем в историю
-        addToHistory(searchQuery);
+        addToHistory(normalized);
         
         // Выполняем поиск
-        const searchResult = await search(searchQuery);
+        const searchResult = await search(normalized);
         
         // Если найден автомобиль по VIN, открываем в новой вкладке каталог
         if (searchResult?.detectedType === 'VIN' && searchResult?.vehicle) {
             const vehicleId = searchResult.vehicle.vehicleId;
             const ssd = searchResult.vehicle.ssd;
             if (vehicleId && ssd) {
-                const catalogUrl = `/catalogs/${vehicleId}?vin=${encodeURIComponent(searchQuery)}&ssd=${encodeURIComponent(ssd)}&brand=${encodeURIComponent(searchResult.vehicle.brand || '')}&name=${encodeURIComponent(searchResult.vehicle.name || '')}`;
+                const catalogUrl = `/catalogs/${vehicleId}?vin=${encodeURIComponent(normalized)}&ssd=${encodeURIComponent(ssd)}&brand=${encodeURIComponent(searchResult.vehicle.brand || '')}&name=${encodeURIComponent(searchResult.vehicle.name || '')}`;
                 window.open(catalogUrl, '_blank');
                 setIsFocused(false);
                 setSelectedItem(null);
@@ -158,12 +159,15 @@ function ActionSearchBar() {
         }
         
         // Для остальных типов поиска перенаправляем на страницу результатов
-        router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
+        setIsFocused(false);
+        setSelectedItem(null);
+        router.push(`/search?q=${encodeURIComponent(normalized)}`);
     };
 
     const clearSearch = () => {
         setLocalQuery('');
         setQuery('');
+        clearResults();
         
         // Clear any pending search timeout
         if (searchTimeoutRef.current) {
@@ -210,8 +214,10 @@ function ActionSearchBar() {
     };
 
     const addToHistory = (query: string) => {
+        const normalized = query.trim();
+        if (!normalized) return;
         setSearchHistory(prev => {
-            const existingIndex = prev.findIndex(item => item.query === query);
+            const existingIndex = prev.findIndex(item => item.query === normalized);
             let updated = [...prev];
 
             if (existingIndex !== -1) {
@@ -220,7 +226,7 @@ function ActionSearchBar() {
 
             updated.unshift({
                 id: uuidv4(),
-                query,
+                query: normalized,
                 timestamp: new Date(),
             });
 
@@ -241,7 +247,7 @@ function ActionSearchBar() {
                 searchTimeoutRef.current = null;
             }
             
-            performSearch(query);
+            void performSearch(query);
         }
     };
 
@@ -312,7 +318,7 @@ function ActionSearchBar() {
                                                     clearTimeout(searchTimeoutRef.current);
                                                     searchTimeoutRef.current = null;
                                                 }
-                                                performSearch(query);
+                                                void performSearch(query);
                                             }}
                                         >
                                             <Send className="w-5 h-5 text-blue-500 hover:text-blue-600 cursor-pointer" />

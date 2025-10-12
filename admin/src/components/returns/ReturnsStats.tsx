@@ -1,79 +1,166 @@
 "use client";
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { returnsApi, ReturnSummary } from "@/lib/api/returns";
+
+type ChangeType = "increase" | "decrease" | "neutral";
 
 interface StatCard {
   title: string;
   value: string;
-  change: string;
-  changeType: "increase" | "decrease" | "neutral";
+  changeLabel: string;
+  changeType: ChangeType;
   icon: React.ReactNode;
   color: string;
 }
 
-const ReturnsStats: React.FC = () => {
-  const stats: StatCard[] = [
-    {
-      title: "Всего возвратов",
-      value: "1,248",
-      change: "+8.2%",
-      changeType: "increase",
-      color: "bg-yellow-500",
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m5 14v-5a2 2 0 00-2-2H6a2 2 0 00-2 2v5a2 2 0 002 2h14a2 2 0 002-2z" />
-        </svg>
-      ),
-    },
-    {
-      title: "В обработке",
-      value: "89",
-      change: "+12 новых",
-      changeType: "increase",
-      color: "bg-orange-500",
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-    },
-    {
-      title: "Сумма возвратов",
-      value: "₽2,847,560",
-      change: "-5.1%",
-      changeType: "decrease",
-      color: "bg-red-500",
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-    },
-    {
-      title: "Процент возвратов",
-      value: "4.2%",
-      change: "-0.8%",
-      changeType: "decrease",
-      color: "bg-blue-500",
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-    },
-  ];
+const numberFormatter = new Intl.NumberFormat("ru-RU");
+const currencyFormatter = new Intl.NumberFormat("ru-RU", {
+  style: "currency",
+  currency: "KZT",
+  maximumFractionDigits: 0,
+});
 
-  const getChangeColor = (changeType: "increase" | "decrease" | "neutral") => {
+const formatNumber = (value: number) => numberFormatter.format(Math.round(value));
+const formatCurrency = (value: number) => currencyFormatter.format(Math.round(value));
+const formatPercent = (value: number) => {
+  if (!Number.isFinite(value)) return "0%";
+  const rounded = Math.round(value * 10) / 10;
+  const sign = rounded > 0 ? "+" : rounded < 0 ? "" : "";
+  return `${sign}${rounded.toFixed(1)}%`;
+};
+const formatPercentValue = (value: number) => {
+  if (!Number.isFinite(value)) return "0%";
+  const rounded = Math.round(value * 10) / 10;
+  return `${rounded.toFixed(1)}%`;
+};
+const asNumber = (value: unknown): number => {
+  if (typeof value === "number") return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+};
+
+const getChangeType = (value: number): ChangeType => {
+  if (value > 0) return "increase";
+  if (value < 0) return "decrease";
+  return "neutral";
+};
+
+const ReturnsStats: React.FC<{ refreshToken?: string }> = ({ refreshToken }) => {
+  const [summary, setSummary] = useState<ReturnSummary | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchSummary = async () => {
+      try {
+        setLoading(true);
+        const data = await returnsApi.getStats();
+        if (!active) return;
+        setSummary(data);
+        setError(null);
+      } catch (err) {
+        console.error("Не удалось получить статистику возвратов", err);
+        if (!active) return;
+        setError("Не удалось загрузить статистику возвратов");
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchSummary();
+    return () => {
+      active = false;
+    };
+  }, [refreshToken]);
+
+  const stats = useMemo<StatCard[]>(() => {
+    if (!summary) return [];
+
+    const totalValue = asNumber(summary.total.value);
+    const totalChange = asNumber(summary.total.changePercent);
+
+    const processingValue = asNumber(summary.processing.value);
+    const processingDelta = asNumber(summary.processing.delta);
+
+    const amountCurrent = asNumber(summary.amount.current);
+    const amountChange = asNumber(summary.amount.changePercent);
+
+    const returnRateValue = asNumber(summary.returnRate.value);
+    const returnRateChange = asNumber(summary.returnRate.change);
+
+    return [
+      {
+        title: "Всего возвратов",
+        value: formatNumber(totalValue),
+        changeLabel: `${formatPercent(totalChange)} от прошлого месяца`,
+        changeType: getChangeType(totalChange),
+        color: "bg-yellow-500",
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m5 14v-5a2 2 0 00-2-2H6a2 2 0 00-2 2v5a2 2 0 002 2h14a2 2 0 002-2z" />
+          </svg>
+        ),
+      },
+      {
+        title: "В обработке",
+        value: formatNumber(processingValue),
+        changeLabel:
+          processingDelta === 0
+            ? "Без изменений"
+            : `${processingDelta > 0 ? "+" : ""}${formatNumber(Math.abs(processingDelta))} новых`,
+        changeType: getChangeType(processingDelta),
+        color: "bg-orange-500",
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+      },
+      {
+        title: "Сумма возвратов",
+        value: formatCurrency(amountCurrent),
+        changeLabel: `${formatPercent(amountChange)} от прошлого месяца`,
+        changeType: getChangeType(amountChange),
+        color: "bg-red-500",
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        ),
+      },
+      {
+        title: "Процент возвратов",
+        value: formatPercentValue(returnRateValue),
+        changeLabel: `${formatPercent(returnRateChange)} к прошлому периоду`,
+        changeType: getChangeType(returnRateChange),
+        color: "bg-blue-500",
+        icon: (
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+        ),
+      },
+    ];
+  }, [summary]);
+
+  const getChangeColor = (changeType: ChangeType) => {
     switch (changeType) {
       case "increase":
         return "text-green-600 dark:text-green-400";
       case "decrease":
         return "text-red-600 dark:text-red-400";
-      case "neutral":
+      default:
         return "text-gray-600 dark:text-gray-400";
     }
   };
 
-  const getChangeIcon = (changeType: "increase" | "decrease" | "neutral") => {
+  const getChangeIcon = (changeType: ChangeType) => {
     if (changeType === "increase") {
       return (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -90,6 +177,33 @@ const ReturnsStats: React.FC = () => {
     }
     return null;
   };
+
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        {[0, 1, 2, 3].map((key) => (
+          <div
+            key={key}
+            className="rounded-xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]"
+          >
+            <div className="animate-pulse space-y-4">
+              <div className="h-3 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-7 w-32 rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-3 w-20 rounded bg-gray-200 dark:bg-gray-700" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -108,8 +222,7 @@ const ReturnsStats: React.FC = () => {
               </p>
               <div className={`flex items-center gap-1 text-sm ${getChangeColor(stat.changeType)}`}>
                 {getChangeIcon(stat.changeType)}
-                <span className="font-medium">{stat.change}</span>
-                <span className="text-gray-500 dark:text-gray-400">от прошлого месяца</span>
+                <span className="font-medium">{stat.changeLabel}</span>
               </div>
             </div>
             <div className={`${stat.color} text-white p-3 rounded-lg`}>

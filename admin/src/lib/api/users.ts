@@ -16,6 +16,7 @@ export interface User {
   phone?: string;
   lastBrowser?: string;
   banned: boolean;
+  createdAt?: string;
 }
 
 export interface UserFilters {

@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import ComponentCard from "../common/ComponentCard";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
 import { Modal } from "../ui/modal";
@@ -229,13 +228,13 @@ const ApiManagementPage: React.FC = () => {
 
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <div className="border-b border-gray-200 dark:border-gray-700">
-              <nav className="flex space-x-8 px-6" aria-label="Tabs">
+              <nav className="flex flex-wrap gap-4 px-6 py-2" aria-label="Tabs">
                 {TABS.map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm",
+                      "whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium transition-colors",
                       activeTab === tab.id
                         ? "border-blue-500 text-blue-600 dark:text-blue-400"
                         : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
@@ -248,7 +247,7 @@ const ApiManagementPage: React.FC = () => {
             </div>
 
             <div className="p-6">
-              <ComponentCard
+              <SectionCard
                 title="Управление API ключами"
                 description="Создание и управление доступом внешних интеграций"
                 action={
@@ -274,8 +273,8 @@ const ApiManagementPage: React.FC = () => {
                     <p className="text-sm mt-1">Создайте первый ключ, чтобы предоставить доступ партнёрам</p>
                   </div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
+                  <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm dark:border-gray-800">
+                    <Table className="min-w-full">
                       <TableHeader>
                         <TableRow>
                           <TableCell isHeader className="px-5 py-3 text-left">Название</TableCell>
@@ -366,8 +365,8 @@ const ApiManagementPage: React.FC = () => {
                     ) : logs.length === 0 ? (
                       <div className="text-sm text-gray-500 dark:text-gray-400">Запросов пока не было.</div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
+                      <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm dark:border-gray-800">
+                        <Table className="min-w-full">
                           <TableHeader>
                             <TableRow>
                               <TableCell isHeader className="px-4 py-2 text-left">Время</TableCell>
@@ -405,14 +404,14 @@ const ApiManagementPage: React.FC = () => {
                     )}
                   </div>
                 )}
-              </ComponentCard>
+              </SectionCard>
             </div>
           </div>
         </>
       )}
 
       {activeTab === "docs" && (
-        <ComponentCard
+        <SectionCard
           title="Документация"
           description="Рекомендации по использованию API для внешних партнёров"
         >
@@ -444,11 +443,11 @@ const ApiManagementPage: React.FC = () => {
               </ul>
             </section>
           </div>
-        </ComponentCard>
+        </SectionCard>
       )}
 
       {activeTab === "usage" && (
-        <ComponentCard
+        <SectionCard
           title="Примеры интеграции"
           description="Шаблоны запросов на популярных языках"
         >
@@ -485,7 +484,7 @@ print(response.json())`}
               </pre>
             </section>
           </div>
-        </ComponentCard>
+        </SectionCard>
       )}
 
       <Modal
@@ -495,7 +494,8 @@ print(response.json())`}
           setCreatedKey(null);
           setNameError(null);
         }}
-        className="max-w-lg"
+        size="md"
+        className="p-0"
       >
         <div className="space-y-6 p-6 sm:p-8">
           <div>
@@ -592,7 +592,8 @@ print(response.json())`}
       <Modal
         isOpen={confirmRevoke !== null}
         onClose={() => setConfirmRevoke(null)}
-        className="max-w-md"
+        size="sm"
+        className="p-0"
       >
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Отзыв API ключа</h3>
@@ -624,6 +625,26 @@ interface MetricsCardProps {
   subtitle?: string;
   tone?: "primary" | "info" | "success";
 }
+
+interface SectionCardProps {
+  title: string;
+  description?: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}
+
+const SectionCard: React.FC<SectionCardProps> = ({ title, description, action, children }) => (
+  <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <div className="flex flex-col gap-3 border-b border-gray-200 px-6 py-4 dark:border-gray-800 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+        {description && <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{description}</p>}
+      </div>
+      {action && <div className="flex-shrink-0">{action}</div>}
+    </div>
+    <div className="px-6 py-5">{children}</div>
+  </div>
+);
 
 const toneClasses: Record<NonNullable<MetricsCardProps["tone"]>, string> = {
   primary: "text-blue-600 dark:text-blue-300",
