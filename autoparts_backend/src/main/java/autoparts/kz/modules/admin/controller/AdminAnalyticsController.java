@@ -40,6 +40,11 @@ public class AdminAnalyticsController {
         return analyticsService.getTotalRevenue();
     }
 
+    @GetMapping("/summary")
+    public ResponseEntity<Map<String, Object>> getSummary() {
+        return ResponseEntity.ok(analyticsService.getSummaryMetrics());
+    }
+
     @GetMapping("/top-products")
     public List<String> topProducts() {
         return analyticsService.getTopProducts();

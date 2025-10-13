@@ -10,6 +10,7 @@ import { notificationsApi, AdminNotificationHistoryItem, NotificationAudience } 
 import { useToast } from "@/context/ToastContext";
 import { Modal } from "@/components/ui/modal";
 import { API_URL } from "@/lib/api";
+import Pagination from "@/components/ui/pagination/Pagination";
 
 interface AdminNotificationHistoryTableProps {
   refreshKey: number;
@@ -69,15 +70,21 @@ const AdminNotificationHistoryTable: React.FC<AdminNotificationHistoryTableProps
   const [highlightFilter, setHighlightFilter] = useState<HighlightFilterValue>("any");
   const [searchValue, setSearchValue] = useState("");
   const [selected, setSelected] = useState<AdminNotificationHistoryItem | null>(null);
+  const [page, setPage] = useState(0);
+  const [pageSize] = useState(25);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       setLoading(true);
       try {
-        const data = await notificationsApi.getAdminNotificationHistory();
+        const data = await notificationsApi.getAdminNotificationHistory(page, pageSize);
         if (!cancelled) {
-          setItems(data);
+          setItems(data.content);
+          setTotalItems(data.totalElements);
+          setTotalPages(Math.max(data.totalPages, 1));
         }
       } catch (err) {
         console.error("Failed to load notifications history", err);
@@ -96,7 +103,15 @@ const AdminNotificationHistoryTable: React.FC<AdminNotificationHistoryTableProps
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, showError]);
+  }, [page, pageSize, refreshKey, showError]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [refreshKey]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [audienceFilter, highlightFilter, searchValue]);
 
   const filteredItems = useMemo(() => {
     const searchTerm = searchValue.trim().toLowerCase();
@@ -122,6 +137,14 @@ const AdminNotificationHistoryTable: React.FC<AdminNotificationHistoryTableProps
       return true;
     });
   }, [items, audienceFilter, highlightFilter, searchValue]);
+
+  const hasActiveFilters =
+    audienceFilter !== "any" || highlightFilter !== "any" || searchValue.trim().length > 0;
+
+  const effectiveTotalItems = hasActiveFilters ? filteredItems.length : totalItems;
+  const effectiveTotalPages = hasActiveFilters ? 1 : totalPages;
+  const currentPageForPagination = hasActiveFilters ? 1 : page + 1;
+  const itemsPerPage = hasActiveFilters ? Math.max(filteredItems.length, 1) : pageSize;
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
@@ -254,6 +277,19 @@ const AdminNotificationHistoryTable: React.FC<AdminNotificationHistoryTableProps
           </TableBody>
         </Table>
       </div>
+
+      <Pagination
+        currentPage={currentPageForPagination}
+        totalPages={Math.max(effectiveTotalPages, 1)}
+        onPageChange={(nextPage) => {
+          if (hasActiveFilters) {
+            return;
+          }
+          setPage(Math.max(nextPage - 1, 0));
+        }}
+        totalItems={effectiveTotalItems}
+        itemsPerPage={itemsPerPage}
+      />
 
       <Modal
         isOpen={!!selected}

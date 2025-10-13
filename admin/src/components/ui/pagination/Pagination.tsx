@@ -58,7 +58,7 @@ const Pagination: React.FC<PaginationProps> = ({
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-t border-gray-200 dark:border-gray-800">
       {/* Results Info */}
       <div className="text-sm text-gray-500 dark:text-gray-400">
-        Показано {startItem}-{endItem} из {totalItems} товаров
+        Показано {startItem}-{endItem} из {totalItems} записей
       </div>
 
       {/* Pagination Controls */}

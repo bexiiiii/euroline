@@ -91,8 +91,12 @@ export const notificationsApi = {
   /**
    * Fetch admin notification history
    */
-  getAdminNotificationHistory: async (): Promise<AdminNotificationHistoryItem[]> => {
-    return apiFetch<AdminNotificationHistoryItem[]>('/api/admin/notifications/history');
+  getAdminNotificationHistory: async (page = 0, size = 25): Promise<PageResponse<AdminNotificationHistoryItem>> => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      size: size.toString(),
+    });
+    return apiFetch<PageResponse<AdminNotificationHistoryItem>>(`/api/admin/notifications/history?${params.toString()}`);
   },
 
   /**

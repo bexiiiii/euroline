@@ -1,6 +1,7 @@
 package autoparts.kz.modules.admin.controller;
 
 
+import autoparts.kz.common.dto.PageResponse;
 import autoparts.kz.modules.admin.dto.NotificationHistoryResponse;
 import autoparts.kz.modules.admin.dto.NotificationRequest;
 import autoparts.kz.modules.admin.dto.NotificationResponse;
@@ -41,8 +42,11 @@ public class AdminNotificationController {
 
     @GetMapping("/history")
     @PreAuthorize("hasRole('ADMIN')")
-    public List<NotificationHistoryResponse> getNotificationHistory() {
-        return notificationSenderService.getNotificationHistory();
+    public PageResponse<NotificationHistoryResponse> getNotificationHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "25") int size
+    ) {
+        return notificationSenderService.getNotificationHistory(page, size);
     }
 
     @PostMapping("/{id}/read")

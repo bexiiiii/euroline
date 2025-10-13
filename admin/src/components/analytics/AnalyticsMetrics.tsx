@@ -1,10 +1,10 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { analyticsApi } from "@/lib/api/analytics";
+import { analyticsApi, SummaryMetrics } from "@/lib/api/analytics";
 import { ArrowUpIcon, ArrowDownIcon, GroupIcon, BoxIconLine, DollarLineIcon } from "@/icons";
 
 export default function AnalyticsMetrics() {
-  const [metrics, setMetrics] = useState({
+  const [metrics, setMetrics] = useState<SummaryMetrics>({
     totalUsers: 0,
     totalOrders: 0,
     totalRevenue: 0,
@@ -14,16 +14,8 @@ export default function AnalyticsMetrics() {
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
-        const [users, orders, revenue] = await Promise.all([
-          analyticsApi.getTotalUsers(),
-          analyticsApi.getTotalOrders(),
-          analyticsApi.getTotalRevenue(),
-        ]);
-        setMetrics({
-          totalUsers: users,
-          totalOrders: orders,
-          totalRevenue: revenue,
-        });
+        const summary = await analyticsApi.getSummaryMetrics();
+        setMetrics(summary);
       } catch (error) {
         console.error("Failed to fetch analytics metrics:", error);
       } finally {

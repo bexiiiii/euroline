@@ -6,6 +6,7 @@ import autoparts.kz.common.exception.OrderNotFoundException;
 import autoparts.kz.modules.auth.entity.User;
 import autoparts.kz.modules.auth.repository.UserRepository;
 import autoparts.kz.modules.cart.entity.Cart;
+import autoparts.kz.modules.cart.repository.CartItemRepository;
 import autoparts.kz.modules.cart.repository.CartRepository;
 import autoparts.kz.modules.order.dto.CreateOrderRequest;
 import autoparts.kz.modules.order.entity.Order;
@@ -26,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Slf4j
 @Service
@@ -34,6 +37,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final CartRepository cartRepository;
+    private final CartItemRepository cartItemRepository;
     private final OutboxRepository outboxRepository;
     private final NotificationService notifications;
     private final ObjectMapper objectMapper;
@@ -50,8 +54,9 @@ public class OrderService {
                     throw new DuplicateRequestException(req.getIdempotencyKey()); 
                 });
 
-        Cart cart = cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new CartNotFoundException(userId));
+        Cart cart = cartRepository.findByUserIdFetch(userId)
+                .orElseGet(() -> cartRepository.findByUserId(userId)
+                        .orElseThrow(() -> new CartNotFoundException(userId)));
 
         // Проверка что корзина не пустая
         if (cart.getItems().isEmpty()) {
@@ -106,23 +111,33 @@ public class OrderService {
 
     private String generateUniquePublicCode() {
         final String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-        while (true) {
-            StringBuilder sb = new StringBuilder(5);
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+
+        for (int attempt = 0; attempt < 10; attempt++) {
+            StringBuilder builder = new StringBuilder(5);
             boolean hasLetter = false;
             boolean hasDigit = false;
             for (int i = 0; i < 5; i++) {
-                int idx = (int) Math.floor(Math.random() * chars.length());
-                char c = chars.charAt(idx);
-                if (Character.isDigit(c)) hasDigit = true;
-                else hasLetter = true;
-                sb.append(c);
+                char c = chars.charAt(random.nextInt(chars.length()));
+                if (Character.isDigit(c)) {
+                    hasDigit = true;
+                } else {
+                    hasLetter = true;
+                }
+                builder.append(c);
             }
-            if (!(hasLetter && hasDigit)) continue;
-            String code = sb.toString();
-            if (orderRepository.findByPublicCode(code).isEmpty()) {
+            if (!hasLetter || !hasDigit) {
+                continue;
+            }
+            String code = builder.toString();
+            if (!orderRepository.existsByPublicCode(code)) {
                 return code;
             }
         }
+
+        String fallback = UUID.randomUUID().toString().replace("-", "").toUpperCase();
+        fallback = fallback.substring(0, Math.min(8, fallback.length()));
+        return orderRepository.existsByPublicCode(fallback) ? generateUniquePublicCode() : fallback;
     }
     
     private OrderItem createOrderItem(Order order, autoparts.kz.modules.cart.entity.CartItem cartItem) {
@@ -139,6 +154,9 @@ public class OrderService {
     }
     
     private void clearCart(Cart cart) {
+        if (cart.getId() != null) {
+            cartItemRepository.deleteByCartId(cart.getId());
+        }
         cart.getItems().clear();
         cartRepository.save(cart);
     }

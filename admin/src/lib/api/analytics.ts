@@ -48,6 +48,12 @@ export interface AnalyticsOverview {
   }>;
 }
 
+export interface SummaryMetrics {
+  totalUsers: number;
+  totalOrders: number;
+  totalRevenue: number;
+}
+
 export interface FinanceOverviewSummary {
   totalRevenue: number;
   monthlyRevenue: number;
@@ -132,6 +138,10 @@ export const analyticsApi = {
 
   getFinance: async (): Promise<Record<string, unknown>> => {
     return apiFetch<Record<string, unknown>>('/api/analytics/finance');
+  },
+
+  getSummaryMetrics: async (): Promise<SummaryMetrics> => {
+    return apiFetch<SummaryMetrics>('/api/admin/analytics/summary');
   },
 
   getTotalUsers: async (): Promise<number> => {

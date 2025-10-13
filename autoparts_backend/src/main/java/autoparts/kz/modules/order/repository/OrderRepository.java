@@ -3,8 +3,10 @@ package autoparts.kz.modules.order.repository;
 
 import autoparts.kz.modules.order.entity.Order;
 import autoparts.kz.modules.order.orderStatus.OrderStatus;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,9 +14,8 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import java.util.Optional;
 
 @Repository
@@ -38,9 +39,18 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     Optional<Order> findByExternalId(String externalId);
     Optional<Order> findByIdempotencyKey(String idempotencyKey);
     Optional<Order> findByPublicCode(String publicCode);
+    boolean existsByPublicCode(String publicCode);
 
     @EntityGraph(attributePaths = {"user", "items", "items.product"})
     Page<Order> findByUser_Id(Long userId, Pageable pageable);
+
+    @Query("""
+            select o.id
+            from Order o
+            where o.status in :statuses
+            order by o.createdAt asc
+            """)
+    Page<Long> findIdsByStatusIn(@Param("statuses") Collection<OrderStatus> statuses, Pageable pageable);
 
     @Query("""
            select count(o)

@@ -1,6 +1,7 @@
 package autoparts.kz.modules.admin.settings.controller;
 
 import autoparts.kz.modules.admin.Events.service.EventLogService;
+import autoparts.kz.modules.admin.settings.service.MaintenanceModeService;
 import autoparts.kz.modules.stockOneC.service.OneCIntegrationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.actuate.health.HealthEndpoint;
@@ -11,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @RestController
 @RequestMapping("/api/admin/system") 
@@ -21,7 +21,7 @@ public class AdminSystemController {
     private final MetricsEndpoint metricsEndpoint;
     private final EventLogService eventLogService;
     private final OneCIntegrationService oneCIntegrationService;
-    private final AtomicBoolean maintenanceMode = new AtomicBoolean(false);
+    private final MaintenanceModeService maintenanceModeService;
 
     @GetMapping("/status") 
     @PreAuthorize("hasRole('ADMIN')")
@@ -86,16 +86,13 @@ public class AdminSystemController {
     @GetMapping("/maintenance")
     @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> maintenanceStatus() {
-        return Map.of(
-                "enabled", maintenanceMode.get(),
-                "timestamp", Instant.now().toEpochMilli()
-        );
+        return maintenanceModeService.statusPayload();
     }
 
     @PostMapping("/maintenance")
     @PreAuthorize("hasRole('ADMIN')")
     public Map<String, Object> toggleMaintenance(@RequestParam("enabled") boolean enabled) {
-        maintenanceMode.set(enabled);
+        maintenanceModeService.setEnabled(enabled);
         eventLogService.logAdminAction(
                 "SYSTEM_MAINTENANCE",
                 enabled ? "Включен режим обслуживания" : "Выключен режим обслуживания"

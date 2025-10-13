@@ -1,5 +1,7 @@
 package autoparts.kz.modules.admin.service;
 
+import autoparts.kz.common.config.CacheConfig;
+import autoparts.kz.common.dto.PageResponse;
 import autoparts.kz.modules.admin.dto.NotificationHistoryResponse;
 import autoparts.kz.modules.admin.dto.NotificationRequest;
 import autoparts.kz.modules.admin.dto.NotificationResponse;
@@ -10,18 +12,28 @@ import autoparts.kz.modules.admin.repository.NotificationRepository;
 import autoparts.kz.modules.auth.Roles.Role;
 import autoparts.kz.modules.auth.entity.User;
 import autoparts.kz.modules.auth.repository.UserRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 public class NotificationSenderService {
+
+    private static final int BULK_BATCH_SIZE = 500;
 
     @Autowired
     private NotificationRepository notificationRepository;
@@ -32,7 +44,11 @@ public class NotificationSenderService {
     @Autowired
     private UserRepository userRepository;
 
+    @PersistenceContext
+    private EntityManager entityManager;
+
     @Transactional
+    @CacheEvict(value = CacheConfig.ADMIN_NOTIFICATION_HISTORY_CACHE, allEntries = true)
     public void sendNotification(NotificationRequest request, Long senderId) {
         String title = Optional.ofNullable(request.getTitle())
                 .map(String::trim)
@@ -44,8 +60,8 @@ public class NotificationSenderService {
                 .orElseThrow(() -> new IllegalArgumentException("Текст уведомления не может быть пустым"));
 
         String target = resolveTargetLabel(request);
-        List<User> recipients = resolveRecipients(request, target);
-        if (recipients.isEmpty()) {
+        List<Long> recipientIds = resolveRecipientIds(request, target);
+        if (recipientIds.isEmpty()) {
             throw new RuntimeException("No recipients resolved for target audience");
         }
 
@@ -58,17 +74,7 @@ public class NotificationSenderService {
         campaign.setSender(resolveSender(senderId));
         notificationCampaignRepository.save(campaign);
 
-        for (User user : recipients) {
-            Notification notification = new Notification();
-            notification.setTitle(title);
-            notification.setMessage(message);
-            notification.setStatus(request.isStatus());
-            notification.setRecipient(user);
-            notification.setImageUrl(campaign.getImageUrl());
-            notification.setTarget(target);
-            notification.setCampaign(campaign);
-            notificationRepository.save(notification);
-        }
+        saveNotificationsBulk(campaign, recipientIds);
     }
 
     @Transactional(readOnly = true)
@@ -88,29 +94,33 @@ public class NotificationSenderService {
     }
 
     @Transactional(readOnly = true)
-    public List<NotificationHistoryResponse> getNotificationHistory() {
-        return notificationCampaignRepository.findTop50ByOrderByCreatedAtDesc().stream()
-                .map(campaign -> {
-                    User sender = campaign.getSender();
-                    long recipientCount = notificationRepository.countByCampaignId(campaign.getId());
-                    return new NotificationHistoryResponse(
-                            campaign.getId(),
-                            campaign.getTitle(),
-                            campaign.getMessage(),
-                            campaign.isStatus(),
-                            campaign.getTarget(),
-                            campaign.getImageUrl(),
-                            campaign.getCreatedAt() != null ? campaign.getCreatedAt().toString() : null,
-                            sender != null ? sender.getId() : null,
-                            sender != null ? sender.getEmail() : null,
-                            buildSenderDisplayName(sender),
-                            recipientCount
-                    );
-                })
-                .collect(Collectors.toList());
+    @Cacheable(value = CacheConfig.ADMIN_NOTIFICATION_HISTORY_CACHE, key = "#page + ':' + #size")
+    public PageResponse<NotificationHistoryResponse> getNotificationHistory(int page, int size) {
+        Page<NotificationCampaign> campaignPage = notificationCampaignRepository.findAllByOrderByCreatedAtDesc(
+                PageRequest.of(Math.max(page, 0), Math.max(size, 1))
+        );
+
+        Map<Long, Long> recipientCounts = loadCampaignCounts(
+                campaignPage.getContent().stream()
+                        .map(NotificationCampaign::getId)
+                        .collect(Collectors.toList())
+        );
+
+        List<NotificationHistoryResponse> content = campaignPage.getContent().stream()
+                .map(campaign -> buildHistoryResponse(campaign, recipientCounts.getOrDefault(campaign.getId(), 0L)))
+                .toList();
+
+        return new PageResponse<>(
+                content,
+                campaignPage.getTotalElements(),
+                campaignPage.getTotalPages(),
+                campaignPage.getSize(),
+                campaignPage.getNumber()
+        );
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.ADMIN_NOTIFICATION_HISTORY_CACHE, allEntries = true)
     public void markAsRead(Long notificationId) {
         Notification n = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("Not found"));
@@ -119,6 +129,7 @@ public class NotificationSenderService {
     }
 
     @Transactional
+    @CacheEvict(value = CacheConfig.ADMIN_NOTIFICATION_HISTORY_CACHE, allEntries = true)
     public void deleteNotification(Long id) {
         if (!notificationRepository.existsById(id)) {
             throw new RuntimeException("Notification not found");
@@ -126,23 +137,27 @@ public class NotificationSenderService {
         notificationRepository.deleteById(id);
     }
 
-    private List<User> resolveRecipients(NotificationRequest request, String target) {
+    private List<Long> resolveRecipientIds(NotificationRequest request, String target) {
         if (request.getUserId() != null) {
-            return List.of(userRepository.findById(request.getUserId())
-                    .orElseThrow(() -> new RuntimeException("User not found")));
+            Long userId = userRepository.findById(request.getUserId())
+                    .map(User::getId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            return List.of(userId);
         }
 
-        List<User> recipients = new ArrayList<>();
+        List<Long> recipients = new ArrayList<>();
         switch (target) {
-            case "ADMINS" -> recipients.addAll(userRepository.findByRole(Role.ADMIN));
-            case "USERS" -> recipients.addAll(userRepository.findByRole(Role.USER));
-            case "ALL" -> recipients.addAll(userRepository.findAll());
+            case "ADMINS" -> recipients.addAll(userRepository.findIdsByRole(Role.ADMIN));
+            case "USERS" -> recipients.addAll(userRepository.findIdsByRole(Role.USER));
+            case "ALL" -> recipients.addAll(userRepository.findAllIds());
             default -> {
                 if (request.getUserId() != null) {
-                    recipients.add(userRepository.findById(request.getUserId())
-                            .orElseThrow(() -> new RuntimeException("User not found")));
+                    Long userId = userRepository.findById(request.getUserId())
+                            .map(User::getId)
+                            .orElseThrow(() -> new RuntimeException("User not found"));
+                    recipients.add(userId);
                 } else {
-                    recipients.addAll(userRepository.findAll());
+                    recipients.addAll(userRepository.findAllIds());
                 }
             }
         }
@@ -161,6 +176,63 @@ public class NotificationSenderService {
             return null;
         }
         return userRepository.findById(senderId).orElse(null);
+    }
+
+    private void saveNotificationsBulk(NotificationCampaign campaign, List<Long> recipientIds) {
+        if (recipientIds.isEmpty()) {
+            return;
+        }
+
+        List<Notification> buffer = new ArrayList<>(BULK_BATCH_SIZE);
+        for (Long recipientId : recipientIds) {
+            Notification notification = new Notification();
+            notification.setTitle(campaign.getTitle());
+            notification.setMessage(campaign.getMessage());
+            notification.setStatus(campaign.isStatus());
+            notification.setRecipient(entityManager.getReference(User.class, recipientId));
+            notification.setImageUrl(campaign.getImageUrl());
+            notification.setTarget(campaign.getTarget());
+            notification.setCampaign(campaign);
+            buffer.add(notification);
+
+            if (buffer.size() == BULK_BATCH_SIZE) {
+                notificationRepository.saveAll(buffer);
+                notificationRepository.flush();
+                buffer.clear();
+            }
+        }
+
+        if (!buffer.isEmpty()) {
+            notificationRepository.saveAll(buffer);
+            notificationRepository.flush();
+            buffer.clear();
+        }
+    }
+
+    private Map<Long, Long> loadCampaignCounts(Collection<Long> campaignIds) {
+        if (campaignIds.isEmpty()) {
+            return Map.of();
+        }
+        return notificationRepository.countByCampaignIds(campaignIds).stream()
+                .collect(Collectors.toMap(NotificationRepository.CampaignCount::getCampaignId,
+                        NotificationRepository.CampaignCount::getCount));
+    }
+
+    private NotificationHistoryResponse buildHistoryResponse(NotificationCampaign campaign, long recipientCount) {
+        User sender = campaign.getSender();
+        return new NotificationHistoryResponse(
+                campaign.getId(),
+                campaign.getTitle(),
+                campaign.getMessage(),
+                campaign.isStatus(),
+                campaign.getTarget(),
+                campaign.getImageUrl(),
+                campaign.getCreatedAt() != null ? campaign.getCreatedAt().toString() : null,
+                sender != null ? sender.getId() : null,
+                sender != null ? sender.getEmail() : null,
+                buildSenderDisplayName(sender),
+                recipientCount
+        );
     }
 
     private String normalizeImageUrl(String raw) {

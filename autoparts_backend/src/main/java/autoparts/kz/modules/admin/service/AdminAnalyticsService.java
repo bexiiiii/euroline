@@ -1,6 +1,7 @@
 package autoparts.kz.modules.admin.service;
 
 
+import autoparts.kz.common.config.CacheConfig;
 import autoparts.kz.modules.admin.utils.ChartUtils;
 import autoparts.kz.modules.admin.utils.dto.ChartDataPoint;
 import autoparts.kz.modules.auth.entity.User;
@@ -12,6 +13,7 @@ import autoparts.kz.modules.order.orderStatus.OrderStatus;
 import autoparts.kz.modules.order.repository.OrderRepository;
 import autoparts.kz.modules.manualProducts.repository.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -46,9 +48,8 @@ public class AdminAnalyticsService {
     }
 
     public BigDecimal getTotalRevenue() {
-        return orderRepository.findAllWithItems().stream()
-                .map(Order::getTotalPrice)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = orderRepository.totalRevenue();
+        return total != null ? total : BigDecimal.ZERO;
     }
 
     public List<String> getTopProducts() {
@@ -63,6 +64,15 @@ public class AdminAnalyticsService {
                 .limit(5)
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
+    }
+
+    @Cacheable(value = CacheConfig.ADMIN_ANALYTICS_SUMMARY_CACHE, key = "'summary'")
+    public Map<String, Object> getSummaryMetrics() {
+        return Map.of(
+                "totalUsers", getTotalUsers(),
+                "totalOrders", getTotalOrders(),
+                "totalRevenue", getTotalRevenue()
+        );
     }
 
     public BigDecimal getRevenueBetweenDates(LocalDate from, LocalDate to) {
@@ -570,5 +580,3 @@ public class AdminAnalyticsService {
         return BigDecimal.valueOf(value).setScale(1, RoundingMode.HALF_UP).doubleValue();
     }
 }
-
-

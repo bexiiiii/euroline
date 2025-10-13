@@ -195,6 +195,9 @@ public class RabbitConfig {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter);
+        factory.setPrefetchCount(50);
+        factory.setConcurrentConsumers(4);
+        factory.setMaxConcurrentConsumers(10);
         factory.setAdviceChain(RetryInterceptorBuilder.stateless()
                 .maxAttempts(3)
                 .backOffPolicy(exponentialBackOff())

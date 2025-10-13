@@ -1,10 +1,11 @@
 package autoparts.kz.modules.stockOneC.service.impl;
 
-import autoparts.kz.modules.stockOneC.service.OneCIntegrationService;
 import autoparts.kz.modules.order.entity.Order;
 import autoparts.kz.modules.order.orderStatus.OrderStatus;
 import autoparts.kz.modules.order.repository.OrderRepository;
 import autoparts.kz.modules.stockOneC.service.InventoryOnDemandRefresher;
+import autoparts.kz.modules.stockOneC.service.OneCIntegrationService;
+import autoparts.kz.modules.stockOneC.service.OneCIntegrationService.SyncStatus;
 import autoparts.kz.modules.cml.domain.dto.OneCOrderMessage;
 import autoparts.kz.modules.cml.domain.dto.OneCReturnMessage;
 import autoparts.kz.modules.cml.domain.dto.OneCIntegrationContract;
@@ -14,12 +15,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.EnumSet;
 import java.util.List;
 
 /**
@@ -186,42 +190,47 @@ public class OneCIntegrationServiceImpl implements OneCIntegrationService {
     
     @Override
     public void sendPendingOrdersToOneC() {
+        final int batchSize = 100;
+        final List<OrderStatus> statuses = List.copyOf(EnumSet.of(OrderStatus.PENDING, OrderStatus.CONFIRMED));
+
         try {
             logger.info("Sending pending orders to 1C");
             updateSyncStatus("BATCH_ORDER", "IN_PROGRESS", "Отправка ожидающих заказов");
-            
-            // Находим заказы со статусом PENDING или CONFIRMED
-            List<Order> pendingOrders = orderRepository.findAll().stream()
-                .filter(order -> 
-                    order.getStatus() == OrderStatus.PENDING || 
-                    order.getStatus() == OrderStatus.CONFIRMED
-                )
-                .toList();
-            
-            if (pendingOrders.isEmpty()) {
+
+            int page = 0;
+            int successCount = 0;
+            int errorCount = 0;
+            int totalProcessed = 0;
+
+            Page<Long> batch;
+            do {
+                batch = orderRepository.findIdsByStatusIn(statuses, PageRequest.of(page, batchSize));
+                if (batch.isEmpty()) {
+                    break;
+                }
+                for (Long orderId : batch) {
+                    try {
+                        sendOrderToOneC(orderId);
+                        successCount++;
+                    } catch (Exception e) {
+                        errorCount++;
+                        logger.error("Failed to send order {} to 1C: {}", orderId, e.getMessage());
+                    }
+                }
+                totalProcessed += batch.getNumberOfElements();
+                page++;
+            } while (batch.hasNext());
+
+            if (totalProcessed == 0) {
                 updateSyncStatus("BATCH_ORDER", "SUCCESS", "Нет ожидающих заказов для отправки");
                 return;
             }
-            
-            int successCount = 0;
-            int errorCount = 0;
-            
-            for (Order order : pendingOrders) {
-                try {
-                    sendOrderToOneC(order.getId());
-                    successCount++;
-                } catch (Exception e) {
-                    errorCount++;
-                    logger.error("Failed to send order {} to 1C: {}", order.getId(), e.getMessage());
-                }
-            }
-            
-            String message = String.format("Отправлено: %d, Ошибок: %d из %d заказов", 
-                successCount, errorCount, pendingOrders.size());
+
+            String message = String.format("Отправлено: %d, Ошибок: %d из %d заказов",
+                    successCount, errorCount, totalProcessed);
             updateSyncStatus("BATCH_ORDER", errorCount == 0 ? "SUCCESS" : "PARTIAL", message);
-            
             logger.info("Pending orders sync completed. Success: {}, Errors: {}", successCount, errorCount);
-            
+
         } catch (Exception e) {
             updateSyncStatus("BATCH_ORDER", "ERROR", "Ошибка массовой отправки: " + e.getMessage());
             logger.error("Error sending pending orders to 1C: {}", e.getMessage(), e);

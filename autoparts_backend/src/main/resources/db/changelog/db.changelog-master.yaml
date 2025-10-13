@@ -83,3 +83,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/20-create-admin-notification-campaigns.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/21-optimize-notifications-and-orders.sql
+      relativeToChangelogFile: false

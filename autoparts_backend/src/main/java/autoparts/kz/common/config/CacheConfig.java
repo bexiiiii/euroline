@@ -31,6 +31,8 @@ public class CacheConfig {
     public static final String UNIT_INFO_CACHE = "unitInfo";
     public static final String IMAGE_MAP_CACHE = "imageMap";
     public static final String FILTER_BY_UNIT_CACHE = "filterByUnit";
+    public static final String ADMIN_NOTIFICATION_HISTORY_CACHE = "adminNotificationHistory";
+    public static final String ADMIN_ANALYTICS_SUMMARY_CACHE = "adminAnalyticsSummary";
 
     @Bean
     public RedisCacheManager redisCacheManager(RedisConnectionFactory cf) {
@@ -88,6 +90,14 @@ public class CacheConfig {
         // Фильтры для юнита - кешируем на 1 час
         cacheConfigurations.put(FILTER_BY_UNIT_CACHE, 
             defaultConfig.entryTtl(Duration.ofHours(1)));
+
+        // История админских уведомлений — короткий TTL, чтобы снизить конкуренцию
+        cacheConfigurations.put(ADMIN_NOTIFICATION_HISTORY_CACHE,
+            defaultConfig.entryTtl(Duration.ofMinutes(1)));
+
+        // Сводная аналитика — кешируем на 1 минуту
+        cacheConfigurations.put(ADMIN_ANALYTICS_SUMMARY_CACHE,
+            defaultConfig.entryTtl(Duration.ofMinutes(1)));
 
         return RedisCacheManager.builder(cf)
                 .cacheDefaults(defaultConfig)
