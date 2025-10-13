@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+import org.springframework.core.annotation.Order;
 
 @Configuration
 @EnableWebSecurity
@@ -61,7 +62,18 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    @Order(0)
+    public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .securityMatcher("/actuator/prometheus")
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .csrf(AbstractHttpConfigurer::disable);
+        return http.build();
+    }
+
+    @Bean
+    @Order(1)
+    public SecurityFilterChain appSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> {})
@@ -78,7 +90,6 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/search").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/external/categories").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/admin/categories/tree").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/actuator/prometheus").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/system/maintenance").permitAll()
                         // News endpoints
                         .requestMatchers(HttpMethod.GET, "/api/news/published").permitAll()
