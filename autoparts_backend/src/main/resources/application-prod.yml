@@ -105,6 +105,23 @@ outbox:
   publisher:
     delay-ms: 15000
 
+cml:
+  username: ${CML_USERNAME:1c_exchange}
+  password: ${CML_PASSWORD:changeit}
+  allowed-ips: ${CML_ALLOWED_IPS:127.0.0.1}
+  queue:
+    exchange: ${CML_QUEUE_EXCHANGE:cml.exchange}
+    catalog-routing-key: ${CML_CATALOG_ROUTING_KEY:catalog.import}
+    offers-routing-key: ${CML_OFFERS_ROUTING_KEY:offers.import}
+    orders-export-routing-key: ${CML_ORDERS_EXPORT_ROUTING_KEY:orders.export}
+    orders-apply-routing-key: ${CML_ORDERS_APPLY_ROUTING_KEY:orders.apply}
+    orders-integration-routing-key: ${CML_ORDERS_INTEGRATION_ROUTING_KEY:orders.integration}
+    returns-integration-routing-key: ${CML_RETURNS_INTEGRATION_ROUTING_KEY:returns.integration}
+  max-file-size-mb: ${CML_MAX_FILE_SIZE_MB:50}
+  max-unzipped-size-mb: ${CML_MAX_UNZIPPED_SIZE_MB:500}
+  batch-size: ${CML_BATCH_SIZE:5000}
+  orders-export-interval-ms: ${CML_ORDERS_EXPORT_INTERVAL_MS:300000}
+
 app:
   cors:
     allowed-origins: https://admin.euroline.1edu.kz,https://euroline.1edu.kz
