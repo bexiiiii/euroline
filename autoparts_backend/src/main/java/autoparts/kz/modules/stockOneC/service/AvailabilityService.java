@@ -1,11 +1,11 @@
 package autoparts.kz.modules.stockOneC.service;
 
-
-
+import autoparts.kz.common.config.CacheConfig;
 import autoparts.kz.modules.stockOneC.entity.Stock;
 import autoparts.kz.modules.stockOneC.repository.StockRepo;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +25,7 @@ public class AvailabilityService {
         @Data public static class Row { public String warehouseCode; public int available; public String address; }
     }
 
-    // @Cacheable(cacheNames = "availability", key = "#sku")
+    @Cacheable(cacheNames = CacheConfig.AVAILABILITY_CACHE, key = "#sku")
     public SkuAvailability getBySku(String sku) {
         List<Stock> list = stockRepo.findBySku(sku);
         SkuAvailability a = new SkuAvailability();
@@ -41,5 +41,10 @@ public class AvailabilityService {
         }
         a.setTotal(total);
         return a;
+    }
+
+    @CacheEvict(cacheNames = CacheConfig.AVAILABILITY_CACHE, key = "#sku")
+    public void evict(String sku) {
+        // Метод-инвалидатор: тело пустое, логика выполняется за счёт аннотации
     }
 }

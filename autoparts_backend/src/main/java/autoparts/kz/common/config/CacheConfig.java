@@ -1,9 +1,9 @@
 package autoparts.kz.common.config;
 
-
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
@@ -31,8 +31,18 @@ public class CacheConfig {
     public static final String UNIT_INFO_CACHE = "unitInfo";
     public static final String IMAGE_MAP_CACHE = "imageMap";
     public static final String FILTER_BY_UNIT_CACHE = "filterByUnit";
+    public static final String FILTER_BY_DETAIL_CACHE = "filterByDetail";
     public static final String ADMIN_NOTIFICATION_HISTORY_CACHE = "adminNotificationHistory";
     public static final String ADMIN_ANALYTICS_SUMMARY_CACHE = "adminAnalyticsSummary";
+    public static final String VEHICLE_BY_VIN_CACHE = "vehicleByVin";
+    public static final String VEHICLE_BY_FRAME_CACHE = "vehicleByFrame";
+    public static final String VEHICLE_BY_PLATE_CACHE = "vehicleByPlate";
+    public static final String WIZARD_START_CACHE = "wizardStart";
+    public static final String FULLTEXT_DETAILS_CACHE = "fulltextDetails";
+    public static final String VEHICLE_INFO_CACHE = "vehicleInfo";
+    public static final String QUICK_GROUPS_CACHE = "quickGroups";
+    public static final String QUICK_DETAILS_CACHE = "quickDetails";
+    public static final String AVAILABILITY_CACHE = "availability";
 
     @Bean
     public RedisCacheManager redisCacheManager(RedisConnectionFactory cf) {
@@ -40,6 +50,10 @@ public class CacheConfig {
         ObjectMapper om = new ObjectMapper();
         om.registerModule(new JavaTimeModule());
         om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+        om.activateDefaultTyping(
+                LaissezFaireSubTypeValidator.instance,
+                ObjectMapper.DefaultTyping.NON_FINAL
+        );
         GenericJackson2JsonRedisSerializer jsonSer = new GenericJackson2JsonRedisSerializer(om);
 
         RedisSerializationContext.SerializationPair<Object> valueSer =
@@ -91,6 +105,34 @@ public class CacheConfig {
         cacheConfigurations.put(FILTER_BY_UNIT_CACHE, 
             defaultConfig.entryTtl(Duration.ofHours(1)));
 
+        // Фильтры по детали - кешируем на 30 минут
+        cacheConfigurations.put(FILTER_BY_DETAIL_CACHE,
+            defaultConfig.entryTtl(Duration.ofMinutes(30)));
+
+        // Поиск автомобилей по идентификаторам VIN/Frame/Plate — кешируем на 6 часов
+        cacheConfigurations.put(VEHICLE_BY_VIN_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(6)));
+        cacheConfigurations.put(VEHICLE_BY_FRAME_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(6)));
+        cacheConfigurations.put(VEHICLE_BY_PLATE_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(6)));
+
+        // Старт мастера — кешируем на 2 часа
+        cacheConfigurations.put(WIZARD_START_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(2)));
+
+        // Полнотекстовый поиск деталей — кешируем на 15 минут
+        cacheConfigurations.put(FULLTEXT_DETAILS_CACHE,
+            defaultConfig.entryTtl(Duration.ofMinutes(15)));
+
+        // Информация об автомобиле и быстрые группы/детали — кешируем на 2 часа
+        cacheConfigurations.put(VEHICLE_INFO_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(2)));
+        cacheConfigurations.put(QUICK_GROUPS_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(2)));
+        cacheConfigurations.put(QUICK_DETAILS_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(2)));
+
         // История админских уведомлений — короткий TTL, чтобы снизить конкуренцию
         cacheConfigurations.put(ADMIN_NOTIFICATION_HISTORY_CACHE,
             defaultConfig.entryTtl(Duration.ofMinutes(1)));
@@ -98,6 +140,10 @@ public class CacheConfig {
         // Сводная аналитика — кешируем на 1 минуту
         cacheConfigurations.put(ADMIN_ANALYTICS_SUMMARY_CACHE,
             defaultConfig.entryTtl(Duration.ofMinutes(1)));
+
+        // Наличие товаров — кешируем на 5 минут
+        cacheConfigurations.put(AVAILABILITY_CACHE,
+            defaultConfig.entryTtl(Duration.ofMinutes(5)));
 
         return RedisCacheManager.builder(cf)
                 .cacheDefaults(defaultConfig)

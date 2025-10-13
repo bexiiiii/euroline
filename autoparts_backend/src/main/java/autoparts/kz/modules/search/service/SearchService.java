@@ -31,6 +31,7 @@ public class SearchService {
     public SearchResult searchByBrandOem(String brand, String oem, String catalog) {
         String sku = mapper.skuByBrandOem(brand, oem);
         refresher.refreshSkus(List.of(sku));
+        availability.evict(sku);
         var av = availability.getBySku(sku);
 
         var res = new SearchResult();

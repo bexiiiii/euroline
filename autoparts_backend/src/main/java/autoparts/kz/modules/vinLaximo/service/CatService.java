@@ -1,8 +1,7 @@
 package autoparts.kz.modules.vinLaximo.service;
 
 
-
-
+import autoparts.kz.common.config.CacheConfig;
 import autoparts.kz.modules.vinLaximo.XmlParser.CatXmlParser;
 import autoparts.kz.modules.vinLaximo.client.LaximoSoapClient;
 import autoparts.kz.modules.vinLaximo.dto.*;
@@ -25,7 +24,7 @@ public class CatService {
     }
 
     // ---- Catalogs ----
-    // @Cacheable(cacheNames = "catalogs", key = "'all'")
+    @Cacheable(cacheNames = CacheConfig.CATALOGS_CACHE, key = "'all'")
     public List<CatalogDto> listCatalogs(){
         try {
             String cmd = "ListCatalogs:Locale=" + locale;
@@ -36,7 +35,7 @@ public class CatService {
         }
     }
 
-    // @Cacheable(cacheNames = "catalogInfo", key = "#catalog")
+    @Cacheable(cacheNames = CacheConfig.CATALOG_INFO_CACHE, key = "#catalog")
     public CatalogInfoDto getCatalogInfo(String catalog){
         try {
             String cmd = "GetCatalogInfo:Locale=" + locale + "|Catalog=" + catalog;
@@ -52,8 +51,7 @@ public class CatService {
     }
 
     // ---- Vehicle search ----
-    // Temporarily disabled caching for VIN search to fix LinkedHashMap cast issue
-    // @Cacheable(cacheNames = "vehicleByVin", key = "#vin + '::' + #catalog")
+    @Cacheable(cacheNames = CacheConfig.VEHICLE_BY_VIN_CACHE, key = "#vin + '::' + (#catalog == null ? 'ALL' : #catalog)")
     public VehicleDto findByVin(String vin, String catalog) {
         String cmd = "FindVehicleByVIN:Locale=" + locale +
                 (catalog != null && !catalog.isBlank() ? "|Catalog=" + catalog : "") +
@@ -61,7 +59,7 @@ public class CatService {
         return CatXmlParser.parseFindVehicleByVin(soap.execCommands(List.of(cmd)));
     }
 
-    // @Cacheable(cacheNames = "vehicleByFrame", key = "#frame + '::' + #frameNo + '::' + #catalog")
+    @Cacheable(cacheNames = CacheConfig.VEHICLE_BY_FRAME_CACHE, key = "#frame + '::' + #frameNo + '::' + (#catalog == null ? 'ALL' : #catalog)")
     public VehicleDto findByFrame(String frame, String frameNo, String catalog) {
         String cmd = "FindVehicleByFrame:Locale=" + locale +
                 (catalog != null && !catalog.isBlank() ? "|Catalog=" + catalog : "") +
@@ -69,14 +67,14 @@ public class CatService {
         return CatXmlParser.parseFindVehicleByFrame(soap.execCommands(List.of(cmd)));
     }
 
-    // @Cacheable(cacheNames = "vehicleByPlate", key = "#plate")
+    @Cacheable(cacheNames = CacheConfig.VEHICLE_BY_PLATE_CACHE, key = "#plate")
     public VehicleDto findByPlateNumber(String plate) {
         String cmd = "FindVehicleByPlateNumber:Locale=" + locale + "|PlateNumber=" + plate + "|Localized=true";
         return CatXmlParser.parseFindVehicleByPlateNumber(soap.execCommands(List.of(cmd)));
     }
 
     // ---- Wizard (GetWizard2 / Next / Finish) ----
-    // @Cacheable(cacheNames = "wizardStart", key = "#catalog")
+    @Cacheable(cacheNames = CacheConfig.WIZARD_START_CACHE, key = "#catalog")
     public WizardStepDto wizardStart(String catalog){
         try {
             String cmd = "GetWizard2:Locale=" + locale + "|Catalog=" + catalog + "|Localized=true";
@@ -92,6 +90,7 @@ public class CatService {
     }
 
     // Overload supporting VIN and custom locale (if provided)
+    @Cacheable(cacheNames = CacheConfig.WIZARD_START_CACHE, key = "#catalog + '::' + (#vin == null ? 'NO_VIN' : #vin) + '::' + (#overrideLocale == null ? 'DEFAULT' : #overrideLocale)")
     public WizardStepDto wizardStart(String catalog, String vin, String overrideLocale){
         String useLocale = (overrideLocale != null && !overrideLocale.isBlank()) ? overrideLocale : this.locale;
         try {
@@ -204,7 +203,7 @@ public class CatService {
     }
 
     // ---- Categories / Units / UnitInfo / Details / ImageMap / Filters ----
-    // @Cacheable(cacheNames = "categories", key = "#catalog + '::' + #vehicleId + '::' + #ssd")
+    @Cacheable(cacheNames = CacheConfig.CATEGORIES_CACHE, key = "#catalog + '::' + #vehicleId + '::' + #ssd")
     public List<CategoryDto> listCategories(String catalog, String vehicleId, String ssd) {
         ssd = validateSsd(ssd); // Валидируем SSD
         String cmd = "ListCategories:Locale=" + locale +
@@ -212,7 +211,7 @@ public class CatService {
         return CatXmlParser.parseListCategories(soap.execCommands(List.of(cmd)));
     }
 
-    // @Cacheable(cacheNames = "units", key = "#catalog + '::' + #vehicleId + '::' + #ssd + '::' + #categoryId")
+    @Cacheable(cacheNames = CacheConfig.UNITS_CACHE, key = "#catalog + '::' + #vehicleId + '::' + #ssd + '::' + #categoryId")
     public List<UnitDto> listUnits(String catalog, String vehicleId, String ssd, long categoryId) {
         String cmd = "ListUnits:Locale=" + locale +
                 "|Catalog=" + catalog + "|VehicleId=" + vehicleId + "|ssd=" + ssd +
@@ -220,14 +219,14 @@ public class CatService {
         return CatXmlParser.parseListUnits(soap.execCommands(List.of(cmd)));
     }
 
-    // @Cacheable(cacheNames = "unitInfo", key = "#catalog + '::' + #ssd + '::' + #unitId")
+    @Cacheable(cacheNames = CacheConfig.UNIT_INFO_CACHE, key = "#catalog + '::' + #ssd + '::' + #unitId")
     public UnitInfoDto getUnitInfo(String catalog, long unitId, String ssd) {
         String cmd = "GetUnitInfo:Locale=" + locale + "|Catalog=" + catalog +
                 "|UnitId=" + unitId + "|ssd=" + ssd + "|Localized=true";
         return CatXmlParser.parseUnitInfo(soap.execCommands(List.of(cmd)));
     }
 
-        // @Cacheable(cacheNames = "unitDetails", key = "#catalog + '::' + #ssd + '::' + #unitId")
+    @Cacheable(cacheNames = CacheConfig.UNIT_DETAILS_CACHE, key = "#catalog + '::' + #ssd + '::' + #unitId")
     public List<DetailDto> listDetailsByUnit(String catalog, String ssd, Integer unitId) {
         System.out.println("DEBUG listDetailsByUnit: catalog=" + catalog + ", unitId=" + unitId + ", ssd=" + ssd);
         String cmd = "ListDetailsByUnit:Locale=" + locale + "|Catalog=" + catalog +
@@ -243,7 +242,7 @@ public class CatService {
         return details;
     }
 
-    // @Cacheable(cacheNames = "imageMap", key = "#catalog + '::' + #ssd + '::' + #unitId")
+    @Cacheable(cacheNames = CacheConfig.IMAGE_MAP_CACHE, key = "#catalog + '::' + #ssd + '::' + #unitId")
     public List<ImageMapDto> listImageMapByUnit(String catalog, long unitId, String ssd) {
         String cmd = "ListImageMapByUnit:Locale=" + locale + "|Catalog=" + catalog +
                 "|UnitId=" + unitId + "|ssd=" + ssd;
@@ -258,7 +257,7 @@ public class CatService {
         return result != null ? result : "";
     }
 
-    // @Cacheable(cacheNames = "filterByUnit", key = "#catalog + '::' + #vehicleId + '::' + #ssd + '::' + #unitId + '::' + #filter")
+    @Cacheable(cacheNames = CacheConfig.FILTER_BY_UNIT_CACHE, key = "#catalog + '::' + #vehicleId + '::' + #ssd + '::' + #unitId + '::' + #filter")
     public List<FilterOptionDto> getFilterByUnit(String catalog, long unitId, String vehicleId, String ssd, String filter) {
         String cmd = "GetFilterByUnit:Locale=" + locale + "|Catalog=" + catalog +
                 "|UnitId=" + unitId + "|VehicleId=" + vehicleId + "|ssd=" + ssd +
@@ -266,7 +265,7 @@ public class CatService {
         return CatXmlParser.parseFilter(soap.execCommands(List.of(cmd)), "GetFilterByUnit");
     }
 
-    // @Cacheable(cacheNames = "filterByDetail", key = "#catalog + '::' + #vehicleId + '::' + #ssd + '::' + #detailId")
+    @Cacheable(cacheNames = CacheConfig.FILTER_BY_DETAIL_CACHE, key = "#catalog + '::' + #vehicleId + '::' + #ssd + '::' + #detailId")
     public List<FilterOptionDto> getFilterByDetail(String catalog, long detailId, String vehicleId, String ssd) {
         String cmd = "GetFilterByDetail:Locale=" + locale + "|Catalog=" + catalog +
                 "|DetailId=" + detailId + "|VehicleId=" + vehicleId + "|ssd=" + ssd;
@@ -275,7 +274,7 @@ public class CatService {
 
 
     // ---- search by name ----
-    // @Cacheable(cacheNames = "fulltextDetails", key = "#query + '::' + (#catalog==null?'ALL':#catalog)")
+    @Cacheable(cacheNames = CacheConfig.FULLTEXT_DETAILS_CACHE, key = "#query + '::' + (#catalog==null?'ALL':#catalog)")
     public List<DetailDto> searchDetails(String query, String catalog) {
     // Нормализация + кодирование
     String raw = query == null ? "" : query.trim();
@@ -605,16 +604,14 @@ public class CatService {
     }
     
 
-    // CatService.java
-    // @Cacheable(cacheNames = "vehicleInfo", key = "#catalog + '::' + #vehicleId + '::' + #ssd")
+    @Cacheable(cacheNames = CacheConfig.VEHICLE_INFO_CACHE, key = "#catalog + '::' + #vehicleId + '::' + #ssd")
     public VehicleDto getVehicleInfo(String catalog, String vehicleId, String ssd) {
         String cmd = "GetVehicleInfo:Locale=" + locale +
                 "|Catalog=" + catalog + "|VehicleId=" + vehicleId + "|ssd=" + ssd + "|Localized=true";
         return CatXmlParser.parseGetVehicleInfo(soap.execCommands(List.of(cmd)));
     }
 
-    // CatService.java
-    // @Cacheable(cacheNames = "quickGroups", key = "#catalog + '::' + #vehicleId + '::' + #ssd")
+    @Cacheable(cacheNames = CacheConfig.QUICK_GROUPS_CACHE, key = "#catalog + '::' + #vehicleId + '::' + #ssd")
     public List<QuickGroupDto> listQuickGroups(String catalog, String vehicleId, String ssd) {
         String cmd = "ListQuickGroup:Locale=" + locale +
                 "|Catalog=" + catalog + "|VehicleId=" + vehicleId + "|ssd=" + ssd + "|Localized=true";
@@ -631,7 +628,7 @@ public class CatService {
         return result;
     }
 
-    // @Cacheable(cacheNames = "quickDetails", key = "#catalog + '::' + #vehicleId + '::' + #ssd + '::' + #groupId")
+    @Cacheable(cacheNames = CacheConfig.QUICK_DETAILS_CACHE, key = "#catalog + '::' + #vehicleId + '::' + #ssd + '::' + #groupId")
     public List<DetailDto> listQuickDetails(String catalog, String vehicleId, String ssd, long groupId) {
         String cmd = "ListQuickDetail:Locale=" + locale +
                 "|Catalog=" + catalog + "|VehicleId=" + vehicleId + "|ssd=" + ssd +
@@ -694,7 +691,7 @@ public class CatService {
         selections.forEach((k,v)-> sb.append("|").append(k).append("=").append(v));
         return soap.execCommands(List.of(sb.toString()));
     }
-    // @Cacheable(cacheNames = "categoryTree", key = "#catalog + '::' + #vehicleId + '::' + #ssd")
+    @Cacheable(cacheNames = CacheConfig.CATEGORY_TREE_CACHE, key = "#catalog + '::' + #vehicleId + '::' + #ssd")
     public List<CategoryNodeDto> tree(String catalog, String vehicleId, String ssd) {
         ssd = validateSsd(ssd); // Валидируем SSD
         var cats = listCategories(catalog, vehicleId, ssd);
