@@ -23,6 +23,18 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   const { parseAs = 'json', ...requestInit } = options;
   let token: string | null | undefined;
 
+  const redirectToLogin = () => {
+    if (typeof window === 'undefined') return;
+    try {
+      const currentPath = window.location.pathname;
+      if (!currentPath.startsWith('/signin')) {
+        window.location.href = '/signin';
+      }
+    } catch {
+      // ignore navigation errors
+    }
+  };
+
   if (typeof window !== 'undefined') {
     // 1) Берём токен из localStorage (или из cookie, если нужен такой вариант)
     token = localStorage.getItem('admin_token');
@@ -112,6 +124,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
           console.warn('Получен 401 — токен очищен. Требуется повторный вход.');
         } catch {}
       }
+      redirectToLogin();
       throw new ApiError('Не авторизован', res.status);
     }
     if (res.status === 403) {
@@ -129,6 +142,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
                 console.warn('JWT signature mismatch — токен очищен. Требуется повторный вход.');
               } catch {}
             }
+            redirectToLogin();
             throw new ApiError('Не авторизован', 401);
           }
         } catch {
@@ -175,6 +189,7 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
           localStorage.removeItem('admin_token');
           document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT';
         } catch {}
+        redirectToLogin();
         throw new ApiError('Не авторизован', 401);
       }
 

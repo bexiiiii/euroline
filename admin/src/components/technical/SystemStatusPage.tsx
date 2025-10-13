@@ -337,10 +337,7 @@ const SystemStatusPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <ComponentCard
-        title="Общее состояние"
-        description="Текущее состояние основных сервисов приложения"
-        action={
+       <h1>Общее состояние</h1>
           <div className="flex items-center gap-2">
             <Button
               size="sm"
@@ -366,8 +363,7 @@ const SystemStatusPage: React.FC = () => {
               {actionLoading === "onec" ? "Проверка 1С..." : "Проверить 1С"}
             </Button>
           </div>
-        }
-      >
+      
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
             <p className="text-sm text-gray-500">Статус системы</p>
@@ -397,9 +393,9 @@ const SystemStatusPage: React.FC = () => {
             </p>
           </div>
         </div>
-      </ComponentCard>
 
-      <ComponentCard title="Действия" description="Операции для диагностики и технического обслуживания">
+
+          <h1>Действия</h1>
         <div className="flex flex-wrap gap-3">
           <Button
             size="sm"
@@ -425,12 +421,9 @@ const SystemStatusPage: React.FC = () => {
             {actionLoading === "restart" ? "Перезапуск..." : "Перезапуск сервисов"}
           </Button>
         </div>
-      </ComponentCard>
 
-      <ComponentCard
-        title="Интеграция с 1С"
-        description="Актуальное состояние соединения и последняя проверка"
-        action={
+
+      <h1>Интеграция с 1С</h1>
           <Button
             size="sm"
             variant="outline"
@@ -439,8 +432,7 @@ const SystemStatusPage: React.FC = () => {
           >
             {actionLoading === "onec" ? "Проверка..." : "Повторить проверку"}
           </Button>
-        }
-      >
+       
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
             <p className="text-sm text-gray-500">Статус соединения</p>
@@ -462,9 +454,9 @@ const SystemStatusPage: React.FC = () => {
             </p>
           </div>
         </div>
-      </ComponentCard>
+      
 
-      <ComponentCard title="Сервисы" description="Состояние ключевых компонентов системы">
+      <h1>Сервисы</h1>
         <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
             <thead className="bg-gray-50 dark:bg-gray-800/40">
@@ -512,9 +504,9 @@ const SystemStatusPage: React.FC = () => {
             </tbody>
           </table>
         </div>
-      </ComponentCard>
+      
 
-      <ComponentCard title="Серверные метрики" description="Основные показатели работы приложения">
+            <h1>Серверные метрики</h1>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {metrics.map((metric) => {
             const status = metricStatus(metric);
@@ -549,7 +541,7 @@ const SystemStatusPage: React.FC = () => {
             );
           })}
         </div>
-      </ComponentCard>
+      
     </div>
   );
 };

@@ -12,6 +12,7 @@ import autoparts.kz.modules.auth.entity.User;
 import autoparts.kz.modules.auth.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +32,7 @@ public class NotificationSenderService {
     @Autowired
     private UserRepository userRepository;
 
+    @Transactional
     public void sendNotification(NotificationRequest request, Long senderId) {
         String title = Optional.ofNullable(request.getTitle())
                 .map(String::trim)
@@ -69,6 +71,7 @@ public class NotificationSenderService {
         }
     }
 
+    @Transactional(readOnly = true)
     public List<NotificationResponse> getUserNotifications(Long userId) {
         return notificationRepository.findByRecipientIdOrderByCreatedAtDesc(userId).stream()
                 .map(n -> new NotificationResponse(
@@ -84,6 +87,7 @@ public class NotificationSenderService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional(readOnly = true)
     public List<NotificationHistoryResponse> getNotificationHistory() {
         return notificationCampaignRepository.findTop50ByOrderByCreatedAtDesc().stream()
                 .map(campaign -> {
@@ -106,6 +110,7 @@ public class NotificationSenderService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
     public void markAsRead(Long notificationId) {
         Notification n = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("Not found"));
@@ -113,6 +118,7 @@ public class NotificationSenderService {
         notificationRepository.save(n);
     }
 
+    @Transactional
     public void deleteNotification(Long id) {
         if (!notificationRepository.existsById(id)) {
             throw new RuntimeException("Notification not found");

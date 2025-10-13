@@ -5,10 +5,12 @@ const nextConfig: NextConfig = {
   images: {
     domains: [
       'img.laximo.ru',
+      'api.euroline.storage.1edu.kz',
     ],
     remotePatterns: [
       { protocol: 'https', hostname: 'img.laximo.ru' },
       { protocol: 'http', hostname: 'img.laximo.ru' },
+      { protocol: 'https', hostname: 'api.euroline.storage.1edu.kz' },
     ],
   },
   webpack(config) {
