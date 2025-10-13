@@ -38,6 +38,9 @@ public class Order {
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     private User user;
 
+    @Column(name = "customer_email", nullable = false, length = 255)
+    private String customerEmail;
+
     /** Адрес доставки, который требуется 1С. */
     @Column(length = 500)
     private String deliveryAddress;
@@ -57,6 +60,12 @@ public class Order {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Column(name = "total_amount", nullable = false, precision = 19, scale = 2)
+    private BigDecimal totalAmount = BigDecimal.ZERO;
+
     /** Оптимистическая блокировка для безопасных апдейтов по событиям. */
     @Version
     private Long version;
@@ -66,7 +75,23 @@ public class Order {
 
     @PrePersist
     void onCreate() {
-        if (createdAt == null) createdAt = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        updatedAt = createdAt;
+        recalcTotals();
+        if (customerEmail == null && user != null) {
+            customerEmail = user.getEmail();
+        }
+    }
+
+    @PreUpdate
+    void onUpdate() {
+        updatedAt = LocalDateTime.now();
+        recalcTotals();
+        if (customerEmail == null && user != null) {
+            customerEmail = user.getEmail();
+        }
     }
 
     public BigDecimal getTotalPrice() {
@@ -77,14 +102,12 @@ public class Order {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    @Transient
     public BigDecimal getTotalAmount() {
-        return getTotalPrice();
+        return totalAmount == null ? BigDecimal.ZERO : totalAmount;
     }
 
-    @Transient
-    public String getCustomerEmail() {
-        return user != null ? user.getEmail() : null;
+    public void setTotalAmount(BigDecimal totalAmount) {
+        this.totalAmount = totalAmount == null ? BigDecimal.ZERO : totalAmount;
     }
 
     @Transient
@@ -93,4 +116,19 @@ public class Order {
     }
 
     public enum PaymentStatus { UNPAID, PAID, REFUNDED, PARTIALLY_PAID }
+
+    public void applyCustomerSnapshot(User source) {
+        if (source == null) {
+            throw new IllegalArgumentException("Источник данных о пользователе не может быть пустым");
+        }
+        this.user = source;
+        if (source.getEmail() == null || source.getEmail().isBlank()) {
+            throw new IllegalStateException("Для пользователя отсутствует email, необходимый для создания заказа");
+        }
+        this.customerEmail = source.getEmail();
+    }
+
+    private void recalcTotals() {
+        this.totalAmount = getTotalPrice();
+    }
 }

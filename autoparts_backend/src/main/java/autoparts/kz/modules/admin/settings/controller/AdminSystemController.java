@@ -38,7 +38,7 @@ public class AdminSystemController {
     @GetMapping("/metrics") 
     @PreAuthorize("hasRole('ADMIN')")
     public Object metrics(){ 
-        return metricsEndpoint.listNames(); 
+        return metricsEndpoint.listNames().getNames(); 
     }
 
     @PostMapping("/restart") 
@@ -79,7 +79,7 @@ public class AdminSystemController {
                 "status", "COMPLETED",
                 "timestamp", Instant.now().toEpochMilli(),
                 "health", healthEndpoint.health(),
-                "metrics", metricsEndpoint.listNames()
+                "metrics", metricsEndpoint.listNames().getNames()
         );
     }
 

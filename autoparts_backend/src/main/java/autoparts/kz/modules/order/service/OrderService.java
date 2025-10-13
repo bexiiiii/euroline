@@ -4,6 +4,7 @@ import autoparts.kz.common.exception.CartNotFoundException;
 import autoparts.kz.common.exception.DuplicateRequestException;
 import autoparts.kz.common.exception.OrderNotFoundException;
 import autoparts.kz.modules.auth.entity.User;
+import autoparts.kz.modules.auth.repository.UserRepository;
 import autoparts.kz.modules.cart.entity.Cart;
 import autoparts.kz.modules.cart.repository.CartRepository;
 import autoparts.kz.modules.order.dto.CreateOrderRequest;
@@ -39,6 +40,7 @@ public class OrderService {
     private final FinanceService financeService;
     private final autoparts.kz.modules.telegram.service.TelegramNotificationService telegramNotificationService;
     private final autoparts.kz.modules.cml.service.OneCBridgePublisher oneCBridgePublisher;
+    private final UserRepository userRepository;
 
     @Transactional
     public Order createOrderFromCart(Long userId, CreateOrderRequest req) {
@@ -79,9 +81,15 @@ public class OrderService {
     
     private Order createOrder(Long userId, CreateOrderRequest req, Cart cart) {
         Order order = new Order();
-        var user = new User(); 
-        user.setId(userId);
-        order.setUser(user);
+        User user = cart.getUser();
+        if (user == null || user.getEmail() == null) {
+            user = userRepository.findById(userId)
+                    .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userId));
+        }
+        if (user.getId() == null) {
+            user.setId(userId);
+        }
+        order.applyCustomerSnapshot(user);
         order.setDeliveryAddress(req.getDeliveryAddress());
         order.setStatus(OrderStatus.PENDING);
         order.setIdempotencyKey(req.getIdempotencyKey());
@@ -91,6 +99,7 @@ public class OrderService {
                 .map(cartItem -> createOrderItem(order, cartItem))
                 .toList();
         order.setItems(orderItems);
+        order.setTotalAmount(order.getTotalPrice());
         
         return order;
     }
