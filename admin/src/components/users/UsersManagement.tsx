@@ -10,8 +10,6 @@ import Input from "../form/input/InputField";
 import Select from "../form/Select";
 import { userApi, User as ApiUser } from "@/lib/api/users";
 import { userActivityApi, UserActivity as ApiUserActivity } from "@/lib/api/userActivity";
-import { PageResponse } from "@/lib/api/types";
-import { apiFetch } from "@/lib/api";
 import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
 import { exportAdminData } from "@/lib/api/importExport";
 import { useToast } from "@/context/ToastContext";
@@ -42,6 +40,8 @@ interface UserActivity {
   status: "success" | "failed" | "warning";
 }
 
+type UserRole = ApiUser["role"];
+
 const UsersManagement = () => {
   const [activeTab, setActiveTab] = useState("users");
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,12 +52,27 @@ const UsersManagement = () => {
   const [loading, setLoading] = useState(false);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userForm, setUserForm] = useState<{ role: UserRole }>({ role: "USER" });
+  const [savingUser, setSavingUser] = useState(false);
   const { success: showSuccess, error: showError } = useToast();
 
   useEffect(() => {
     loadUsers();
     loadUserActivities();
   }, []);
+
+  const normalizeRole = (role?: string): UserRole => {
+    const clean = role?.toUpperCase().replace(/^ROLE_/, "");
+    return clean === "ADMIN" ? "ADMIN" : "USER";
+  };
+
+  useEffect(() => {
+    if (isModalOpen && modalType === "user") {
+      setUserForm({
+        role: normalizeRole(selectedUser?.role),
+      });
+    }
+  }, [isModalOpen, modalType, selectedUser]);
 
   const loadUsers = async () => {
     try {
@@ -134,15 +149,12 @@ const UsersManagement = () => {
   const formatDateTime = (dateString: string) => new Date(dateString).toLocaleString("ru-RU");
 
   const getRoleBadge = (role: string) => {
-    switch (role) {
+    const normalizedRole = role?.toLowerCase().replace(/^role_/, "");
+    switch (normalizedRole) {
       case "admin":
         return <Badge color="error">Администратор</Badge>;
-      case "manager":
-        return <Badge color="primary">Менеджер</Badge>;
-      case "operator":
-        return <Badge color="warning">Оператор</Badge>;
-      case "viewer":
-        return <Badge color="light">Наблюдатель</Badge>;
+      case "user":
+        return <Badge color="primary">Пользователь</Badge>;
       default:
         return <Badge color="light">{role}</Badge>;
     }
@@ -167,19 +179,6 @@ const UsersManagement = () => {
     setIsModalOpen(true);
   };
 
-  const roleOptions = [
-    { value: "admin", label: "Администратор" },
-    { value: "manager", label: "Менеджер" },
-    { value: "operator", label: "Оператор" },
-    { value: "viewer", label: "Наблюдатель" },
-  ];
-
-  const statusOptions = [
-    { value: "active", label: "Активен" },
-    { value: "inactive", label: "Неактивен" },
-    { value: "blocked", label: "Заблокирован" },
-  ];
-
   const toggleBan = async (u: User) => {
     try {
       const newBannedStatus = u.status === "blocked";
@@ -187,6 +186,32 @@ const UsersManagement = () => {
       setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, status: u.status === "blocked" ? "active" : "blocked" } : x)));
     } catch (e) {
       setError("Не удалось изменить статус пользователя");
+    }
+  };
+
+  const handleUserSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!selectedUser) {
+      setIsModalOpen(false);
+      return;
+    }
+
+    try {
+      setSavingUser(true);
+      const updated = await userApi.updateUserRole(selectedUser.id, userForm.role);
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === selectedUser.id ? { ...user, role: updated.role } : user,
+        ),
+      );
+      setSelectedUser((prev) => (prev ? { ...prev, role: updated.role } : prev));
+      showSuccess("Роль пользователя обновлена");
+      setIsModalOpen(false);
+    } catch (err) {
+      console.error("Не удалось сохранить изменения пользователя", err);
+      showError("Не удалось сохранить изменения пользователя");
+    } finally {
+      setSavingUser(false);
     }
   };
 
@@ -378,7 +403,7 @@ const UsersManagement = () => {
             </div>
           )}
           
-          <form onSubmit={(e) => { e.preventDefault(); setIsModalOpen(false); }}>
+          <form onSubmit={handleUserSubmit}>
             <div className="space-y-6">
               {/* Основная информация */}
               <div>
@@ -471,15 +496,19 @@ const UsersManagement = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="role">Роль *</Label>
-                    <Select 
+                    <Select
                       options={[
-                        {value: 'USER', label: 'Пользователь'},
-                        {value: 'ADMIN', label: 'Администратор'},
-                        {value: 'MANAGER', label: 'Менеджер'}
-                      ]} 
-                      onChange={() => {}} 
-                      placeholder="Выберите роль" 
-                      defaultValue={selectedUser?.role || 'USER'}
+                        { value: "USER", label: "Пользователь" },
+                        { value: "ADMIN", label: "Администратор" },
+                      ]}
+                      onChange={(value) =>
+                        setUserForm((prev) => ({
+                          ...prev,
+                          role: normalizeRole(value),
+                        }))
+                      }
+                      placeholder="Выберите роль"
+                      value={userForm.role}
                     />
                   </div>
                   <div className="flex items-center space-x-4 pt-6">
@@ -520,8 +549,21 @@ const UsersManagement = () => {
             </div>
             
             <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 mt-6 border-t border-gray-200 dark:border-gray-700">
-              <Button variant="outline" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto">Отменить</Button>
-              <Button onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto">{selectedUser ? "Сохранить изменения" : "Создать пользователя"}</Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsModalOpen(false)}
+                className="w-full sm:w-auto"
+                type="button"
+              >
+                Отменить
+              </Button>
+              <Button
+                className="w-full sm:w-auto"
+                type="submit"
+                disabled={savingUser}
+              >
+                {savingUser ? "Сохранение..." : selectedUser ? "Сохранить изменения" : "Создать пользователя"}
+              </Button>
             </div>
           </form>
         </div>
