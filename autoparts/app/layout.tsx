@@ -57,7 +57,7 @@ export default async function RootLayout({
           className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-gray-50 text-gray-800`}
         >
           <main className="flex-1 flex items-center justify-center px-4">
-            <div className="max-w-xl text-center space-y-6 rounded-3xl border border-gray-200 bg-white p-10 shadow-lg">
+            <div className="max-w-xl text-center space-y-6 rounded-2xl border-1 border-gray-300 bg-white p-10 ">
               <div className="mx-auto h-16 w-16 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center text-3xl">
                 ⚙️
               </div>
@@ -71,7 +71,7 @@ export default async function RootLayout({
               <p className="text-sm text-gray-500">
                 Если вам срочно нужна помощь, свяжитесь с нашей службой поддержки{" "}
                 <a href="tel:+77081234567" className="text-brand-600 hover:underline">
-                  +7 (708) 123-45-67
+                  +7 (706) 426-71-43
                 </a>
               </p>
             </div>

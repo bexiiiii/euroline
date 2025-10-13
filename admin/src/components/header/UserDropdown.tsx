@@ -1,6 +1,5 @@
 "use client";
 import Image from "next/image";
-import Link from "next/link";
 import React, { useState } from "react";
 import { Dropdown } from "../ui/dropdown/Dropdown";
 import { DropdownItem } from "../ui/dropdown/DropdownItem";
@@ -47,7 +46,7 @@ function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
         </span>
 
         <span className="block mr-1 font-medium text-theme-sm">
-          {loading ? "..." : (displayName || "User")}
+          {loading ? "..." : (displayName || "Пользователь")}
         </span>
 
         <svg
@@ -77,7 +76,7 @@ function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
       >
         <div>
           <span className="block font-medium text-gray-700 text-theme-sm dark:text-gray-400">
-            {loading ? "Loading..." : fullName}
+            {loading ? "Загрузка..." : fullName}
           </span>
           <span className="mt-0.5 block text-theme-xs text-gray-500 dark:text-gray-400">
             {loading ? "" : (user?.email ?? "")}
@@ -107,7 +106,7 @@ function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
                   fill=""
                 />
               </svg>
-              Edit profile
+              Профиль
             </DropdownItem>
           </li>
           <li>
@@ -132,7 +131,7 @@ function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
                   fill=""
                 />
               </svg>
-              Account settings
+              Настройки аккаунта
             </DropdownItem>
           </li>
           <li>
@@ -157,7 +156,7 @@ function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
                   fill=""
                 />
               </svg>
-              Support
+              Поддержка
             </DropdownItem>
           </li>
         </ul>
@@ -180,7 +179,7 @@ function toggleDropdown(e: React.MouseEvent<HTMLButtonElement, MouseEvent>) {
               fill=""
             />
           </svg>
-          Sign out
+          Выйти
         </button>
       </Dropdown>
     </div>
