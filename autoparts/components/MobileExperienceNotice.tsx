@@ -41,7 +41,7 @@ export function MobileExperienceNotice() {
         <DialogHeader className="space-y-2">
           <DialogTitle>Попробуйте мобильную версию</DialogTitle>
           <DialogDescription>
-            Мы заметили, что вы заходите с телефона. Для удобства пользуйтесь мобильным интерфейсом —
+            Мы заметили, что вы заходите с телефона. Для удобства пользуйтесь десктопным интерфейсом —
             все основные функции работают здесь полностью.
           </DialogDescription>
         </DialogHeader>
