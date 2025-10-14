@@ -28,4 +28,12 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     List<Product> findAllByIdWithProperties(@Param("ids") List<Long> ids);
 
     java.util.Optional<Product> findFirstByCodeIgnoreCase(String code);
+
+    // ✅ НОВЫЙ МЕТОД: Подсчет товаров по категориям (агрегирующий запрос)
+    @Query("SELECT c.name, COUNT(p) FROM Product p " +
+           "JOIN p.category c " +
+           "GROUP BY c.name " +
+           "ORDER BY COUNT(p) DESC")
+    List<Object[]> countProductsByCategory();
 }
+

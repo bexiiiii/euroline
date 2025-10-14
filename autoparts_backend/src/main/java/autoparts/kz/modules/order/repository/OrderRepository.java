@@ -78,4 +78,13 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
            where o.createdAt >= :start and o.createdAt < :end
            """)
     BigDecimal sumTotalBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+
+    // Оптимизированный метод для поиска заказов по статусам (вместо findAll())
+    @Query("SELECT o FROM Order o WHERE o.status IN :statuses ORDER BY o.createdAt ASC")
+    List<Order> findByStatusIn(@Param("statuses") Collection<OrderStatus> statuses);
+
+    // Еще более оптимизированная версия с пагинацией
+    @EntityGraph(attributePaths = {"items", "items.product", "user"})
+    @Query("SELECT o FROM Order o WHERE o.status IN :statuses ORDER BY o.createdAt ASC")
+    Page<Order> findByStatusInWithDetails(@Param("statuses") Collection<OrderStatus> statuses, Pageable pageable);
 }

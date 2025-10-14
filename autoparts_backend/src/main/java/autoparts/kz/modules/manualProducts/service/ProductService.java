@@ -11,7 +11,9 @@ import autoparts.kz.modules.order.orderStatus.OrderStatus;
 import autoparts.kz.modules.order.repository.OrderItemRepository;
 import autoparts.kz.modules.stockOneC.service.OneCService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -24,6 +26,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProductService {
 
     private final ProductRepository productRepository;
@@ -79,14 +82,33 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    @Deprecated // ⚠️ Не использовать! Загружает ВСЕ продукты в память. Используйте getAllPaginated()
     public List<ProductResponse> getAll() {
-        return productRepository.findAll().stream()
+        log.warn("getAll() вызван - это неоптимально! Рекомендуется использовать getAllPaginated()");
+        return productRepository.findAll(PageRequest.of(0, 1000)).stream() // Ограничиваем 1000 записями
                 .map(this::toResponse)
                 .map(p -> oneCService.enrichWithOneCData(p).orElse(p))
                 .toList();
     }
 
+    // ✅ ОПТИМИЗИРОВАННАЯ ВЕРСИЯ с пагинацией и кэшированием
     @Transactional(readOnly = true)
+    @org.springframework.cache.annotation.Cacheable(
+        cacheNames = "products", 
+        key = "'page_' + #page + '_' + #size",
+        unless = "#result == null || #result.isEmpty()"
+    )
+    public Page<ProductResponse> getAllPaginated(int page, int size) {
+        return productRepository.findAll(PageRequest.of(page, size))
+                .map(this::toResponse)
+                .map(p -> oneCService.enrichWithOneCData(p).orElse(p));
+    }
+
+    @Transactional(readOnly = true)
+    @org.springframework.cache.annotation.Cacheable(
+        cacheNames = "products", 
+        key = "'id_' + #id"
+    )
     public ProductResponse getById(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
@@ -95,6 +117,10 @@ public class ProductService {
     }
 
     @Transactional(readOnly = true)
+    @org.springframework.cache.annotation.Cacheable(
+        cacheNames = "products", 
+        key = "'code_' + #code"
+    )
     public ProductResponse getByCode(String code) {
         return productRepository.findFirstByCodeIgnoreCase(code)
                 .map(product -> {
@@ -104,6 +130,7 @@ public class ProductService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
     }
 
+    @org.springframework.cache.annotation.CacheEvict(cacheNames = "products", allEntries = true)
     public ProductResponse update(Long id, ProductRequest request) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));
@@ -128,6 +155,7 @@ public class ProductService {
         return toResponse(productRepository.save(product));
     }
 
+    @org.springframework.cache.annotation.CacheEvict(cacheNames = "products", allEntries = true)
     public void delete(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Product not found"));

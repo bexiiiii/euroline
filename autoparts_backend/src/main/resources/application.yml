@@ -25,13 +25,14 @@ spring:
     username: behruz
     password: 234Bex456
     hikari:
-      maximum-pool-size: 40
-      minimum-idle: 20
-      connection-timeout: 15000
+      maximum-pool-size: 60  # Увеличено с 40 до 60 для dev
+      minimum-idle: 25  # Увеличено с 20 до 25
+      connection-timeout: 10000  # Уменьшено с 15 до 10 сек
       idle-timeout: 300000
-      max-lifetime: 1200000
+      max-lifetime: 540000  # 9 минут (меньше чем PostgreSQL wait_timeout)
       leak-detection-threshold: 60000
       validation-timeout: 5000
+      keepalive-time: 300000  # 5 минут keepalive
   task:
     scheduling:
       enabled: true  # Включаем scheduled tasks
@@ -87,6 +88,16 @@ spring:
     port: ${RABBIT_PORT:5672}
     username: ${RABBIT_USER:cml}
     password: ${RABBIT_PASSWORD:cml}
+    connection-timeout: 30000
+    requested-heartbeat: 30  # Heartbeat каждые 30 секунд
+    listener:
+      simple:
+        retry:
+          enabled: true
+          initial-interval: 2000
+          max-attempts: 3
+          max-interval: 10000
+          multiplier: 2
 
 # Kafka topic shortcuts disabled; RabbitMQ is the only broker in use
 # kafka:

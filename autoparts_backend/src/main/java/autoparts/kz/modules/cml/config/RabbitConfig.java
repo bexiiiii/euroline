@@ -195,9 +195,14 @@ public class RabbitConfig {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter);
-        factory.setPrefetchCount(50);
-        factory.setConcurrentConsumers(4);
-        factory.setMaxConcurrentConsumers(10);
+        
+        // ✅ ОПТИМИЗИРОВАНО: Уменьшен prefetch для больших сообщений (XML каталоги)
+        factory.setPrefetchCount(10);  // Было 50, стало 10
+        
+        // ✅ ОПТИМИЗИРОВАНО: Увеличено количество consumers для обработки пиков
+        factory.setConcurrentConsumers(8);  // Было 4, стало 8
+        factory.setMaxConcurrentConsumers(20);  // Было 10, стало 20
+        
         factory.setAdviceChain(RetryInterceptorBuilder.stateless()
                 .maxAttempts(3)
                 .backOffPolicy(exponentialBackOff())

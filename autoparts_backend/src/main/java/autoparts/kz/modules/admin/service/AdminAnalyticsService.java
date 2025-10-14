@@ -211,8 +211,11 @@ public class AdminAnalyticsService {
         
         List<Map<String, Object>> monthlyData = new ArrayList<>();
         
-        // Получаем всех пользователей с их датой создания
-        List<User> users = userRepository.findAll();
+        // ✅ ОПТИМИЗИРОВАНО: Получаем пользователей только за нужный период
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
+        
+        List<User> users = userRepository.findByCreatedAtBetween(startDateTime, endDateTime);
         
         // Группируем пользователей по месяцам
         Map<String, Long> usersByMonth = users.stream()
@@ -359,30 +362,23 @@ public class AdminAnalyticsService {
     
     // Category Distribution Methods
     public List<Map<String, Object>> getCategoryDistribution() {
-        List<Product> allProducts = productRepository.findAll();
-        
-        // Группируем по категориям
-        Map<String, Long> categoryCount = allProducts.stream()
-            .filter(product -> product.getCategory() != null)
-            .collect(Collectors.groupingBy(
-                product -> product.getCategory().getName(),
-                Collectors.counting()
-            ));
-        
-        long total = allProducts.size();
+        // ✅ ОПТИМИЗИРОВАНО: Используем агрегирующий запрос на уровне БД
+        List<Object[]> categoryStats = productRepository.countProductsByCategory();
+        long total = productRepository.count();
         
         List<Map<String, Object>> result = new ArrayList<>();
-        for (Map.Entry<String, Long> entry : categoryCount.entrySet()) {
+        for (Object[] row : categoryStats) {
+            String categoryName = (String) row[0];
+            Long count = (Long) row[1];
+            
             Map<String, Object> categoryData = new HashMap<>();
-            categoryData.put("category", entry.getKey());
-            categoryData.put("count", entry.getValue());
-            categoryData.put("percentage", total > 0 ? (entry.getValue() * 100.0 / total) : 0.0);
+            categoryData.put("category", categoryName != null ? categoryName : "Без категории");
+            categoryData.put("count", count);
+            categoryData.put("percentage", total > 0 ? (count * 100.0 / total) : 0.0);
             result.add(categoryData);
         }
         
-        // Сортируем по количеству
-        result.sort((a, b) -> Long.compare((Long)b.get("count"), (Long)a.get("count")));
-        
+        // Уже отсортировано в запросе по убыванию количества
         return result;
     }
     

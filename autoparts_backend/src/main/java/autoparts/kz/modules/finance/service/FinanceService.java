@@ -302,46 +302,44 @@ public class FinanceService {
 
     // Stats
     public Map<String,Object> stats(){
-        var allBalances = balances.findAll();
-        BigDecimal totalBalance = allBalances.stream()
-                .map(ClientBalance::getBalance)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // ✅ ОПТИМИЗИРОВАНО: Используем агрегирующие запросы вместо загрузки всех записей
+        
+        // 1. Считаем общий баланс агрегирующим запросом
+        BigDecimal totalBalance = balances.sumAllBalances();
+        if (totalBalance == null) totalBalance = BigDecimal.ZERO;
 
         Instant monthStart = LocalDate.now(ZoneId.systemDefault())
                 .withDayOfMonth(1)
                 .atStartOfDay(ZoneId.systemDefault())
                 .toInstant();
 
-        var allTopUps = topups.findAll();
-        BigDecimal monthlyTopUps = allTopUps.stream()
-                .filter(t -> t.getCreatedAt() != null && !t.getCreatedAt().isBefore(monthStart))
-                .filter(t -> t.getStatus() == TopUp.Status.APPROVED)
-                .map(TopUp::getAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // 2. Считаем пополнения за месяц агрегирующим запросом
+        BigDecimal monthlyTopUps = topups.sumApprovedTopUpsAfterDate(monthStart);
+        if (monthlyTopUps == null) monthlyTopUps = BigDecimal.ZERO;
+        
+        // 3. Считаем ожидающие пополнения
+        long pendingTopUps = topups.countByStatus(TopUp.Status.PENDING);
 
-        long pendingTopUps = allTopUps.stream()
-                .filter(t -> t.getStatus() == TopUp.Status.PENDING)
-                .count();
+        // 4. Считаем возвраты за месяц агрегирующим запросом
+        List<RefundRequest.Status> completedStatuses = List.of(
+            RefundRequest.Status.DONE, 
+            RefundRequest.Status.APPROVED
+        );
+        BigDecimal monthlyRefunds = refunds.sumRefundsByStatusesAfterDate(completedStatuses, monthStart);
+        if (monthlyRefunds == null) monthlyRefunds = BigDecimal.ZERO;
 
-        var allRefunds = refunds.findAll();
-        BigDecimal monthlyRefunds = allRefunds.stream()
-                .filter(r -> r.getCreatedAt() != null && !r.getCreatedAt().isBefore(monthStart))
-                .filter(r -> r.getStatus() == RefundRequest.Status.DONE || r.getStatus() == RefundRequest.Status.APPROVED)
-                .map(RefundRequest::getAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // 5. Считаем ожидающие возвраты
+        long pendingRefunds = refunds.countByStatusIn(
+            List.of(RefundRequest.Status.NEW, RefundRequest.Status.IN_REVIEW)
+        );
 
-        long pendingRefunds = allRefunds.stream()
-                .filter(r -> r.getStatus() == RefundRequest.Status.NEW || r.getStatus() == RefundRequest.Status.IN_REVIEW)
-                .count();
+        // 6. Считаем выручку агрегирующим запросом
+        BigDecimal revenue = txns.sumAmountByType("CHARGE");
+        if (revenue == null) revenue = BigDecimal.ZERO;
 
-        BigDecimal revenue = txns.findAll().stream()
-                .filter(t->"CHARGE".equals(t.getType()))
-                .map(FinanceTxn::getAmount)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // 7. Общее количество операций
+        long totalTopUps = topups.count();
+        long totalRefunds = refunds.count();
 
         Map<String,Object> response = new HashMap<>();
         response.put("totalBalance", totalBalance);
@@ -349,8 +347,8 @@ public class FinanceService {
         response.put("monthlyRefunds", monthlyRefunds);
         response.put("pendingOperations", pendingTopUps + pendingRefunds);
         response.put("revenue", revenue);
-        response.put("topUps", allTopUps.size());
-        response.put("refunds", allRefunds.size());
+        response.put("topUps", totalTopUps);
+        response.put("refunds", totalRefunds);
         return response;
     }
 

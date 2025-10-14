@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -31,4 +32,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("select u.id from User u")
     List<Long> findAllIds();
+
+    // ✅ НОВЫЙ МЕТОД: Получить пользователей за период времени
+    List<User> findByCreatedAtBetween(LocalDateTime startDate, LocalDateTime endDate);
 }
+
