@@ -27,6 +27,29 @@ export interface SearchItem {
   ssd?: string;
   categoryId?: number;
   vehicleHints?: string[];
+  
+  // UMAPI enrichment fields
+  umapiSuppliers?: UmapiSupplier[];      // список брендов из UMAPI
+  analogsCount?: number;                  // количество доступных аналогов
+  oeNumbers?: string[];                   // OE коды
+  tradeNumbers?: string[];                // торговые номера
+  eanNumbers?: string[];                  // EAN штрихкоды
+  criteria?: TechnicalCriteria[];         // технические характеристики
+  umapiImages?: string[];                 // изображения из UMAPI
+}
+
+export interface UmapiSupplier {
+  id: number;
+  name: string;
+  matchType: string;        // EXACT, OE, SIMILAR
+  articleCount: number;
+}
+
+export interface TechnicalCriteria {
+  id: number;
+  name: string;
+  value: string;
+  unit?: string;
 }
 
 export interface SearchWarehouse {
@@ -117,6 +140,18 @@ export const searchApi = {
     const params = new URLSearchParams({ catalog, ssd, oem });
     return apiRequest<OemApplicabilityResponse>(`/v1/search/oem/applicability?${params.toString()}`);
   },
+  
+  // UMAPI: поиск по артикулу (уточнение бренда)
+  async searchByArticle(article: string): Promise<BrandRefinementResponse> {
+    const params = new URLSearchParams({ article });
+    return apiRequest<BrandRefinementResponse>(`/parts-search/by-article?${params.toString()}`);
+  },
+  
+  // UMAPI: получить аналоги
+  async getAnalogs(article: string, brand: string): Promise<AnalogsResponse> {
+    const params = new URLSearchParams({ article, brand });
+    return apiRequest<AnalogsResponse>(`/parts-search/analogs?${params.toString()}`);
+  },
 };
 
 export { SearchApiError };
@@ -156,4 +191,27 @@ export interface OemApplicabilityCategory {
 export interface OemApplicabilityResponse {
   categories: OemApplicabilityCategory[];
 }
+
+// ===== UMAPI Types =====
+export interface BrandRefinementResponse {
+  articleNumber: string;
+  suppliers: UmapiSupplier[];
+}
+
+export interface AnalogsResponse {
+  originalArticle: string;
+  originalSupplier: string;
+  analogs: AnalogItem[];
+}
+
+export interface AnalogItem {
+  articleNumber: string;
+  supplierId: number;
+  supplierName: string;
+  name?: string;
+  matchType: string;      // OE, OEM, SIMILAR
+  quality?: string;       // OEM, Aftermarket
+  available?: boolean;
+}
+
 import { API_BASE } from './base';

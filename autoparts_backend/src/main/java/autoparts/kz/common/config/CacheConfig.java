@@ -43,6 +43,16 @@ public class CacheConfig {
     public static final String QUICK_GROUPS_CACHE = "quickGroups";
     public static final String QUICK_DETAILS_CACHE = "quickDetails";
     public static final String AVAILABILITY_CACHE = "availability";
+    
+    // UMAPI Integration Caches
+    public static final String UMAPI_MANUFACTURERS_CACHE = "umapi-manufacturers";
+    public static final String UMAPI_MODELS_CACHE = "umapi-models";
+    public static final String UMAPI_MODIFICATIONS_CACHE = "umapi-modifications";
+    public static final String UMAPI_CATEGORIES_CACHE = "umapi-categories";
+    public static final String UMAPI_PRODUCTS_CACHE = "umapi-products";
+    public static final String UMAPI_ARTICLES_CACHE = "umapi-articles";
+    public static final String UMAPI_BRAND_SEARCH_CACHE = "umapi-brand-search";
+    public static final String UMAPI_ANALOGS_CACHE = "umapi-analogs";
 
     @Bean
     public RedisCacheManager redisCacheManager(RedisConnectionFactory cf) {
@@ -144,6 +154,40 @@ public class CacheConfig {
         // Наличие товаров — кешируем на 5 минут
         cacheConfigurations.put(AVAILABILITY_CACHE,
             defaultConfig.entryTtl(Duration.ofMinutes(5)));
+
+        // ========== UMAPI Integration Caches ==========
+        
+        // Производители автомобилей — кешируем на 24 часа (почти статичные данные)
+        cacheConfigurations.put(UMAPI_MANUFACTURERS_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(24)));
+        
+        // Модели автомобилей — кешируем на 24 часа
+        cacheConfigurations.put(UMAPI_MODELS_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(24)));
+        
+        // Модификации автомобилей — кешируем на 24 часа
+        cacheConfigurations.put(UMAPI_MODIFICATIONS_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(24)));
+        
+        // Категории запчастей — кешируем на 6 часов
+        cacheConfigurations.put(UMAPI_CATEGORIES_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(6)));
+        
+        // Продуктовые группы — кешируем на 1 час
+        cacheConfigurations.put(UMAPI_PRODUCTS_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(1)));
+        
+        // Артикулы — кешируем на 1 час
+        cacheConfigurations.put(UMAPI_ARTICLES_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(1)));
+        
+        // Поиск по артикулу (brand refinement) — кешируем на 6 часов
+        cacheConfigurations.put(UMAPI_BRAND_SEARCH_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(6)));
+        
+        // Аналоги запчастей — кешируем на 6 часов
+        cacheConfigurations.put(UMAPI_ANALOGS_CACHE,
+            defaultConfig.entryTtl(Duration.ofHours(6)));
 
         return RedisCacheManager.builder(cf)
                 .cacheDefaults(defaultConfig)

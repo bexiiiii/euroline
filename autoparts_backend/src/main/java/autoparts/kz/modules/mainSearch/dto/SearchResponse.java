@@ -43,6 +43,31 @@ public class SearchResponse {
         private Long categoryId;
 
         private List<String> vehicleHints;
+        
+        // UMAPI enrichment fields
+        private List<UmapiSupplier> umapiSuppliers;  // список брендов из UMAPI
+        private Integer analogsCount;                // количество доступных аналогов
+        private List<String> oeNumbers;              // OE коды
+        private List<String> tradeNumbers;           // торговые номера
+        private List<String> eanNumbers;             // EAN штрихкоды
+        private List<TechnicalCriteria> criteria;    // технические характеристики
+        private List<String> umapiImages;            // изображения из UMAPI
+    }
+    
+    @Data
+    public static class UmapiSupplier {
+        private Long id;
+        private String name;
+        private String matchType;    // EXACT, OE, SIMILAR
+        private Integer articleCount;
+    }
+    
+    @Data
+    public static class TechnicalCriteria {
+        private Long id;
+        private String name;
+        private String value;
+        private String unit;
     }
 
     @Data

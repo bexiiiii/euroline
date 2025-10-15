@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ShoppingCart, Package, MapPin, Info } from 'lucide-react';
-import { SearchItem, SearchWarehouse, SearchVehicle } from '@/lib/api/search';
+import { ShoppingCart, Package, MapPin, Info, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { SearchItem, SearchWarehouse, SearchVehicle, type AnalogItem } from '@/lib/api/search';
 import { useSearchStore } from '@/lib/stores/searchStore';
 import { useCartStore } from '@/lib/stores/cartStore';
 import { toast } from 'sonner';
+import { searchApi } from '@/lib/api/search';
 
 interface SearchResultsTableProps {
   className?: string;
@@ -158,9 +159,34 @@ interface SearchResultRowProps {
 
 function SearchResultRow({ item }: SearchResultRowProps) {
   const [showWarehouses, setShowWarehouses] = useState(false);
+  const [showAnalogs, setShowAnalogs] = useState(false);
+  const [analogs, setAnalogs] = useState<AnalogItem[]>([]);
+  const [loadingAnalogs, setLoadingAnalogs] = useState(false);
   const { addByOem } = useCartStore();
 
   const hasStock = item.quantity && item.quantity > 0;
+  
+  const handleToggleAnalogs = async () => {
+    if (!showAnalogs && analogs.length === 0 && item.umapiSuppliers && item.umapiSuppliers.length > 0) {
+      // Загружаем аналоги при первом открытии
+      setLoadingAnalogs(true);
+      try {
+        const exactMatch = item.umapiSuppliers.find(s => s.matchType === 'EXACT');
+        const brand = exactMatch?.name || item.umapiSuppliers[0]?.name;
+        
+        if (brand) {
+          const response = await searchApi.getAnalogs(item.oem, brand);
+          setAnalogs(response.analogs || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch analogs:', error);
+        toast.error('Не удалось загрузить аналоги');
+      } finally {
+        setLoadingAnalogs(false);
+      }
+    }
+    setShowAnalogs(!showAnalogs);
+  };
   
   return (
     <>
@@ -192,12 +218,35 @@ function SearchResultRow({ item }: SearchResultRowProps) {
 
         {/* Артикул / Бренд */}
         <td className="px-6 py-4">
-          <div>
+          <div className="space-y-2">
             <div className="text-sm font-mono font-medium text-gray-900">
               {item.oem}
             </div>
-            <div className="text-sm text-gray-600 mt-1">
+            <div className="text-sm text-gray-600">
               {item.brand}
+            </div>
+            
+            {/* UMAPI бейджи */}
+            <div className="flex flex-wrap gap-1 mt-2">
+              {item.analogsCount && item.analogsCount > 0 && (
+                <button
+                  onClick={handleToggleAnalogs}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition cursor-pointer"
+                >
+                  🔄 {item.analogsCount} аналогов
+                  {showAnalogs ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+              )}
+              {item.oeNumbers && item.oeNumbers.length > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded" title={`OE коды: ${item.oeNumbers.join(', ')}`}>
+                  ✓ {item.oeNumbers.length} OE кода
+                </span>
+              )}
+              {item.umapiSuppliers && item.umapiSuppliers.length > 1 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded" title={`Бренды: ${item.umapiSuppliers.map(s => s.name).join(', ')}`}>
+                  🏷️ {item.umapiSuppliers.length} брендов
+                </span>
+              )}
             </div>
           </div>
         </td>
@@ -278,8 +327,121 @@ function SearchResultRow({ item }: SearchResultRowProps) {
           </td>
         </tr>
       )}
+      
+      {/* Таблица аналогов и заменителей */}
+      {showAnalogs && (
+        <tr>
+          <td colSpan={5} className="px-0 py-0">
+            <div className="bg-blue-50 border-t-2 border-blue-200">
+              <div className="px-6 py-3 bg-blue-100 border-b border-blue-200">
+                <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider">
+                  🔄 Аналоги и заменители
+                </h4>
+              </div>
+              
+              {loadingAnalogs ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+                  <span className="ml-3 text-sm text-gray-600">Загрузка аналогов...</span>
+                </div>
+              ) : analogs.length === 0 ? (
+                <div className="px-6 py-8 text-center text-sm text-gray-600">
+                  Аналоги не найдены
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-blue-50">
+                      <tr>
+                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Производитель</th>
+                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Артикул</th>
+                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Наименование</th>
+                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Тип</th>
+                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Качество</th>
+                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Действия</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {analogs.map((analog, idx) => (
+                        <tr key={`${analog.articleNumber}-${idx}`} className="hover:bg-gray-50">
+                          <td className="px-6 py-3 text-sm font-medium text-gray-900">
+                            {analog.supplierName}
+                          </td>
+                          <td className="px-6 py-3 text-sm font-mono text-gray-900">
+                            {analog.articleNumber}
+                          </td>
+                          <td className="px-6 py-3 text-sm text-gray-700">
+                            {analog.name || '-'}
+                          </td>
+                          <td className="px-6 py-3">
+                            {getAnalogMatchTypeBadge(analog.matchType)}
+                          </td>
+                          <td className="px-6 py-3">
+                            {getAnalogQualityBadge(analog.quality)}
+                          </td>
+                          <td className="px-6 py-3">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await addByOem(
+                                    analog.articleNumber,
+                                    analog.name || analog.articleNumber,
+                                    analog.supplierName,
+                                    1,
+                                    undefined,
+                                    undefined
+                                  );
+                                  toast.success('Аналог добавлен в корзину');
+                                } catch (error) {
+                                  console.error('Failed to add analog to cart:', error);
+                                  toast.error('Не удалось добавить в корзину');
+                                }
+                              }}
+                              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600"
+                            >
+                              <ShoppingCart className="w-3 h-3" />
+                              В корзину
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
     </>
   );
+}
+
+// Вспомогательные функции для бейджей аналогов
+function getAnalogMatchTypeBadge(matchType: string) {
+  switch (matchType?.toUpperCase()) {
+    case 'OE':
+      return <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded">OE оригинал</span>;
+    case 'OEM':
+      return <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">OEM</span>;
+    case 'SIMILAR':
+      return <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded">Аналог</span>;
+    default:
+      return <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded">{matchType || '-'}</span>;
+  }
+}
+
+function getAnalogQualityBadge(quality?: string) {
+  if (!quality) return <span className="text-xs text-gray-400">-</span>;
+  
+  switch (quality?.toUpperCase()) {
+    case 'OEM':
+      return <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded">OEM</span>;
+    case 'AFTERMARKET':
+      return <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded">Aftermarket</span>;
+    default:
+      return <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded">{quality}</span>;
+  }
 }
 
 interface MobileSearchResultCardProps {
@@ -289,7 +451,31 @@ interface MobileSearchResultCardProps {
 function MobileSearchResultCard({ item }: MobileSearchResultCardProps) {
   const { addByOem } = useCartStore();
   const [showWarehouses, setShowWarehouses] = useState(false);
+  const [showAnalogs, setShowAnalogs] = useState(false);
+  const [analogs, setAnalogs] = useState<AnalogItem[]>([]);
+  const [loadingAnalogs, setLoadingAnalogs] = useState(false);
   const hasStock = item.quantity && item.quantity > 0;
+  
+  const handleToggleAnalogs = async () => {
+    if (!showAnalogs && analogs.length === 0 && item.umapiSuppliers && item.umapiSuppliers.length > 0) {
+      setLoadingAnalogs(true);
+      try {
+        const exactMatch = item.umapiSuppliers.find(s => s.matchType === 'EXACT');
+        const brand = exactMatch?.name || item.umapiSuppliers[0]?.name;
+        
+        if (brand) {
+          const response = await searchApi.getAnalogs(item.oem, brand);
+          setAnalogs(response.analogs || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch analogs:', error);
+        toast.error('Не удалось загрузить аналоги');
+      } finally {
+        setLoadingAnalogs(false);
+      }
+    }
+    setShowAnalogs(!showAnalogs);
+  };
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
@@ -311,6 +497,29 @@ function MobileSearchResultCard({ item }: MobileSearchResultCardProps) {
           <div className="text-xs text-gray-600 space-y-1">
             <div className="font-mono text-sm text-gray-900">{item.oem}</div>
             {item.brand && <div>Бренд: {item.brand}</div>}
+            
+            {/* UMAPI бейджи для мобильной версии */}
+            <div className="flex flex-wrap gap-1 mt-2">
+              {item.analogsCount && item.analogsCount > 0 && (
+                <button
+                  onClick={handleToggleAnalogs}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition cursor-pointer"
+                >
+                  🔄 {item.analogsCount} аналогов
+                  {showAnalogs ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                </button>
+              )}
+              {item.oeNumbers && item.oeNumbers.length > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded">
+                  ✓ {item.oeNumbers.length} OE
+                </span>
+              )}
+              {item.umapiSuppliers && item.umapiSuppliers.length > 1 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded">
+                  🏷️ {item.umapiSuppliers.length} брендов
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -363,6 +572,69 @@ function MobileSearchResultCard({ item }: MobileSearchResultCardProps) {
               <WarehouseItem key={`${warehouse.code}-${idx}`} warehouse={warehouse} />
             ))}
           </div>
+        </div>
+      )}
+      
+      {/* Мобильная таблица аналогов */}
+      {showAnalogs && (
+        <div className="rounded-lg border-2 border-blue-200 bg-blue-50 overflow-hidden">
+          <div className="px-4 py-2 bg-blue-100 border-b border-blue-200">
+            <h5 className="text-xs font-bold text-blue-900 uppercase tracking-wider">
+              🔄 Аналоги и заменители
+            </h5>
+          </div>
+          
+          {loadingAnalogs ? (
+            <div className="flex items-center justify-center py-6">
+              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+              <span className="ml-2 text-xs text-gray-600">Загрузка...</span>
+            </div>
+          ) : analogs.length === 0 ? (
+            <div className="px-4 py-6 text-center text-xs text-gray-600">
+              Аналоги не найдены
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200">
+              {analogs.map((analog, idx) => (
+                <div key={`${analog.articleNumber}-${idx}`} className="p-3 bg-white">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm text-gray-900">{analog.supplierName}</div>
+                      <div className="font-mono text-xs text-gray-600 mt-0.5">{analog.articleNumber}</div>
+                      {analog.name && (
+                        <div className="text-xs text-gray-500 mt-1">{analog.name}</div>
+                      )}
+                    </div>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await addByOem(
+                            analog.articleNumber,
+                            analog.name || analog.articleNumber,
+                            analog.supplierName,
+                            1,
+                            undefined,
+                            undefined
+                          );
+                          toast.success('Аналог добавлен в корзину');
+                        } catch (error) {
+                          console.error('Failed to add analog:', error);
+                          toast.error('Ошибка добавления');
+                        }
+                      }}
+                      className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600"
+                    >
+                      <ShoppingCart className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {getAnalogMatchTypeBadge(analog.matchType)}
+                    {getAnalogQualityBadge(analog.quality)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

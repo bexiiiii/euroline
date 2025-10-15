@@ -7,19 +7,27 @@ import autoparts.kz.modules.vinLaximo.dto.VehicleDto;
 import autoparts.kz.modules.vinLaximo.service.CatService;
 import autoparts.kz.modules.vinLaximo.dto.OemPartReferenceDto;
 import autoparts.kz.modules.stockOneC.client.OneCClient;
+import autoparts.kz.integration.umapi.service.UmapiIntegrationService;
+import autoparts.kz.integration.umapi.dto.BrandRefinementDto;
+import autoparts.kz.integration.umapi.dto.AnalogDto;
+import autoparts.kz.common.util.ArticleNormalizationUtil;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MainSearchService {
 
     private final CatService cat;
     private final OneCClient oneC;
+    private final UmapiIntegrationService umapiService;
 
     // VIN - точно 17 символов, без букв I, O, Q (расширенный паттерн)
     private static final Pattern VIN = Pattern.compile("^[A-HJ-NPR-Z0-9]{17}$", Pattern.CASE_INSENSITIVE);
@@ -124,6 +132,14 @@ public class MainSearchService {
 
         StockBulkResponse stock = getStock(oems);
 
+        // Для OEM поиска: обогащаем данными из UMAPI
+        Map<String, UmapiEnrichmentData> umapiDataMap = new HashMap<>();
+        if (looksLikeOem && !oems.isEmpty()) {
+            umapiDataMap = enrichWithUmapiData(oems);
+        }
+
+        final Map<String, UmapiEnrichmentData> finalUmapiDataMap = umapiDataMap;
+        
         var items = found.stream().map(d -> {
             var it = new SearchResponse.Item();
             it.setOem(d.getOem());
@@ -141,6 +157,19 @@ public class MainSearchService {
             }
 
             it.setVehicleHints(Collections.emptyList());
+            
+            // Обогащение UMAPI данными
+            UmapiEnrichmentData umapiData = finalUmapiDataMap.get(ArticleNormalizationUtil.normalize(d.getOem()));
+            if (umapiData != null) {
+                it.setUmapiSuppliers(umapiData.suppliers);
+                it.setAnalogsCount(umapiData.analogsCount);
+                it.setOeNumbers(umapiData.oeNumbers);
+                it.setTradeNumbers(umapiData.tradeNumbers);
+                it.setEanNumbers(umapiData.eanNumbers);
+                it.setCriteria(umapiData.criteria);
+                it.setUmapiImages(umapiData.images);
+            }
+            
             return it;
         }).toList();
 
@@ -234,5 +263,82 @@ public class MainSearchService {
             // Если запрос остатков не удался, возвращаем пустой ответ
             return new StockBulkResponse();
         }
+    }
+    
+    /**
+     * Обогащает данные информацией из UMAPI (бренды, аналоги, OE коды, характеристики)
+     */
+    private Map<String, UmapiEnrichmentData> enrichWithUmapiData(List<String> oems) {
+        Map<String, UmapiEnrichmentData> result = new HashMap<>();
+        
+        // Ограничиваем количество запросов к UMAPI
+        List<String> limitedOems = oems.stream().limit(50).toList();
+        
+        for (String oem : limitedOems) {
+            try {
+                String normalized = ArticleNormalizationUtil.normalize(oem);
+                
+                // 1. Получаем информацию о брендах (brand refinement)
+                BrandRefinementDto brandData = umapiService.searchByArticle(oem);
+                
+                if (brandData != null && brandData.getSuppliers() != null && !brandData.getSuppliers().isEmpty()) {
+                    UmapiEnrichmentData enrichment = new UmapiEnrichmentData();
+                    
+                    // Конвертируем suppliers
+                    enrichment.suppliers = brandData.getSuppliers().stream()
+                            .map(s -> {
+                                var supplier = new SearchResponse.UmapiSupplier();
+                                supplier.setId(s.getId());
+                                supplier.setName(s.getName());
+                                supplier.setMatchType(s.getMatchType());
+                                supplier.setArticleCount(s.getArticleCount());
+                                return supplier;
+                            })
+                            .collect(Collectors.toList());
+                    
+                    // 2. Пробуем получить аналоги (берём первый бренд)
+                    if (!brandData.getSuppliers().isEmpty()) {
+                        String mainBrand = brandData.getSuppliers().get(0).getName();
+                        try {
+                            AnalogDto analogData = umapiService.getAnalogs(oem, mainBrand);
+                            
+                            if (analogData != null && analogData.getAnalogs() != null) {
+                                enrichment.analogsCount = analogData.getAnalogs().size();
+                                
+                                // Собираем OE номера из аналогов
+                                Set<String> oeSet = new HashSet<>();
+                                for (var analog : analogData.getAnalogs()) {
+                                    if ("OE".equalsIgnoreCase(analog.getMatchType())) {
+                                        oeSet.add(analog.getArticleNumber());
+                                    }
+                                }
+                                enrichment.oeNumbers = new ArrayList<>(oeSet);
+                            }
+                        } catch (Exception e) {
+                            log.debug("Failed to fetch analogs for article {}: {}", oem, e.getMessage());
+                        }
+                    }
+                    
+                    result.put(normalized, enrichment);
+                }
+            } catch (Exception e) {
+                log.debug("Failed to enrich UMAPI data for article {}: {}", oem, e.getMessage());
+            }
+        }
+        
+        return result;
+    }
+    
+    /**
+     * Вспомогательный класс для хранения данных UMAPI
+     */
+    private static class UmapiEnrichmentData {
+        List<SearchResponse.UmapiSupplier> suppliers = new ArrayList<>();
+        Integer analogsCount = 0;
+        List<String> oeNumbers = new ArrayList<>();
+        List<String> tradeNumbers = new ArrayList<>();
+        List<String> eanNumbers = new ArrayList<>();
+        List<SearchResponse.TechnicalCriteria> criteria = new ArrayList<>();
+        List<String> images = new ArrayList<>();
     }
 }
