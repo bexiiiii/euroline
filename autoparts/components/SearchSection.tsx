@@ -12,32 +12,40 @@ const SearchSection = () => {
   const { setSession } = useVehicle();
   const router = useRouter();
   
-  // Ref for search timeout
+  // Ref for debounced search
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Debounced search effect - triggers search when user stops typing (both adding and deleting)
+  // Professional debounced search - triggers only after user stops typing
   useEffect(() => {
     // Clear any existing timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
     
-    // If query is empty, do nothing on the main page
-    if (query.trim().length === 0) {
+    const trimmed = query.trim();
+    
+    // Don't search if empty
+    if (trimmed.length === 0) {
       return;
     }
     
-    // Don't trigger search for queries that are too short
-    if (query.trim().length < 3) {
+    // Don't search if too short (minimum 2 characters)
+    if (trimmed.length < 2) {
       return;
     }
     
-    // Set new timeout to perform search
+    // Set timeout for debounced search (800ms for main page)
     searchTimeoutRef.current = setTimeout(() => {
-      performSearch(query.trim());
-    }, 1000); // Wait 1 second after user stops typing (adding or deleting)
+      performSearch(trimmed);
+    }, 800);
     
-  }, [query]); // Trigger this effect whenever query changes
+    // Cleanup on unmount or when query changes
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [query]); // Only depend on query
 
   const performSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -73,7 +81,7 @@ const SearchSection = () => {
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Clear any pending search timeout when user explicitly triggers search
+    // Cancel debounced search and perform immediate search
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
       searchTimeoutRef.current = null;
@@ -90,7 +98,7 @@ const SearchSection = () => {
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      // Clear any pending search timeout when user explicitly triggers search
+      // Cancel debounced search and perform immediate search on Enter
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
         searchTimeoutRef.current = null;
@@ -99,15 +107,6 @@ const SearchSection = () => {
       handleSearch(e as any);
     }
   };
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
 
   return (
     <section className="pt-32 pb-8 bg-gray-100">

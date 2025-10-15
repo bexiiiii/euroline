@@ -35,7 +35,7 @@ function ActionSearchBar() {
     const [selectedItem, setSelectedItem] = useState<SearchHistoryItem | null>(null);
     const [searchHistory, setSearchHistory] = useState<SearchHistoryItem[]>([]);
     
-    // Ref for search timeout
+    // Ref for debounced search
     const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Debounced query for search history
@@ -91,29 +91,37 @@ function ActionSearchBar() {
         localStorage.setItem("search-history", JSON.stringify(searchHistory));
     }, [searchHistory]);
 
-    // Debounced search effect - triggers search when user stops typing (both adding and deleting)
+    // Professional debounced search - triggers only after user stops typing
     useEffect(() => {
+        // Clear any existing timeout
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
         }
 
         const trimmed = query.trim();
-
+        
+        // Don't search if empty
         if (trimmed.length === 0) {
-            clearResults();
             return;
         }
 
-        if (trimmed.length < 3) {
-            clearResults();
+        // Don't search if too short (minimum 2 characters)
+        if (trimmed.length < 2) {
             return;
         }
 
+        // Set timeout for debounced search (600ms is professional standard)
         searchTimeoutRef.current = setTimeout(() => {
             void performSearch(trimmed);
-        }, 450);
-        
-    }, [query, clearResults]); // Trigger this effect whenever query changes
+        }, 600);
+
+        // Cleanup on unmount or when query changes
+        return () => {
+            if (searchTimeoutRef.current) {
+                clearTimeout(searchTimeoutRef.current);
+            }
+        };
+    }, [query]); // Only depend on query
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
@@ -169,7 +177,7 @@ function ActionSearchBar() {
         setQuery('');
         clearResults();
         
-        // Clear any pending search timeout
+        // Cancel pending search
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
             searchTimeoutRef.current = null;
@@ -183,7 +191,7 @@ function ActionSearchBar() {
         setQuery(item.query);
         setSelectedItem(item);
         
-        // Clear any pending search timeout
+        // Cancel pending debounced search and perform immediate search
         if (searchTimeoutRef.current) {
             clearTimeout(searchTimeoutRef.current);
             searchTimeoutRef.current = null;
@@ -241,7 +249,7 @@ function ActionSearchBar() {
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
         if (e.key === "Enter" && query.trim()) {
-            // Clear any pending search timeout when user explicitly triggers search
+            // Cancel debounced search and perform immediate search on Enter
             if (searchTimeoutRef.current) {
                 clearTimeout(searchTimeoutRef.current);
                 searchTimeoutRef.current = null;
@@ -250,15 +258,6 @@ function ActionSearchBar() {
             void performSearch(query);
         }
     };
-
-    // Cleanup timeout on unmount
-    useEffect(() => {
-        return () => {
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-            }
-        };
-    }, []);
 
     return (
         <div className="w-full max-w-2xl mx-auto">
@@ -313,7 +312,7 @@ function ActionSearchBar() {
                                             exit={{ y: 20, opacity: 0 }}
                                             transition={{ duration: 0.2 }}
                                             onClick={() => {
-                                                // Clear any pending search timeout when user explicitly triggers search
+                                                // Cancel debounced search and perform immediate search on button click
                                                 if (searchTimeoutRef.current) {
                                                     clearTimeout(searchTimeoutRef.current);
                                                     searchTimeoutRef.current = null;

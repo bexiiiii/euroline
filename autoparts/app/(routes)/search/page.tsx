@@ -22,6 +22,11 @@ function SearchPage() {
   const [analogs, setAnalogs] = useState<AnalogItem[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(false);
   const [loadingAnalogs, setLoadingAnalogs] = useState(false);
+  const [showAllBrands, setShowAllBrands] = useState(false);
+  const [showAllAnalogs, setShowAllAnalogs] = useState(false);
+  const [brandFilter, setBrandFilter] = useState<string>('');
+  const [analogFilter, setAnalogFilter] = useState<string>('');
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   
   const searchParams = useSearchParams();
   const { 
@@ -56,7 +61,8 @@ function SearchPage() {
       setBrandItems([]);
       setAnalogs([]);
     }
-  }, [searchParams, search, query, clearResults]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]); // Only depend on searchParams to avoid duplicate searches
 
   // Загружаем данные из UMAPI, если detectedType === 'OEM'
   useEffect(() => {
@@ -105,6 +111,18 @@ function SearchPage() {
       return true;
     })
     .map(convertSearchItemToAutoPart);
+
+  // Фильтрация и пагинация для BrandRefinement
+  const filteredBrandItems = brandItems.filter(item => 
+    !brandFilter || item.brand.toLowerCase().includes(brandFilter.toLowerCase())
+  );
+  const displayedBrandItems = showAllBrands ? filteredBrandItems : filteredBrandItems.slice(0, 5);
+  
+  // Фильтрация и пагинация для Analogs
+  const filteredAnalogs = analogs.filter(analog => 
+    !analogFilter || analog.brand.toLowerCase().includes(analogFilter.toLowerCase())
+  );
+  const displayedAnalogs = showAllAnalogs ? filteredAnalogs : filteredAnalogs.slice(0, 5);
 
   // OEM flow helpers
   const isOem = detectedType === 'OEM';
@@ -236,28 +254,6 @@ function SearchPage() {
 
             {/* Правая колонка – результаты поиска */}
             <section className="w-full lg:w-3/4">
-              {/* OEM step 1: выбрать каталог */}
-              {isOem && !selectedCatalog && (
-                <div className="rounded-lg border p-4 md:p-6 mb-4">
-                  <h3 className="text-lg font-semibold mb-3">Выберите производителя/каталог</h3>
-                  <p className="text-sm text-gray-600 mb-4">Для OEM «{query}» найдены варианты. Выберите бренд и каталог.</p>
-                  <div className="flex flex-wrap gap-2">
-                    {uniqueCatalogs.map((pair) => (
-                      <button
-                        key={`${pair.brand}|${pair.catalog}`}
-                        onClick={() => handlePickCatalog(pair)}
-                        className="px-3 py-2 text-sm rounded border hover:bg-gray-50"
-                        title={pair.catalog}
-                      >
-                        <span className="font-medium">{pair.brand}</span>
-                        <span className="mx-2 text-gray-400">•</span>
-                        <span className="text-gray-700">{pair.catalog}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* OEM step 2: применимые автомобили */}
               {isOem && selectedCatalog && applicableVehicles.length > 0 && parts.length === 0 && (
                 <div className="rounded-lg border overflow-hidden mb-4">
@@ -312,10 +308,19 @@ function SearchPage() {
               {brandItems && brandItems.length > 0 && (
                 <div className="rounded-lg border overflow-hidden mt-6">
                   <div className="px-6 py-4 bg-gray-50 border-b">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Найденные запчасти ({brandItems.length})
-                    </h3>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Найденные запчасти ({filteredBrandItems.length})
+                      </h3>
+                      <input
+                        type="text"
+                        placeholder="Фильтр по бренду"
+                        value={brandFilter}
+                        onChange={(e) => setBrandFilter(e.target.value)}
+                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      />
+                    </div>
+                    <p className="text-sm text-gray-600">
                       Артикул: <span className="font-mono font-medium">{query}</span>
                     </p>
                   </div>
@@ -323,72 +328,111 @@ function SearchPage() {
                     <table className="w-full">
                       <thead className="bg-gray-100">
                         <tr>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Фото</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Бренд</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Артикул</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Наименование</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Цена</th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Кол-во</th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Действия</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 uppercase">Фото</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Бренд</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Артикул</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Наименование</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Остатки</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Цена</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 uppercase">Кол-во</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 uppercase">Действия</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {brandItems.map((item, idx) => (
-                          <tr key={`${item.article}-${item.brand}-${idx}`} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 text-center">
-                              {item.img ? (
-                                <img 
-                                  src={`https://api.umapi.ru${item.img}`}
-                                  alt={item.title}
-                                  className="w-16 h-16 object-cover rounded mx-auto"
+                        {displayedBrandItems.map((item, idx) => {
+                          const stock = Math.floor(Math.random() * 15); // Временно рандомные остатки
+                          const itemKey = `brand-${item.article}-${item.brand}-${idx}`;
+                          const quantity = quantities[itemKey] || 1;
+                          
+                          return (
+                            <tr key={itemKey} className="hover:bg-gray-50">
+                              <td className="px-4 py-2 text-center">
+                                {item.img ? (
+                                  <img 
+                                    src={`https://api.umapi.ru${item.img}`}
+                                    alt={item.title}
+                                    className="w-12 h-12 object-cover rounded mx-auto"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 bg-gray-100 rounded mx-auto flex items-center justify-center">
+                                    <span className="text-gray-400 text-xs">Нет фото</span>
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">
+                                {item.brand}
+                              </td>
+                              <td className="px-4 py-2 text-sm font-mono text-gray-900">
+                                {item.article}
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-700">
+                                {item.title}
+                              </td>
+                              <td className="px-4 py-2 text-sm">
+                                <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
+                                  stock > 5 ? 'bg-green-100 text-green-700' : 
+                                  stock > 0 ? 'bg-yellow-100 text-yellow-700' : 
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {stock > 0 ? `${stock} шт` : 'Нет в наличии'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2 text-sm text-gray-500">
+                                По запросу
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                <input 
+                                  type="number" 
+                                  min="1"
+                                  max={stock}
+                                  value={quantity}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value) || 1;
+                                    setQuantities(prev => ({
+                                      ...prev,
+                                      [itemKey]: Math.min(Math.max(1, val), stock)
+                                    }));
+                                  }}
+                                  disabled={stock === 0}
+                                  className="w-14 px-2 py-0.5 text-center text-sm border border-gray-300 rounded disabled:bg-gray-100 disabled:text-gray-400"
                                 />
-                              ) : (
-                                <div className="w-16 h-16 bg-gray-100 rounded mx-auto flex items-center justify-center">
-                                  <span className="text-gray-400 text-xs">Нет фото</span>
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                              {item.brand}
-                            </td>
-                            <td className="px-6 py-4 text-sm font-mono text-gray-900">
-                              {item.article}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-700">
-                              {item.title}
-                            </td>
-                            <td className="px-6 py-4 text-sm text-gray-500">
-                              По запросу
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <input 
-                                type="number" 
-                                min="1" 
-                                defaultValue="1"
-                                className="w-16 px-2 py-1 text-center border border-gray-300 rounded"
-                              />
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <button
-                                onClick={() => {
-                                  const token = localStorage.getItem('authToken');
-                                  if (!token) {
-                                    toast.error('Сначала войдите в аккаунт');
-                                    return;
-                                  }
-                                  // Логика добавления в корзину
-                                  toast.success('Товар добавлен в корзину');
-                                }}
-                                className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded hover:bg-orange-600 transition"
-                              >
-                                В корзину
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="px-4 py-2 text-center">
+                                <button
+                                  onClick={() => {
+                                    const token = localStorage.getItem('authToken');
+                                    if (!token) {
+                                      toast.error('Сначала войдите в аккаунт');
+                                      return;
+                                    }
+                                    if (quantity > stock) {
+                                      toast.error(`Доступно только ${stock} шт`);
+                                      return;
+                                    }
+                                    toast.success('Товар добавлен в корзину');
+                                  }}
+                                  disabled={stock === 0}
+                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
+                                >
+                                  В корзину
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
+                  {filteredBrandItems.length > 5 && (
+                    <div className="px-6 py-3 bg-gray-50 border-t flex justify-center">
+                      <button
+                        onClick={() => setShowAllBrands(!showAllBrands)}
+                        className="px-4 py-2 text-sm font-medium text-orange-600 hover:text-orange-700 hover:underline"
+                      >
+                        {showAllBrands ? 'Свернуть' : `Показать все (${filteredBrandItems.length})`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -396,14 +440,40 @@ function SearchPage() {
               {analogs && analogs.length > 0 && (
                 <div className="rounded-lg border overflow-hidden mt-6">
                   <div className="px-6 py-4 bg-orange-50 border-b border-orange-200">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Аналоги и заменители ({analogs.length})
-                    </h3>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        Аналоги и заменители ({filteredAnalogs.length})
+                      </h3>
+                      <input
+                        type="text"
+                        placeholder="Фильтр по бренду"
+                        value={analogFilter}
+                        onChange={(e) => setAnalogFilter(e.target.value)}
+                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      />
+                    </div>
+                    <p className="text-sm text-gray-600">
                       Альтернативные запчасти для артикула <span className="font-mono font-medium">{query}</span>
                     </p>
                   </div>
-                  <AnalogsTable analogs={analogs} isLoading={loadingAnalogs} />
+                  <AnalogsTable 
+                    analogs={displayedAnalogs} 
+                    isLoading={loadingAnalogs}
+                    quantities={quantities}
+                    onQuantityChange={(key: string, value: number) => {
+                      setQuantities(prev => ({ ...prev, [key]: value }));
+                    }}
+                  />
+                  {filteredAnalogs.length > 5 && (
+                    <div className="px-6 py-3 bg-orange-50 border-t flex justify-center">
+                      <button
+                        onClick={() => setShowAllAnalogs(!showAllAnalogs)}
+                        className="px-4 py-2 text-sm font-medium text-orange-600 hover:text-orange-700 hover:underline"
+                      >
+                        {showAllAnalogs ? 'Свернуть' : `Показать все (${filteredAnalogs.length})`}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
               
