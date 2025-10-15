@@ -233,7 +233,7 @@ function SearchResultRow({ item }: SearchResultRowProps) {
                   onClick={handleToggleAnalogs}
                   className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition cursor-pointer"
                 >
-                  🔄 {item.analogsCount} аналогов
+                  {item.analogsCount} аналогов
                   {showAnalogs ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
               )}
@@ -335,7 +335,7 @@ function SearchResultRow({ item }: SearchResultRowProps) {
             <div className="bg-blue-50 border-t-2 border-blue-200">
               <div className="px-6 py-3 bg-blue-100 border-b border-blue-200">
                 <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider">
-                  🔄 Аналоги и заменители
+                  🔄Аналоги и заменители
                 </h4>
               </div>
               
@@ -505,7 +505,7 @@ function MobileSearchResultCard({ item }: MobileSearchResultCardProps) {
                   onClick={handleToggleAnalogs}
                   className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition cursor-pointer"
                 >
-                  🔄 {item.analogsCount} аналогов
+                  🔄{item.analogsCount} аналогов
                   {showAnalogs ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
               )}
@@ -580,7 +580,7 @@ function MobileSearchResultCard({ item }: MobileSearchResultCardProps) {
         <div className="rounded-lg border-2 border-blue-200 bg-blue-50 overflow-hidden">
           <div className="px-4 py-2 bg-blue-100 border-b border-blue-200">
             <h5 className="text-xs font-bold text-blue-900 uppercase tracking-wider">
-              🔄 Аналоги и заменители
+               Аналоги и заменители
             </h5>
           </div>
           

@@ -54,40 +54,36 @@ export default function AnalogsTable({ analogs, isLoading }: AnalogsTableProps) 
     }
   };
 
-  const getTypeBadge = (type: string) => {
-    const colors: Record<string, string> = {
-      'OEM': 'bg-green-100 text-green-700',
-      'OES': 'bg-blue-100 text-blue-700',
-      'Indefinite': 'bg-gray-100 text-gray-700',
-    };
-    return colors[type] || 'bg-gray-100 text-gray-700';
-  };
-
-  const getTargetBadge = (target: string) => {
-    const colors: Record<string, string> = {
-      'Original': 'bg-purple-100 text-purple-700',
-      'Cross': 'bg-orange-100 text-orange-700',
-    };
-    return colors[target] || 'bg-gray-100 text-gray-700';
-  };
-
   return (
     <div className="overflow-x-auto">
       <table className="w-full">
         <thead className="bg-orange-50">
           <tr>
+            <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Фото</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Бренд</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Артикул</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Наименование</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Тип</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Категория</th>
-            <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Фото</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Цена</th>
+            <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Кол-во</th>
             <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Действия</th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {analogs.map((analog, idx) => (
             <tr key={`${analog.article}-${analog.brand}-${idx}`} className="hover:bg-gray-50">
+              <td className="px-6 py-4 text-center">
+                {analog.img ? (
+                  <img 
+                    src={`https://api.umapi.ru${analog.img}`}
+                    alt={analog.title}
+                    className="w-16 h-16 object-cover rounded mx-auto"
+                  />
+                ) : (
+                  <div className="w-16 h-16 bg-gray-100 rounded mx-auto flex items-center justify-center">
+                    <span className="text-gray-400 text-xs">Нет фото</span>
+                  </div>
+                )}
+              </td>
               <td className="px-6 py-4 text-sm font-medium text-gray-900">
                 {analog.brand}
               </td>
@@ -97,33 +93,29 @@ export default function AnalogsTable({ analogs, isLoading }: AnalogsTableProps) 
               <td className="px-6 py-4 text-sm text-gray-700">
                 {analog.title}
               </td>
-              <td className="px-6 py-4">
-                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${getTypeBadge(analog.type)}`}>
-                  {analog.type}
-                </span>
-              </td>
-              <td className="px-6 py-4">
-                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded ${getTargetBadge(analog.target)}`}>
-                  {analog.target}
-                </span>
+              <td className="px-6 py-4 text-sm text-gray-500">
+                По запросу
               </td>
               <td className="px-6 py-4 text-center">
-                {analog.img ? (
-                  <img 
-                    src={analog.img} 
-                    alt={analog.title}
-                    className="w-12 h-12 object-cover rounded mx-auto"
-                  />
-                ) : (
-                  <span className="text-gray-400 text-xs">Нет фото</span>
-                )}
+                <input 
+                  type="number" 
+                  min="1" 
+                  defaultValue="1"
+                  className="w-16 px-2 py-1 text-center border border-gray-300 rounded"
+                />
               </td>
               <td className="px-6 py-4 text-center">
                 <button
-                  onClick={() => handleAddToCart(analog)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600 transition"
+                  onClick={() => {
+                    const token = localStorage.getItem('authToken');
+                    if (!token) {
+                      toast.error('Сначала войдите в аккаунт');
+                      return;
+                    }
+                    handleAddToCart(analog);
+                  }}
+                  className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded hover:bg-orange-600 transition"
                 >
-                  <ShoppingCart className="w-3 h-3" />
                   В корзину
                 </button>
               </td>

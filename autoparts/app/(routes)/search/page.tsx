@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { searchApi, type BrandRefinementItem, type AnalogItem } from "@/lib/api/search";
 import AnalogsTable from "@/components/AnalogsTable";
+import { toast } from "sonner";
 
 function SearchPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -322,16 +323,31 @@ function SearchPage() {
                     <table className="w-full">
                       <thead className="bg-gray-100">
                         <tr>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Фото</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Бренд</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Артикул</th>
                           <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Наименование</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Тип</th>
-                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Фото</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Цена</th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Кол-во</th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Действия</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {brandItems.map((item, idx) => (
                           <tr key={`${item.article}-${item.brand}-${idx}`} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-center">
+                              {item.img ? (
+                                <img 
+                                  src={`https://api.umapi.ru${item.img}`}
+                                  alt={item.title}
+                                  className="w-16 h-16 object-cover rounded mx-auto"
+                                />
+                              ) : (
+                                <div className="w-16 h-16 bg-gray-100 rounded mx-auto flex items-center justify-center">
+                                  <span className="text-gray-400 text-xs">Нет фото</span>
+                                </div>
+                              )}
+                            </td>
                             <td className="px-6 py-4 text-sm font-medium text-gray-900">
                               {item.brand}
                             </td>
@@ -341,21 +357,32 @@ function SearchPage() {
                             <td className="px-6 py-4 text-sm text-gray-700">
                               {item.title}
                             </td>
-                            <td className="px-6 py-4">
-                              <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-700">
-                                {item.type}
-                              </span>
+                            <td className="px-6 py-4 text-sm text-gray-500">
+                              По запросу
                             </td>
                             <td className="px-6 py-4 text-center">
-                              {item.img ? (
-                                <img 
-                                  src={item.img} 
-                                  alt={item.title}
-                                  className="w-12 h-12 object-cover rounded mx-auto"
-                                />
-                              ) : (
-                                <span className="text-gray-400 text-xs">Нет фото</span>
-                              )}
+                              <input 
+                                type="number" 
+                                min="1" 
+                                defaultValue="1"
+                                className="w-16 px-2 py-1 text-center border border-gray-300 rounded"
+                              />
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <button
+                                onClick={() => {
+                                  const token = localStorage.getItem('authToken');
+                                  if (!token) {
+                                    toast.error('Сначала войдите в аккаунт');
+                                    return;
+                                  }
+                                  // Логика добавления в корзину
+                                  toast.success('Товар добавлен в корзину');
+                                }}
+                                className="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-white bg-orange-500 rounded hover:bg-orange-600 transition"
+                              >
+                                В корзину
+                              </button>
                             </td>
                           </tr>
                         ))}
@@ -370,7 +397,7 @@ function SearchPage() {
                 <div className="rounded-lg border overflow-hidden mt-6">
                   <div className="px-6 py-4 bg-orange-50 border-b border-orange-200">
                     <h3 className="text-lg font-semibold text-gray-900">
-                      🔄 Аналоги и заменители ({analogs.length})
+                      Аналоги и заменители ({analogs.length})
                     </h3>
                     <p className="text-sm text-gray-600 mt-1">
                       Альтернативные запчасти для артикула <span className="font-mono font-medium">{query}</span>
