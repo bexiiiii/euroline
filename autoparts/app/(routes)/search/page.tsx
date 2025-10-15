@@ -11,10 +11,17 @@ import PaginationButton from "@/components/PaginationWithPrimaryButton";
 import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { searchApi, type BrandRefinementItem, type AnalogItem } from "@/lib/api/search";
+import AnalogsTable from "@/components/AnalogsTable";
 
 function SearchPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filtersVersion, setFiltersVersion] = useState(0);
+  const [brandItems, setBrandItems] = useState<BrandRefinementItem[]>([]);
+  const [analogs, setAnalogs] = useState<AnalogItem[]>([]);
+  const [loadingBrands, setLoadingBrands] = useState(false);
+  const [loadingAnalogs, setLoadingAnalogs] = useState(false);
+  
   const searchParams = useSearchParams();
   const { 
     search, results, isLoading, query, error,
@@ -38,12 +45,50 @@ function SearchPage() {
       // Only search if the query parameter has actually changed
       if (queryParam !== query) {
         search(queryParam);
+        // Сбрасываем UMAPI данные при новом поиске
+        setBrandItems([]);
+        setAnalogs([]);
       }
     } else {
       // Clear results when there's no query parameter
       clearResults();
+      setBrandItems([]);
+      setAnalogs([]);
     }
   }, [searchParams, search, query, clearResults]);
+
+  // Загружаем данные из UMAPI, если detectedType === 'OEM'
+  useEffect(() => {
+    const loadUmapiData = async () => {
+      if (detectedType === 'OEM' && query && !loadingBrands) {
+        setLoadingBrands(true);
+        try {
+          const brandsResponse = await searchApi.searchByArticle(query);
+          setBrandItems(brandsResponse || []);
+          
+          // Автоматически загружаем аналоги для первого бренда
+          if (brandsResponse && brandsResponse.length > 0) {
+            const firstBrand = brandsResponse[0].brand;
+            setLoadingAnalogs(true);
+            try {
+              const analogsResponse = await searchApi.getAnalogs(query, firstBrand);
+              setAnalogs(analogsResponse || []);
+            } catch (err) {
+              console.error('Failed to load analogs:', err);
+            } finally {
+              setLoadingAnalogs(false);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to load brand items:', err);
+        } finally {
+          setLoadingBrands(false);
+        }
+      }
+    };
+
+    loadUmapiData();
+  }, [detectedType, query]);
 
   // Применяем клиентские фильтры и конвертируем в AutoPart
   const parts = results
@@ -259,6 +304,79 @@ function SearchPage() {
                     isLoading={isLoading}
                     emptyMessage={query ? `По запросу "${query}" ничего не найдено` : 'Введите поисковый запрос'}
                   />
+                </div>
+              )}
+
+              {/* Таблица с найденными запчастями из UMAPI (BrandRefinement) */}
+              {brandItems && brandItems.length > 0 && (
+                <div className="rounded-lg border overflow-hidden mt-6">
+                  <div className="px-6 py-4 bg-gray-50 border-b">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Найденные запчасти ({brandItems.length})
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Артикул: <span className="font-mono font-medium">{query}</span>
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Бренд</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Артикул</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Наименование</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase">Тип</th>
+                          <th className="px-6 py-3 text-center text-xs font-medium text-gray-600 uppercase">Фото</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {brandItems.map((item, idx) => (
+                          <tr key={`${item.article}-${item.brand}-${idx}`} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                              {item.brand}
+                            </td>
+                            <td className="px-6 py-4 text-sm font-mono text-gray-900">
+                              {item.article}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-700">
+                              {item.title}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="inline-flex px-2 py-1 text-xs font-medium rounded bg-blue-100 text-blue-700">
+                                {item.type}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              {item.img ? (
+                                <img 
+                                  src={item.img} 
+                                  alt={item.title}
+                                  className="w-12 h-12 object-cover rounded mx-auto"
+                                />
+                              ) : (
+                                <span className="text-gray-400 text-xs">Нет фото</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Таблица с аналогами */}
+              {analogs && analogs.length > 0 && (
+                <div className="rounded-lg border overflow-hidden mt-6">
+                  <div className="px-6 py-4 bg-orange-50 border-b border-orange-200">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      🔄 Аналоги и заменители ({analogs.length})
+                    </h3>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Альтернативные запчасти для артикула <span className="font-mono font-medium">{query}</span>
+                    </p>
+                  </div>
+                  <AnalogsTable analogs={analogs} isLoading={loadingAnalogs} />
                 </div>
               )}
               

@@ -30,7 +30,7 @@ public class ApiKeyFilter extends OncePerRequestFilter {
             return;
         }
 
-        String presentedKey = request.getHeader("X-API-Key");
+        String presentedKey = request.getHeader("X-App-Key");
         if (presentedKey == null || presentedKey.isBlank()) {
             response.sendError(HttpStatus.UNAUTHORIZED.value(), "API key is required");
             return;

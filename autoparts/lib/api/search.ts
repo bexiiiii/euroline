@@ -193,25 +193,35 @@ export interface OemApplicabilityResponse {
 }
 
 // ===== UMAPI Types =====
-export interface BrandRefinementResponse {
-  articleNumber: string;
-  suppliers: UmapiSupplier[];
+
+// BrandRefinement response - теперь это просто массив
+export type BrandRefinementResponse = BrandRefinementItem[];
+
+export interface BrandRefinementItem {
+  article: string;
+  articleSearch: string;
+  title: string;
+  img: string | null;
+  artId: number | null;
+  type: string;        // "Indefinite", "OEM", "OES"
+  target: string;      // "Cross", "Original"
+  brand: string;
+  brandSearch: string;
 }
 
-export interface AnalogsResponse {
-  originalArticle: string;
-  originalSupplier: string;
-  analogs: AnalogItem[];
-}
+// Analogs response - теперь это просто массив
+export type AnalogsResponse = AnalogItem[];
 
 export interface AnalogItem {
-  articleNumber: string;
-  supplierId: number;
-  supplierName: string;
-  name?: string;
-  matchType: string;      // OE, OEM, SIMILAR
-  quality?: string;       // OEM, Aftermarket
-  available?: boolean;
+  article: string;
+  articleSearch: string;
+  title: string;
+  img: string | null;
+  artId: number | null;
+  type: string;        // "Indefinite", "OEM", "OES"
+  target: string;      // "Cross", "Original"
+  brand: string;
+  brandSearch: string;
 }
 
 import { API_BASE } from './base';

@@ -5,11 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 /**
- * Brand refinement result DTO from UMAPI
- * Used when searching by article number to clarify the brand
+ * Brand refinement result from UMAPI /v2/cross/{locale}/BrandRefinement/{article}
+ * Represents a single brand match for an article number
  */
 @Data
 @NoArgsConstructor
@@ -17,31 +15,44 @@ import java.util.List;
 public class BrandRefinementDto {
 
     /**
-     * Article number
+     * Article number as displayed
      */
-    @JsonProperty("articleNr")
-    private String articleNumber;
+    @JsonProperty("article")
+    private String article;
 
     /**
-     * Available suppliers/brands for this article
+     * Article number used for search (normalized)
      */
-    @JsonProperty("suppliers")
-    private List<SupplierMatch> suppliers;
+    @JsonProperty("articleSearch")
+    private String articleSearch;
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class SupplierMatch {
-        @JsonProperty("supplierId")
-        private Long id;
+    /**
+     * Part title/description
+     */
+    @JsonProperty("title")
+    private String title;
 
-        @JsonProperty("supplierName")
-        private String name;
+    /**
+     * Image URL (can be null)
+     */
+    @JsonProperty("img")
+    private String img;
 
-        @JsonProperty("matchType")
-        private String matchType; // EXACT, SIMILAR, OE
+    /**
+     * Type of match (e.g., "Indefinite")
+     */
+    @JsonProperty("type")
+    private String type;
 
-        @JsonProperty("articleCount")
-        private Integer articleCount;
-    }
+    /**
+     * Brand name
+     */
+    @JsonProperty("brand")
+    private String brand;
+
+    /**
+     * Brand name used for search
+     */
+    @JsonProperty("brandSearch")
+    private String brandSearch;
 }

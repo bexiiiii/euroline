@@ -11,6 +11,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * REST API для поиска запчастей и аналогов через UMAPI
  */
@@ -29,12 +31,12 @@ public class PartsSearchController {
             description = "Возвращает список производителей (брендов), у которых есть данный артикул. " +
                     "Используйте для уточнения бренда перед поиском аналогов."
     )
-    public ResponseEntity<BrandRefinementDto> searchByArticle(
+    public ResponseEntity<List<BrandRefinementDto>> searchByArticle(
             @Parameter(description = "Артикул запчасти (номер детали)", required = true, example = "0986452041")
             @RequestParam String article
     ) {
         log.info("GET /api/parts-search/by-article - article={}", article);
-        BrandRefinementDto result = umapiService.searchByArticle(article);
+        List<BrandRefinementDto> result = umapiService.searchByArticle(article);
         return ResponseEntity.ok(result);
     }
 
@@ -44,14 +46,14 @@ public class PartsSearchController {
             description = "Возвращает список аналогов для указанного артикула и бренда. " +
                     "Включает оригинальные (OE), OEM и aftermarket аналоги."
     )
-    public ResponseEntity<AnalogDto> getAnalogs(
+    public ResponseEntity<List<AnalogDto>> getAnalogs(
             @Parameter(description = "Артикул запчасти", required = true, example = "0986452041")
             @RequestParam String article,
             @Parameter(description = "Бренд производителя", required = true, example = "BOSCH")
             @RequestParam String brand
     ) {
         log.info("GET /api/parts-search/analogs - article={}, brand={}", article, brand);
-        AnalogDto analogs = umapiService.getAnalogs(article, brand);
+        List<AnalogDto> analogs = umapiService.getAnalogs(article, brand);
         return ResponseEntity.ok(analogs);
     }
 }

@@ -140,18 +140,18 @@ app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:5173,https://admin.euroline.1edu.kz,https://euroline.1edu.kz}
 
-# UMAPI.ru Integration Configuration
+# UMAPI.ru Integration
 umapi:
-  base-url: ${UMAPI_BASE_URL:https://api.umapi.ru}
-  api-key: ${UMAPI_API_KEY:b9a8ccd2-40b1-4e94-9d34-31674c64649f}
-  default-language: ${UMAPI_LANGUAGE:ru}
-  default-region: ${UMAPI_REGION:RU}
+  base-url: https://api.umapi.ru
+  locale: ru-RU
+  api-key: your-production-api-key-here
   timeout:
-    connect: ${UMAPI_CONNECT_TIMEOUT:5000}
-    read: ${UMAPI_READ_TIMEOUT:10000}
+    connect: 5000
+    read: 10000
   retry:
-    max-attempts: ${UMAPI_RETRY_ATTEMPTS:3}
-    backoff-delay: ${UMAPI_BACKOFF_DELAY:1000}
+    max-attempts: 3
+    backoff-delay: 1000
+
 
 security:
   jwt:

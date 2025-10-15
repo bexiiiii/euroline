@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { X, Package, ShoppingCart, Loader2 } from 'lucide-react';
-import { searchApi, type AnalogItem, type UmapiSupplier } from '@/lib/api/search';
+import { searchApi, type AnalogItem, type BrandRefinementItem } from '@/lib/api/search';
 import { useCartStore } from '@/lib/stores/cartStore';
 import { toast } from 'sonner';
 
@@ -10,33 +10,40 @@ interface AnalogsModalProps {
   isOpen: boolean;
   onClose: () => void;
   article: string;
-  suppliers?: UmapiSupplier[];
+  brandItems?: BrandRefinementItem[]; // теперь это массив запчастей разных брендов
 }
 
-export default function AnalogsModal({ isOpen, onClose, article, suppliers }: AnalogsModalProps) {
+export default function AnalogsModal({ isOpen, onClose, article, brandItems }: AnalogsModalProps) {
   const [analogs, setAnalogs] = useState<AnalogItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<string>('');
   const { addByOem } = useCartStore();
 
+  // Получаем уникальные бренды из brandItems
+  const uniqueBrands = React.useMemo(() => {
+    if (!brandItems || brandItems.length === 0) return [];
+    const brandsSet = new Set<string>();
+    brandItems.forEach(item => brandsSet.add(item.brand));
+    return Array.from(brandsSet);
+  }, [brandItems]);
+
   useEffect(() => {
-    if (isOpen && suppliers && suppliers.length > 0) {
-      // По умолчанию выбираем первый бренд с точным совпадением (EXACT) или первый в списке
-      const exactMatch = suppliers.find(s => s.matchType === 'EXACT');
-      const defaultBrand = exactMatch?.name || suppliers[0]?.name;
+    if (isOpen && uniqueBrands.length > 0) {
+      // По умолчанию выбираем первый бренд
+      const defaultBrand = uniqueBrands[0];
       
       if (defaultBrand) {
         setSelectedBrand(defaultBrand);
         fetchAnalogs(article, defaultBrand);
       }
     }
-  }, [isOpen, article, suppliers]);
+  }, [isOpen, article, uniqueBrands]);
 
   const fetchAnalogs = async (article: string, brand: string) => {
     setLoading(true);
     try {
       const response = await searchApi.getAnalogs(article, brand);
-      setAnalogs(response.analogs || []);
+      setAnalogs(response || []);
     } catch (error) {
       console.error('Failed to fetch analogs:', error);
       toast.error('Не удалось загрузить аналоги');
@@ -90,26 +97,23 @@ export default function AnalogsModal({ isOpen, onClose, article, suppliers }: An
         </div>
 
         {/* Brand Selector */}
-        {suppliers && suppliers.length > 1 && (
+        {uniqueBrands && uniqueBrands.length > 1 && (
           <div className="p-6 border-b bg-gray-50">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Выберите бренд:
             </label>
             <div className="flex flex-wrap gap-2">
-              {suppliers.map((supplier) => (
+              {uniqueBrands.map((brand) => (
                 <button
-                  key={supplier.id}
-                  onClick={() => handleBrandChange(supplier.name)}
+                  key={brand}
+                  onClick={() => handleBrandChange(brand)}
                   className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
-                    selectedBrand === supplier.name
+                    selectedBrand === brand
                       ? 'bg-orange-500 text-white'
                       : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-100'
                   }`}
                 >
-                  {supplier.name}
-                  {supplier.matchType === 'EXACT' && (
-                    <span className="ml-1 text-xs">✓</span>
-                  )}
+                  {brand}
                 </button>
               ))}
             </div>

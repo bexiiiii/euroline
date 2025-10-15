@@ -6,7 +6,7 @@ spring:
     banner-mode: "off"
     lazy-initialization: true
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/eurolinecloud
+    url: jdbc:postgresql://164.90.180.120/eurolinecloud
     username: behruz
     password: 234Bex456
     hikari:
@@ -145,12 +145,11 @@ app:
 # UMAPI.ru Integration
 umapi:
   base-url: https://api.umapi.ru
+  locale: ru-RU
   api-key: b9a8ccd2-40b1-4e94-9d34-31674c64649f
-  default-language: ru
-  default-region: RU
   timeout:
-    connect: 5000  # 5 seconds
-    read: 10000    # 10 seconds
+    connect: 5000
+    read: 10000
   retry:
     max-attempts: 3
-    backoff-delay: 1000  # 1 second
+    backoff-delay: 1000

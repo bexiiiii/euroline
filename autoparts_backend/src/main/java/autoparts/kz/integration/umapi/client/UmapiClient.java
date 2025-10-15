@@ -4,7 +4,6 @@ import autoparts.kz.integration.umapi.config.UmapiProperties;
 import autoparts.kz.integration.umapi.dto.*;
 import autoparts.kz.integration.umapi.exception.UmapiApiException;
 import autoparts.kz.integration.umapi.exception.UmapiConnectionException;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.ParameterizedTypeReference;
@@ -27,13 +26,17 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class UmapiClient {
 
-    @Qualifier("umapiRestTemplate")
     private final RestTemplate restTemplate;
-
     private final UmapiProperties properties;
+
+    // Явный конструктор с @Qualifier для правильного внедрения бина
+    public UmapiClient(@Qualifier("umapiRestTemplate") RestTemplate restTemplate, 
+                       UmapiProperties properties) {
+        this.restTemplate = restTemplate;
+        this.properties = properties;
+    }
 
     /**
      * Get manufacturers by vehicle type
@@ -248,29 +251,35 @@ public class UmapiClient {
 
     /**
      * Search articles by article number (brand refinement)
+     * Returns list of brands that have this article
      */
     @Retryable(
             value = {UmapiConnectionException.class},
             maxAttemptsExpression = "#{${umapi.retry.max-attempts}}",
             backoff = @Backoff(delayExpression = "#{${umapi.retry.backoff-delay}}")
     )
-    public BrandRefinementDto searchByArticle(String articleNumber) {
-        String url = buildUrl("/v2/autocatalog/{locale}/BrandRefinement/{article}");
+    public List<BrandRefinementDto> searchByArticle(String articleNumber) {
+        String url = buildUrl("/v2/cross/{locale}/BrandRefinement/{article}");
         
         try {
-            log.debug("Searching by article: {}", articleNumber);
+            log.info("Searching by article: {}", articleNumber);
+            log.info("URL template: {}", url);
+            log.info("Locale: {}", properties.getLocale());
+            log.info("Article parameter: {}", articleNumber);
             
-            ResponseEntity<BrandRefinementDto> response = restTemplate.exchange(
+            ResponseEntity<List<BrandRefinementDto>> response = restTemplate.exchange(
                     url,
                     HttpMethod.GET,
                     null,
-                    BrandRefinementDto.class,
+                    new ParameterizedTypeReference<List<BrandRefinementDto>>() {},
                     Map.of(
                             "locale", properties.getLocale(),
                             "article", articleNumber
                     )
             );
             
+            log.info("Successfully received {} brand matches for article: {}", 
+                     response.getBody() != null ? response.getBody().size() : 0, articleNumber);
             return response.getBody();
         } catch (HttpClientErrorException | HttpServerErrorException e) {
             log.error("UMAPI error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
@@ -289,17 +298,19 @@ public class UmapiClient {
             maxAttemptsExpression = "#{${umapi.retry.max-attempts}}",
             backoff = @Backoff(delayExpression = "#{${umapi.retry.backoff-delay}}")
     )
-    public AnalogDto getAnalogs(String articleNumber, String brand) {
+    public List<AnalogDto> getAnalogs(String articleNumber, String brand) {
         String url = buildUrl("/v2/cross/{locale}/Analogs/{article}/{brand}");
         
         try {
-            log.debug("Fetching analogs for article: {}, brand: {}", articleNumber, brand);
+            log.info("Fetching analogs for article: {}, brand: {}", articleNumber, brand);
+            log.info("URL template: {}", url);
+            log.info("Locale: {}", properties.getLocale());
             
-            ResponseEntity<AnalogDto> response = restTemplate.exchange(
+            ResponseEntity<List<AnalogDto>> response = restTemplate.exchange(
                     url,
                     HttpMethod.GET,
                     null,
-                    AnalogDto.class,
+                    new ParameterizedTypeReference<List<AnalogDto>>() {},
                     Map.of(
                             "locale", properties.getLocale(),
                             "article", articleNumber,
@@ -307,6 +318,8 @@ public class UmapiClient {
                     )
             );
             
+            log.info("Successfully received {} analog articles for article: {}, brand: {}", 
+                     response.getBody() != null ? response.getBody().size() : 0, articleNumber, brand);
             return response.getBody();
         } catch (HttpClientErrorException | HttpServerErrorException e) {
             log.error("UMAPI error: {} - {}", e.getStatusCode(), e.getResponseBodyAsString());
@@ -320,6 +333,7 @@ public class UmapiClient {
     private String buildUrl(String path) {
         return UriComponentsBuilder.fromUriString(properties.getBaseUrl())
                 .path(path)
+                .build(false)
                 .toUriString();
     }
 }

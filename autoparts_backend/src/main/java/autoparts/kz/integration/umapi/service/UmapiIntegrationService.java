@@ -121,15 +121,16 @@ public class UmapiIntegrationService {
     }
 
     /**
-     * Search articles by article number (brand refinement)
+     * Search by article number (brand refinement)
+     * Returns list of brands that have this article
      * Cached for 6 hours
      */
     @Cacheable(
             cacheNames = "umapi-brand-search",
             key = "#articleNumber",
-            unless = "#result == null"
+            unless = "#result == null || #result.isEmpty()"
     )
-    public BrandRefinementDto searchByArticle(String articleNumber) {
+    public List<BrandRefinementDto> searchByArticle(String articleNumber) {
         log.info("Searching by article: {}", articleNumber);
         // Normalize article number (remove spaces, dashes)
         String normalized = normalizeArticleNumber(articleNumber);
@@ -145,7 +146,7 @@ public class UmapiIntegrationService {
             key = "#articleNumber + '_' + #brand",
             unless = "#result == null"
     )
-    public AnalogDto getAnalogs(String articleNumber, String brand) {
+    public List<AnalogDto> getAnalogs(String articleNumber, String brand) {
         log.info("Fetching analogs for article: {}, brand: {}", articleNumber, brand);
         String normalized = normalizeArticleNumber(articleNumber);
         return umapiClient.getAnalogs(normalized, brand);

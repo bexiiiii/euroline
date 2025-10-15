@@ -5,10 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 /**
  * Analog (cross-reference) DTO from UMAPI
+ * Represents a single analog article result
  */
 @Data
 @NoArgsConstructor
@@ -16,67 +15,56 @@ import java.util.List;
 public class AnalogDto {
 
     /**
-     * Original article number
+     * Article number
      */
-    @JsonProperty("originalArticle")
-    private String originalArticle;
+    @JsonProperty("article")
+    private String article;
 
     /**
-     * Original supplier name
+     * Article number used for search (normalized)
      */
-    @JsonProperty("originalSupplier")
-    private String originalSupplier;
+    @JsonProperty("articleSearch")
+    private String articleSearch;
 
     /**
-     * List of analog articles
+     * Article title/description
      */
-    @JsonProperty("analogs")
-    private List<AnalogArticle> analogs;
+    @JsonProperty("title")
+    private String title;
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class AnalogArticle {
-        /**
-         * Analog article number
-         */
-        @JsonProperty("articleNr")
-        private String articleNumber;
+    /**
+     * Image URL (if available)
+     */
+    @JsonProperty("img")
+    private String img;
 
-        /**
-         * Supplier/Brand ID
-         */
-        @JsonProperty("supplierId")
-        private Long supplierId;
+    /**
+     * Article ID (if available)
+     */
+    @JsonProperty("artId")
+    private Long artId;
 
-        /**
-         * Supplier/Brand name
-         */
-        @JsonProperty("supplierName")
-        private String supplierName;
+    /**
+     * Match type (e.g., "Indefinite", "OEM", "OES")
+     */
+    @JsonProperty("type")
+    private String type;
 
-        /**
-         * Article name
-         */
-        @JsonProperty("articleName")
-        private String name;
+    /**
+     * Target type (e.g., "Cross", "Original")
+     */
+    @JsonProperty("target")
+    private String target;
 
-        /**
-         * Match type (OE, EXACT, SIMILAR)
-         */
-        @JsonProperty("matchType")
-        private String matchType;
+    /**
+     * Brand/Supplier name
+     */
+    @JsonProperty("brand")
+    private String brand;
 
-        /**
-         * Quality indicator (OE, OEM, Aftermarket)
-         */
-        @JsonProperty("quality")
-        private String quality;
-
-        /**
-         * Availability status
-         */
-        @JsonProperty("availability")
-        private Boolean available;
-    }
+    /**
+     * Brand name used for search (normalized)
+     */
+    @JsonProperty("brandSearch")
+    private String brandSearch;
 }

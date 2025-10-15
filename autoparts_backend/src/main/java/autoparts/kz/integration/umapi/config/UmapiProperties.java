@@ -11,67 +11,36 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @ConfigurationProperties(prefix = "umapi")
 public class UmapiProperties {
-
     /**
-     * Base URL of UMAPI.ru API
+     * Base URL for UMAPI
      */
-    private String baseUrl = "https://api.umapi.ru";
-
+    private String baseUrl;
     /**
-     * API key for authentication
+     * Locale string, e.g. "ru-RU"
+     */
+    private String locale = "ru-RU";
+    /**
+     * API key for authorization
      */
     private String apiKey;
-
-    /**
-     * Default language code (e.g., "ru", "en")
-     */
-    private String defaultLanguage = "ru";
-
-    /**
-     * Default region code (e.g., "RU", "EU")
-     */
-    private String defaultRegion = "RU";
-
-    /**
-     * HTTP timeout settings
-     */
-    private Timeout timeout = new Timeout();
-
     /**
      * Retry settings
      */
     private Retry retry = new Retry();
-
-    @Data
-    public static class Timeout {
-        /**
-         * Connection timeout in milliseconds
-         */
-        private int connect = 5000;
-
-        /**
-         * Read timeout in milliseconds
-         */
-        private int read = 10000;
-    }
+    /**
+     * Timeout settings
+     */
+    private Timeout timeout = new Timeout();
 
     @Data
     public static class Retry {
-        /**
-         * Maximum number of retry attempts
-         */
         private int maxAttempts = 3;
-
-        /**
-         * Backoff delay between retries in milliseconds
-         */
         private long backoffDelay = 1000;
     }
 
-    /**
-     * Get locale string in format "languageCode-regionCode"
-     */
-    public String getLocale() {
-        return defaultLanguage + "-" + defaultRegion;
+    @Data
+    public static class Timeout {
+        private int connect = 5000;
+        private int read = 10000;
     }
 }

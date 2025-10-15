@@ -279,37 +279,38 @@ public class MainSearchService {
                 String normalized = ArticleNormalizationUtil.normalize(oem);
                 
                 // 1. Получаем информацию о брендах (brand refinement)
-                BrandRefinementDto brandData = umapiService.searchByArticle(oem);
+                List<BrandRefinementDto> brandMatches = umapiService.searchByArticle(oem);
                 
-                if (brandData != null && brandData.getSuppliers() != null && !brandData.getSuppliers().isEmpty()) {
+                if (brandMatches != null && !brandMatches.isEmpty()) {
                     UmapiEnrichmentData enrichment = new UmapiEnrichmentData();
                     
-                    // Конвертируем suppliers
-                    enrichment.suppliers = brandData.getSuppliers().stream()
-                            .map(s -> {
+                    // Конвертируем brand matches в suppliers
+                    enrichment.suppliers = brandMatches.stream()
+                            .map(brand -> {
                                 var supplier = new SearchResponse.UmapiSupplier();
-                                supplier.setId(s.getId());
-                                supplier.setName(s.getName());
-                                supplier.setMatchType(s.getMatchType());
-                                supplier.setArticleCount(s.getArticleCount());
+                                supplier.setId(null); // API не возвращает ID
+                                supplier.setName(brand.getBrand());
+                                supplier.setMatchType(brand.getType());
+                                supplier.setArticleCount(1); // Каждый бренд = 1 артикул
                                 return supplier;
                             })
                             .collect(Collectors.toList());
                     
                     // 2. Пробуем получить аналоги (берём первый бренд)
-                    if (!brandData.getSuppliers().isEmpty()) {
-                        String mainBrand = brandData.getSuppliers().get(0).getName();
+                    if (!brandMatches.isEmpty()) {
+                        String mainBrand = brandMatches.get(0).getBrand();
                         try {
-                            AnalogDto analogData = umapiService.getAnalogs(oem, mainBrand);
+                            List<AnalogDto> analogsList = umapiService.getAnalogs(oem, mainBrand);
                             
-                            if (analogData != null && analogData.getAnalogs() != null) {
-                                enrichment.analogsCount = analogData.getAnalogs().size();
+                            if (analogsList != null && !analogsList.isEmpty()) {
+                                enrichment.analogsCount = analogsList.size();
                                 
-                                // Собираем OE номера из аналогов
+                                // Собираем OE номера из аналогов (по типу "OEM" или "Original")
                                 Set<String> oeSet = new HashSet<>();
-                                for (var analog : analogData.getAnalogs()) {
-                                    if ("OE".equalsIgnoreCase(analog.getMatchType())) {
-                                        oeSet.add(analog.getArticleNumber());
+                                for (AnalogDto analog : analogsList) {
+                                    if ("OEM".equalsIgnoreCase(analog.getType()) || 
+                                        "Original".equalsIgnoreCase(analog.getTarget())) {
+                                        oeSet.add(analog.getArticle());
                                     }
                                 }
                                 enrichment.oeNumbers = new ArrayList<>(oeSet);
