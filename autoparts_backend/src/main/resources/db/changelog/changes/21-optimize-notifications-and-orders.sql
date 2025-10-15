@@ -21,5 +21,3 @@ ORDER BY ordinal_position;
 CREATE INDEX IF NOT EXISTS idx_admin_notifications_user_created_at
     ON admin_notifications (user_id, created_at DESC);
 
-ALTER TABLE admin_notifications
-    ADD COLUMN recipient_id BIGINT;
