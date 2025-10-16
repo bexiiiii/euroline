@@ -4,8 +4,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -40,7 +38,7 @@ public class CmlSecurityConfig {
                 .httpBasic(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(cmlAuthenticationProvider())
+                .userDetailsService(cmlUserDetailsService())
                 .addFilterBefore(requestIdFilter, UsernamePasswordAuthenticationFilter.class);
                 // Убираем IP фильтр для продакшена, так как запросы идут через nginx
                 // .addFilterBefore(new IpAllowlistFilter(properties.getAllowedIps()), UsernamePasswordAuthenticationFilter.class);
@@ -60,14 +58,5 @@ public class CmlSecurityConfig {
                         .roles("CML")
                         .build()
         );
-    }
-    
-    @Bean
-    @SuppressWarnings("deprecation")
-    public AuthenticationProvider cmlAuthenticationProvider() {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(cmlUserDetailsService());
-        provider.setPasswordEncoder(passwordEncoder);
-        return provider;
     }
 }

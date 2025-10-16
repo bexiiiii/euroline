@@ -42,6 +42,9 @@ public class OneCExchangeController {
             case "sale:query" -> exchangeService.handleSaleQuery(requestId);
             case "sale:success" -> text(exchangeService.handleSaleSuccess());
             case "sale:import" -> text(exchangeService.handleImport(type, filename != null ? filename : "orders_changes.xml", requestId));
+            // ✅ НОВОЕ: Обработка возвратов
+            case "return:query" -> exchangeService.handleReturnQuery(requestId);
+            case "return:success" -> text(exchangeService.handleReturnSuccess());
             default -> ResponseEntity.badRequest()
                     .contentType(MediaType.TEXT_PLAIN)
                     .body(("failure\nunknown mode " + type + ":" + mode).getBytes());

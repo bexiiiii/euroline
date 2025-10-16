@@ -42,6 +42,7 @@ public class FinanceService {
     private final NotificationService notifications;
     private final UserRepository users;
     private final autoparts.kz.modules.telegram.service.TelegramNotificationService telegramNotificationService;
+    private final autoparts.kz.modules.cml.service.ReturnIntegrationService returnIntegrationService;
 
     // Top-ups
     public Page<FinanceDtos.TopUpResponse> listTopUps(String status, Pageable p){
@@ -286,6 +287,15 @@ public class FinanceService {
                 String title = "Возврат одобрен";
                 String body = "Заявка на возврат #" + rr.getId() + " на сумму " + rr.getAmount() + " ₸ одобрена.";
                 notifications.createAndBroadcast(rr.getClientId(), title, body, Notification.Type.FINANCE, Notification.Severity.SUCCESS);
+                
+                // ✅ НОВОЕ: Автоматическая отправка одобренного возврата в 1C через CommerceML
+                try {
+                    returnIntegrationService.sendReturnTo1C(rr.getId());
+                } catch (Exception e) {
+                    // Логируем ошибку, но не блокируем операцию одобрения
+                    org.slf4j.LoggerFactory.getLogger(FinanceService.class)
+                        .error("Не удалось отправить возврат {} в 1C: {}", rr.getId(), e.getMessage());
+                }
             } else if (rr.getStatus() == RefundRequest.Status.REJECTED) {
                 String title = "Возврат отклонён";
                 String body = "Заявка на возврат #" + rr.getId() + " отклонена.";

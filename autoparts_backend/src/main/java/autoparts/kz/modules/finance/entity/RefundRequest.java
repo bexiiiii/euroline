@@ -22,6 +22,11 @@ public class RefundRequest {
 
     @Column(length = 1024)
     private String adminComment;
+    
+    // ✅ Интеграция с 1C через CommerceML
+    private Boolean sentTo1C = false;  // Флаг отправки в 1C
+    private Instant sentTo1CAt;        // Дата отправки в 1C
+    private String externalId;         // ID документа в 1C (после подтверждения)
 
     public enum Status { NEW, IN_REVIEW, APPROVED, REJECTED, DONE }
 }

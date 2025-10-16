@@ -27,15 +27,18 @@ public class OneCExchangeService {
     private final ImportCoordinator importCoordinator;
     private final S3Storage storage;
     private final JobQueue jobQueue;
+    private final ReturnIntegrationService returnIntegrationService;
 
     public OneCExchangeService(CommerceMlProperties properties,
                                ImportCoordinator importCoordinator,
                                S3Storage storage,
-                               JobQueue jobQueue) {
+                               JobQueue jobQueue,
+                               ReturnIntegrationService returnIntegrationService) {
         this.properties = properties;
         this.importCoordinator = importCoordinator;
         this.storage = storage;
         this.jobQueue = jobQueue;
+        this.returnIntegrationService = returnIntegrationService;
     }
 
     public String handleCheckAuth() {
@@ -92,6 +95,50 @@ public class OneCExchangeService {
     }
 
     public String handleSaleSuccess() {
+        return "success";
+    }
+
+    /**
+     * ✅ НОВОЕ: Обработка запроса возвратов от 1C
+     * Endpoint: GET /api/1c-exchange?type=return&mode=query
+     * 
+     * Возвращает XML с одобренными возвратами, которые нужно обработать в 1C
+     */
+    public ResponseEntity<byte[]> handleReturnQuery(String requestId) {
+        log.info("[{}] 1C запрашивает возвраты товаров", requestId);
+        
+        try {
+            // Генерируем XML со всеми одобренными возвратами
+            String xml = returnIntegrationService.generateReturnsPackageXml();
+            
+            if (xml.contains("<!-- Нет возвратов для выгрузки -->")) {
+                log.info("[{}] Нет возвратов для отправки в 1C", requestId);
+            } else {
+                log.info("[{}] Отправляем возвраты в 1C", requestId);
+            }
+            
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_XML)
+                    .body(xml.getBytes());
+                    
+        } catch (Exception e) {
+            log.error("[{}] Ошибка формирования возвратов: {}", requestId, e.getMessage(), e);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body("failure\nerror generating returns".getBytes());
+        }
+    }
+
+    /**
+     * ✅ НОВОЕ: Подтверждение получения возвратов 1C системой
+     * Endpoint: GET /api/1c-exchange?type=return&mode=success
+     * 
+     * 1C вызывает этот endpoint после успешной обработки возвратов
+     */
+    public String handleReturnSuccess() {
+        log.info("1C подтвердила получение возвратов");
+        // Можно дополнительно пометить возвраты как обработанные
+        // но мы уже помечаем их при генерации XML
         return "success";
     }
 
