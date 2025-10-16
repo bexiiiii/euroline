@@ -23,6 +23,7 @@ public class OrdersExportScheduler {
     public OrdersExportScheduler(JobQueue jobQueue, CommerceMlProperties properties) {
         this.jobQueue = jobQueue;
         this.properties = properties;
+        log.info("🔄🔄🔄 OrdersExportScheduler BEAN CREATED! Interval: {} ms", properties.getOrdersExportIntervalMs());
     }
 
     @Scheduled(fixedDelayString = "${cml.orders-export-interval-ms:300000}")
@@ -30,6 +31,6 @@ public class OrdersExportScheduler {
         String requestId = UUID.randomUUID().toString();
         ExchangeJob job = new ExchangeJob(JobType.ORDERS_EXPORT.routingKey(), "orders.xml", "", requestId, Instant.now());
         jobQueue.submit(JobType.ORDERS_EXPORT, job);
-        log.debug("Scheduled orders export job {}", requestId);
+        log.info("⏰ Scheduled orders export job {} (interval: {} ms)", requestId, properties.getOrdersExportIntervalMs());
     }
 }

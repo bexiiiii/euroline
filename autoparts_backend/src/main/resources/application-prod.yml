@@ -4,7 +4,7 @@ spring:
       on-profile: prod
   main:
     banner-mode: "off"
-    lazy-initialization: false  # ❌ БЫЛО TRUE - блокировало RabbitMQ consumers!
+    lazy-initialization: false  
   datasource:
     url: jdbc:postgresql://164.90.180.120/eurolinecloud
     username: behruz
@@ -46,6 +46,7 @@ spring:
         queue-capacity: 1000
       thread-name-prefix: async-
     scheduling:
+      enabled: true  
       pool:
         size: 8
   mvc:
