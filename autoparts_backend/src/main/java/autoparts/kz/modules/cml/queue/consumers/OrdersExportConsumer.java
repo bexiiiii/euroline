@@ -20,12 +20,18 @@ public class OrdersExportConsumer {
     public OrdersExportConsumer(OrdersExportService ordersExportService, IdempotencyGuard idempotencyGuard) {
         this.ordersExportService = ordersExportService;
         this.idempotencyGuard = idempotencyGuard;
-        log.info("🚀 OrdersExportConsumer initialized and ready to consume from 'orders.export.q'");
+        
+        // 🔥 КРИТИЧЕСКИ ВАЖНО: Этот лог ОБЯЗАТЕЛЬНО должен появиться!
+        log.error("🚀🚀🚀 OrdersExportConsumer BEAN CREATED! 🚀🚀🚀");
+        System.out.println("🚀🚀🚀 OrdersExportConsumer BEAN CREATED! 🚀🚀🚀");
+        System.err.println("🚀🚀🚀 OrdersExportConsumer BEAN CREATED! 🚀🚀🚀");
     }
 
     @PostConstruct
     public void init() {
-        log.info("✅ OrdersExportConsumer PostConstruct completed - listener should be registered now");
+        log.error("✅✅✅ OrdersExportConsumer @PostConstruct called! RabbitListener should be ready! ✅✅✅");
+        System.out.println("✅✅✅ OrdersExportConsumer @PostConstruct called! ✅✅✅");
+        System.err.println("✅✅✅ OrdersExportConsumer @PostConstruct called! ✅✅✅");
     }
 
     @RabbitListener(
@@ -34,8 +40,11 @@ public class OrdersExportConsumer {
         ackMode = "AUTO"
     )
     public void consume(ExchangeJob job) {
-        log.info("📥 RECEIVED message in OrdersExportConsumer: requestId={}, filename={}, objectKey={}", 
-                 job.requestId(), job.filename(), job.objectKey());
+        log.error("📥📥📥 RECEIVED MESSAGE! RequestId: {}, Filename: {} 📥📥📥", 
+                 job.requestId(), job.filename());
+        System.out.println("📥📥📥 RECEIVED: " + job.requestId());
+        System.err.println("📥📥📥 RECEIVED: " + job.requestId());
+        
         try {
             String key = job.requestId() + ":" + job.createdAt();
             if (!idempotencyGuard.tryAcquire(key, "orders.export")) {
