@@ -1,7 +1,6 @@
 package autoparts.kz.modules.cml.config;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -20,30 +19,30 @@ public class CmlSecurityConfig {
 
     private final CommerceMlProperties properties;
     private final RequestIdFilter requestIdFilter;
-    private final boolean sslEnabled;
 
     @Autowired
     public CmlSecurityConfig(CommerceMlProperties properties,
-                             RequestIdFilter requestIdFilter,
-                             @Value("${server.ssl.enabled:true}") boolean sslEnabled) {
+                             RequestIdFilter requestIdFilter) {
         this.properties = properties;
         this.requestIdFilter = requestIdFilter;
-        this.sslEnabled = sslEnabled;
     }
 
     @Bean
     @Order(0)
     public SecurityFilterChain cmlSecurityFilterChain(HttpSecurity http) throws Exception {
-        http.securityMatcher("/api/1c-exchange/**")
+        http.securityMatcher("/api/1c-exchange", "/api/1c-exchange/**")
                 .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
                 .httpBasic(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(requestIdFilter, UsernamePasswordAuthenticationFilter.class)
-                .addFilterBefore(new IpAllowlistFilter(properties.getAllowedIps()), UsernamePasswordAuthenticationFilter.class);
-        if (sslEnabled) {
-            http.requiresChannel(channel -> channel.anyRequest().requiresSecure());
-        }
+                .addFilterBefore(requestIdFilter, UsernamePasswordAuthenticationFilter.class);
+                // Убираем IP фильтр для продакшена, так как запросы идут через nginx
+                // .addFilterBefore(new IpAllowlistFilter(properties.getAllowedIps()), UsernamePasswordAuthenticationFilter.class);
+        
+        // Не форсируем HTTPS на уровне приложения - это делает nginx
+        // if (sslEnabled) {
+        //     http.requiresChannel(channel -> channel.anyRequest().requiresSecure());
+        // }
         return http.build();
     }
 
