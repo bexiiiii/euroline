@@ -62,7 +62,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    @Order(0)
+    @Order(2)
     public SecurityFilterChain actuatorSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .securityMatcher("/actuator/prometheus")
@@ -72,7 +72,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    @Order(1)
+    @Order(3)
     public SecurityFilterChain appSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
