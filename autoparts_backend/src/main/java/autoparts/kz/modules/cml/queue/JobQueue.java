@@ -21,14 +21,25 @@ public class JobQueue {
     }
 
     public void submit(JobType jobType, ExchangeJob job) {
-        log.info("Publishing job {} for file {} key {}", jobType, job.filename(), job.objectKey());
-        rabbitTemplate.convertAndSend(properties.getQueue().getExchange(),
-                jobType.routingKey(),
-                job,
-                message -> {
-                    message.getMessageProperties().setHeader("X-Request-Id", job.requestId());
-                    message.getMessageProperties().setAppId("cml-integration");
-                    return message;
-                });
+        String exchange = properties.getQueue().getExchange();
+        String routingKey = jobType.routingKey();
+        log.info("📤 Publishing job {} for file {} key {}", jobType, job.filename(), job.objectKey());
+        log.info("📤 Exchange: {}, RoutingKey: {}, RequestId: {}", exchange, routingKey, job.requestId());
+        
+        try {
+            rabbitTemplate.convertAndSend(exchange,
+                    routingKey,
+                    job,
+                    message -> {
+                        message.getMessageProperties().setHeader("X-Request-Id", job.requestId());
+                        message.getMessageProperties().setAppId("cml-integration");
+                        log.info("📤 Message sent successfully to exchange '{}' with routing key '{}'", exchange, routingKey);
+                        return message;
+                    });
+        } catch (Exception e) {
+            log.error("❌ Failed to publish job to RabbitMQ", e);
+            e.printStackTrace();
+            throw e;
+        }
     }
 }

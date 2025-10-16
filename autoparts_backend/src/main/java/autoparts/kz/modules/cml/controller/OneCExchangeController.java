@@ -13,8 +13,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.io.IOException;
-
 @RestController
 @RequestMapping("/api/1c-exchange")
 public class OneCExchangeController {
@@ -37,7 +35,11 @@ public class OneCExchangeController {
                                             @RequestParam("mode") String mode,
                                             @RequestParam(value = "filename", required = false) String filename,
                                             HttpServletRequest request) {
+        // ✅ Безопасная обработка requestId
         String requestId = (String) request.getAttribute(RequestIdFilter.HEADER);
+        if (requestId == null) {
+            requestId = java.util.UUID.randomUUID().toString();
+        }
         
         try {
             String response = switch ((type + ":" + mode).toLowerCase()) {
@@ -67,19 +69,30 @@ public class OneCExchangeController {
     }
 
     @PostMapping(consumes = MediaType.ALL_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<byte[]> handlePost(@RequestParam("type") String type,
+    public ResponseEntity<String> handlePost(@RequestParam("type") String type,
                                              @RequestParam("mode") String mode,
                                              @RequestParam("filename") String filename,
-                                             HttpServletRequest request) throws IOException {
+                                             HttpServletRequest request) {
+        // ✅ Безопасная обработка requestId
         String requestId = (String) request.getAttribute(RequestIdFilter.HEADER);
-        long contentLength = request.getContentLengthLong();
-        String response = exchangeService.handleFileUpload(type, filename, request.getInputStream(), contentLength, requestId);
-        return text(response);
-    }
-
-    private ResponseEntity<byte[]> text(String body) {
-        return ResponseEntity.ok()
-                .contentType(MediaType.TEXT_PLAIN)
-                .body(body.getBytes());
+        if (requestId == null) {
+            requestId = java.util.UUID.randomUUID().toString();
+        }
+        
+        try {
+            long contentLength = request.getContentLengthLong();
+            String response = exchangeService.handleFileUpload(type, filename, request.getInputStream(), contentLength, requestId);
+            
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body(response);
+                    
+        } catch (Exception e) {
+            e.printStackTrace();
+            log.error("[{}] Error uploading file type={} mode={} filename={}: {}", requestId, type, mode, filename, e.getMessage(), e);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body("failure\n" + e.getMessage());
+        }
     }
 }

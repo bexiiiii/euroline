@@ -189,12 +189,23 @@ public class RabbitConfig {
     }
 
     @Bean
+    public org.springframework.amqp.core.AmqpAdmin amqpAdmin(ConnectionFactory connectionFactory) {
+        return new org.springframework.amqp.rabbit.core.RabbitAdmin(connectionFactory);
+    }
+
+    @Bean
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(ConnectionFactory connectionFactory,
                                                                                MessageConverter messageConverter,
                                                                                MessageRecoverer messageRecoverer) {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
         factory.setConnectionFactory(connectionFactory);
         factory.setMessageConverter(messageConverter);
+        
+        // ✅ CRITICAL: Enable error logging
+        factory.setErrorHandler(error -> {
+            System.err.println("❌ RabbitMQ Listener Error: " + error.getMessage());
+            error.printStackTrace();
+        });
         
         // ✅ ОПТИМИЗИРОВАНО: Уменьшен prefetch для больших сообщений (XML каталоги)
         factory.setPrefetchCount(10);  // Было 50, стало 10
