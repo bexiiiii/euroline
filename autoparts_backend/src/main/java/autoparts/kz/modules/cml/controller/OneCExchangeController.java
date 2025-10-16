@@ -23,8 +23,8 @@ public class OneCExchangeController {
         this.exchangeService = exchangeService;
     }
 
-    // ✅ Fallback для теста соединения (важно для 1С)
-    @GetMapping(produces = MediaType.TEXT_PLAIN_VALUE, params = {})
+    // ✅ Тестовый endpoint для проверки соединения
+    @GetMapping(value = "/test", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> testConnection() {
         return ResponseEntity.ok("success");
     }
