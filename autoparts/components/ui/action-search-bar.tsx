@@ -105,8 +105,8 @@ function ActionSearchBar() {
             return;
         }
 
-        // Don't search if too short (minimum 2 characters)
-        if (trimmed.length < 2) {
+        // Don't search if too short (minimum 3 characters for auto-search)
+        if (trimmed.length < 3) {
             return;
         }
 
