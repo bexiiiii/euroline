@@ -1,6 +1,5 @@
 package autoparts.kz.modules.cml.service;
 
-import autoparts.kz.modules.cml.config.CommerceMlProperties;
 import autoparts.kz.modules.cml.domain.dto.ExchangeJob;
 import autoparts.kz.modules.cml.queue.JobQueue;
 import autoparts.kz.modules.cml.queue.JobType;
@@ -18,12 +17,9 @@ public class OrdersExportScheduler {
     private static final Logger log = LoggerFactory.getLogger(OrdersExportScheduler.class);
 
     private final JobQueue jobQueue;
-    private final CommerceMlProperties properties;
 
-    public OrdersExportScheduler(JobQueue jobQueue, CommerceMlProperties properties) {
+    public OrdersExportScheduler(JobQueue jobQueue) {
         this.jobQueue = jobQueue;
-        this.properties = properties;
-        log.info("🔄🔄🔄 OrdersExportScheduler BEAN CREATED! Interval: {} ms", properties.getOrdersExportIntervalMs());
     }
 
     @Scheduled(fixedDelayString = "${cml.orders-export-interval-ms:300000}")
@@ -31,6 +27,6 @@ public class OrdersExportScheduler {
         String requestId = UUID.randomUUID().toString();
         ExchangeJob job = new ExchangeJob(JobType.ORDERS_EXPORT.routingKey(), "orders.xml", "", requestId, Instant.now());
         jobQueue.submit(JobType.ORDERS_EXPORT, job);
-        log.info("⏰ Scheduled orders export job {} (interval: {} ms)", requestId, properties.getOrdersExportIntervalMs());
+        log.debug("Scheduled orders export job {}", requestId);
     }
 }
