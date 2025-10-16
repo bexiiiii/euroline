@@ -3,6 +3,8 @@ package autoparts.kz.modules.cml.controller;
 import autoparts.kz.modules.cml.config.RequestIdFilter;
 import autoparts.kz.modules.cml.service.OneCExchangeService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +19,7 @@ import java.io.IOException;
 @RequestMapping("/api/1c-exchange")
 public class OneCExchangeController {
 
+    private static final Logger log = LoggerFactory.getLogger(OneCExchangeController.class);
     private final OneCExchangeService exchangeService;
 
     public OneCExchangeController(OneCExchangeService exchangeService) {
@@ -30,25 +33,37 @@ public class OneCExchangeController {
     }
 
     @GetMapping(produces = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<byte[]> handleGet(@RequestParam("type") String type,
+    public ResponseEntity<String> handleGet(@RequestParam("type") String type,
                                             @RequestParam("mode") String mode,
                                             @RequestParam(value = "filename", required = false) String filename,
                                             HttpServletRequest request) {
         String requestId = (String) request.getAttribute(RequestIdFilter.HEADER);
-        return switch ((type + ":" + mode).toLowerCase()) {
-            case "catalog:checkauth" -> text(exchangeService.handleCheckAuth());
-            case "catalog:init" -> text(exchangeService.handleInit());
-            case "catalog:import" -> text(exchangeService.handleImport(type, filename != null ? filename : "import.xml", requestId));
-            case "sale:query" -> exchangeService.handleSaleQuery(requestId);
-            case "sale:success" -> text(exchangeService.handleSaleSuccess());
-            case "sale:import" -> text(exchangeService.handleImport(type, filename != null ? filename : "orders_changes.xml", requestId));
-            // ✅ НОВОЕ: Обработка возвратов
-            case "return:query" -> exchangeService.handleReturnQuery(requestId);
-            case "return:success" -> text(exchangeService.handleReturnSuccess());
-            default -> ResponseEntity.badRequest()
+        
+        try {
+            String response = switch ((type + ":" + mode).toLowerCase()) {
+                case "catalog:checkauth" -> exchangeService.handleCheckAuth();
+                case "catalog:init" -> exchangeService.handleInit();
+                case "catalog:import" -> exchangeService.handleImport(type, filename != null ? filename : "import.xml", requestId);
+                case "sale:query" -> exchangeService.handleSaleQuery(requestId);
+                case "sale:success" -> exchangeService.handleSaleSuccess();
+                case "sale:import" -> exchangeService.handleImport(type, filename != null ? filename : "orders_changes.xml", requestId);
+                // ✅ НОВОЕ: Обработка возвратов
+                case "return:query" -> exchangeService.handleReturnQuery(requestId);
+                case "return:success" -> exchangeService.handleReturnSuccess();
+                default -> "failure\nunknown mode " + type + ":" + mode;
+            };
+            
+            return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_PLAIN)
-                    .body(("failure\nunknown mode " + type + ":" + mode).getBytes());
-        };
+                    .body(response);
+                    
+        } catch (Exception e) {
+            e.printStackTrace();
+            log.error("[{}] Error handling request type={} mode={}: {}", requestId, type, mode, e.getMessage(), e);
+            return ResponseEntity.ok()
+                    .contentType(MediaType.TEXT_PLAIN)
+                    .body("failure\n" + e.getMessage());
+        }
     }
 
     @PostMapping(consumes = MediaType.ALL_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)

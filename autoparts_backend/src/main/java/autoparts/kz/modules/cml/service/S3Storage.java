@@ -72,14 +72,21 @@ public class S3Storage {
     }
 
     public void putObject(String key, byte[] data, String contentType) {
-        log.info("Uploading object {} ({} bytes)", key, data.length);
-        s3Client.putObject(PutObjectRequest.builder()
-                        .bucket(properties.getBucket())
-                        .key(key)
-                        .contentType(contentType)
-                        .acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL)
-                        .build(),
-                RequestBody.fromBytes(data));
+        try {
+            log.info("Uploading object {} ({} bytes)", key, data.length);
+            s3Client.putObject(PutObjectRequest.builder()
+                            .bucket(properties.getBucket())
+                            .key(key)
+                            .contentType(contentType)
+                            .acl(ObjectCannedACL.BUCKET_OWNER_FULL_CONTROL)
+                            .build(),
+                    RequestBody.fromBytes(data));
+            log.info("✅ Successfully uploaded {} to bucket {}", key, properties.getBucket());
+        } catch (Exception e) {
+            log.error("❌ Failed to upload {} to bucket {}: {}", key, properties.getBucket(), e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     public byte[] getObject(String key) {

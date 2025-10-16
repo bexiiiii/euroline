@@ -89,6 +89,7 @@ public class ReturnIntegrationService {
             
         } catch (Exception e) {
             log.error("❌ Ошибка отправки возврата {} в 1C: {}", refundRequestId, e.getMessage(), e);
+            e.printStackTrace();
             throw new RuntimeException("Не удалось отправить возврат в 1C", e);
         }
     }
@@ -113,6 +114,7 @@ public class ReturnIntegrationService {
                 successCount++;
             } catch (Exception e) {
                 log.error("Не удалось отправить возврат {}: {}", refund.getId(), e.getMessage());
+                e.printStackTrace();
             }
         }
         
@@ -166,6 +168,7 @@ public class ReturnIntegrationService {
                 
             } catch (Exception e) {
                 log.error("Ошибка подготовки возврата {}: {}", refund.getId(), e.getMessage());
+                e.printStackTrace();
             }
         }
         
@@ -193,6 +196,7 @@ public class ReturnIntegrationService {
                 }
             } catch (Exception e) {
                 log.error("Ошибка подтверждения возврата {}: {}", refundId, e.getMessage());
+                e.printStackTrace();
             }
         }
     }

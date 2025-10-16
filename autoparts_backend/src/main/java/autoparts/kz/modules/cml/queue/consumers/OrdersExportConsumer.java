@@ -23,12 +23,19 @@ public class OrdersExportConsumer {
 
     @RabbitListener(queues = "orders.export.q")
     public void consume(ExchangeJob job) {
-        String key = job.requestId() + ":" + job.createdAt();
-        if (!idempotencyGuard.tryAcquire(key, "orders.export")) {
-            log.info("Skip duplicate orders export {}", key);
-            return;
+        try {
+            String key = job.requestId() + ":" + job.createdAt();
+            if (!idempotencyGuard.tryAcquire(key, "orders.export")) {
+                log.info("Skip duplicate orders export {}", key);
+                return;
+            }
+            log.info("🔄 Processing orders export job: {}", job.requestId());
+            String objectKey = ordersExportService.exportOrders(job.requestId());
+            log.info("✅ Orders export produced {}", objectKey);
+        } catch (Exception e) {
+            log.error("❌ Orders export job failed", e);
+            e.printStackTrace();
+            throw e;
         }
-        String objectKey = ordersExportService.exportOrders(job.requestId());
-        log.info("Orders export produced {}", objectKey);
     }
 }

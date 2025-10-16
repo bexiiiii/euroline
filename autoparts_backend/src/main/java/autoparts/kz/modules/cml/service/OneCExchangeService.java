@@ -6,8 +6,6 @@ import autoparts.kz.modules.cml.queue.JobQueue;
 import autoparts.kz.modules.cml.queue.JobType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -80,18 +78,20 @@ public class OneCExchangeService {
         return "progress\nqueued";
     }
 
-    public ResponseEntity<byte[]> handleSaleQuery(String requestId) {
-        Optional<String> latest = findLatestOrdersFile();
-        if (latest.isEmpty()) {
-            queueOrdersExport(requestId);
-            return ResponseEntity.ok()
-                    .contentType(MediaType.TEXT_PLAIN)
-                    .body("progress\norders export scheduled".getBytes());
+    public String handleSaleQuery(String requestId) {
+        try {
+            Optional<String> latest = findLatestOrdersFile();
+            if (latest.isEmpty()) {
+                queueOrdersExport(requestId);
+                return "progress\norders export scheduled";
+            }
+            byte[] data = storage.getObject(latest.get());
+            return new String(data);
+        } catch (Exception e) {
+            log.error("Error in handleSaleQuery", e);
+            e.printStackTrace();
+            return "failure\nerror fetching orders";
         }
-        byte[] data = storage.getObject(latest.get());
-        return ResponseEntity.ok()
-                .contentType(MediaType.APPLICATION_XML)
-                .body(data);
     }
 
     public String handleSaleSuccess() {
@@ -104,7 +104,7 @@ public class OneCExchangeService {
      * 
      * Возвращает XML с одобренными возвратами, которые нужно обработать в 1C
      */
-    public ResponseEntity<byte[]> handleReturnQuery(String requestId) {
+    public String handleReturnQuery(String requestId) {
         log.info("[{}] 1C запрашивает возвраты товаров", requestId);
         
         try {
@@ -117,15 +117,12 @@ public class OneCExchangeService {
                 log.info("[{}] Отправляем возвраты в 1C", requestId);
             }
             
-            return ResponseEntity.ok()
-                    .contentType(MediaType.APPLICATION_XML)
-                    .body(xml.getBytes());
+            return xml;
                     
         } catch (Exception e) {
             log.error("[{}] Ошибка формирования возвратов: {}", requestId, e.getMessage(), e);
-            return ResponseEntity.ok()
-                    .contentType(MediaType.TEXT_PLAIN)
-                    .body("failure\nerror generating returns".getBytes());
+            e.printStackTrace();
+            return "failure\nerror generating returns";
         }
     }
 

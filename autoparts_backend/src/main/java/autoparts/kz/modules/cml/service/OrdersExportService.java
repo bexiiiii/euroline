@@ -34,18 +34,29 @@ public class OrdersExportService {
     public String exportOrders(String requestId) {
         try {
             List<CmlOrder> orders = orderRepository.findAll();
+            log.info("Building XML for {} orders", orders.size());
             byte[] xml = builder.build(orders);
+            log.info("XML built, size: {} bytes", xml.length);
+            
             LocalDate today = LocalDate.now();
             String key = "commerce-ml/outbox/orders/%d/%02d/%02d/orders_%s.xml".formatted(
                     today.getYear(),
                     today.getMonthValue(),
                     today.getDayOfMonth(),
                     UUID.randomUUID());
+            
+            log.info("Saving to MinIO: {}", key);
             storage.putObject(key, xml, "application/xml");
-            log.info("Exported {} orders to {}", orders.size(), key);
+            log.info("✅ Exported {} orders to {}", orders.size(), key);
             return key;
         } catch (XMLStreamException e) {
+            log.error("XML building failed", e);
+            e.printStackTrace();
             throw new IllegalStateException("Unable to build orders XML", e);
+        } catch (Exception e) {
+            log.error("Orders export failed", e);
+            e.printStackTrace();
+            throw new RuntimeException("Unable to export orders", e);
         }
     }
 }
