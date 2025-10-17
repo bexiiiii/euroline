@@ -32,25 +32,51 @@ public class ImportCoordinator {
 
     public String storeChunk(String type, String filename, InputStream inputStream, String requestId) throws IOException {
         String key = sessionKey(type, filename, requestId);
-        UploadSession session = sessions.computeIfAbsent(key, ignored -> newSession(filename));
+        log.info("📦 storeChunk: type={}, filename={}, requestId={}, sessionKey={}", type, filename, requestId, key);
+        
+        UploadSession session = sessions.computeIfAbsent(key, ignored -> {
+            UploadSession newSession = newSession(filename);
+            log.info("🆕 Created new session for {}: objectKey={}", filename, newSession.objectKey);
+            return newSession;
+        });
+        
         if (!session.initialized) {
-            storage.initiateMultipartUpload(session.objectKey, resolveContentType(filename));
+            log.info("🚀 Initializing multipart upload for objectKey={}", session.objectKey);
+            String uploadId = storage.initiateMultipartUpload(session.objectKey, resolveContentType(filename));
+            log.info("✅ Multipart upload initialized with uploadId={}", uploadId);
             session.initialized = true;
         }
+        
+        log.info("⬆️ Uploading part to objectKey={}", session.objectKey);
         storage.uploadPart(session.objectKey, inputStream);
+        log.info("✅ Part uploaded successfully to objectKey={}", session.objectKey);
+        
         return session.objectKey;
     }
 
     public String finalizeUpload(String type, String filename, String requestId) {
         String key = sessionKey(type, filename, requestId);
+        log.info("🏁 finalizeUpload: type={}, filename={}, requestId={}, sessionKey={}", type, filename, requestId, key);
+        
         UploadSession session = sessions.remove(key);
         if (session == null) {
+            log.error("❌ No upload session found for filename={}, requestId={}", filename, requestId);
             throw new IllegalStateException("No upload session for " + filename + " " + requestId);
         }
+        
+        log.info("📝 Session found: objectKey={}, initialized={}", session.objectKey, session.initialized);
+        
+        log.info("🔄 Completing multipart upload...");
         storage.completeMultipartUpload(session.objectKey);
+        log.info("✅ Multipart upload completed");
+        
         JobType jobType = resolveJobType(type, filename);
+        log.info("📋 Resolved job type: {}", jobType);
+        
         ExchangeJob job = new ExchangeJob(jobType.routingKey(), filename, session.objectKey, requestId, Instant.now());
+        log.info("📤 Submitting job to queue: type={}, objectKey={}", jobType, session.objectKey);
         jobQueue.submit(jobType, job);
+        
         return session.objectKey;
     }
 

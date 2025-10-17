@@ -73,8 +73,9 @@ public class OneCExchangeService {
     }
 
     public String handleImport(String type, String filename, String requestId) {
+        log.info("🔄 handleImport called - type={}, filename={}, requestId={}", type, filename, requestId);
         String objectKey = importCoordinator.finalizeUpload(type, filename, requestId);
-        log.info("Queued import for {} {}", type, objectKey);
+        log.info("✅ Queued import for {} {}", type, objectKey);
         return "progress\nqueued";
     }
 

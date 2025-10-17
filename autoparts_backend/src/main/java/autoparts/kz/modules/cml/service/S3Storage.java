@@ -168,23 +168,39 @@ public class S3Storage {
     }
 
     public String initiateMultipartUpload(String key, String contentType) {
+        log.info("🔵 Initiating multipart upload: bucket={}, key={}, contentType={}", 
+                properties.getBucket(), key, contentType);
+        
         UploadState state = new UploadState(key, contentType);
         UploadState existing = uploads.putIfAbsent(key, state);
         if (existing != null) {
+            log.info("⚠️ Upload already exists for key={}, reusing uploadId={}", key, existing.uploadId);
             return existing.uploadId;
         }
-        state.uploadId = s3Client.createMultipartUpload(CreateMultipartUploadRequest.builder()
-                .bucket(properties.getBucket())
-                .key(key)
-                .contentType(contentType)
-                .build()).uploadId();
-        return state.uploadId;
+        
+        try {
+            state.uploadId = s3Client.createMultipartUpload(CreateMultipartUploadRequest.builder()
+                    .bucket(properties.getBucket())
+                    .key(key)
+                    .contentType(contentType)
+                    .build()).uploadId();
+            log.info("✅ Multipart upload initiated: uploadId={}", state.uploadId);
+            return state.uploadId;
+        } catch (Exception e) {
+            log.error("❌ Failed to initiate multipart upload for key={}: {}", key, e.getMessage(), e);
+            uploads.remove(key);
+            throw e;
+        }
     }
 
     public void uploadPart(String key, InputStream inputStream) throws IOException {
         UploadState state = requireState(key);
         byte[] bytes = inputStream.readAllBytes();
         int partNumber = state.nextPart();
+        
+        log.info("📦 Uploading part: key={}, partNumber={}, size={} bytes, uploadId={}", 
+                key, partNumber, bytes.length, state.uploadId);
+        
         UploadPartRequest upload = UploadPartRequest.builder()
                 .bucket(properties.getBucket())
                 .key(key)
@@ -192,27 +208,46 @@ public class S3Storage {
                 .partNumber(partNumber)
                 .contentLength((long) bytes.length)
                 .build();
-        log.debug("Uploading part {} for {} ({} bytes)", partNumber, key, bytes.length);
-        String eTag = s3Client.uploadPart(upload, RequestBody.fromBytes(bytes)).eTag();
-        state.parts.add(CompletedPart.builder()
-                .partNumber(partNumber)
-                .eTag(eTag)
-                .build());
+        
+        try {
+            String eTag = s3Client.uploadPart(upload, RequestBody.fromBytes(bytes)).eTag();
+            state.parts.add(CompletedPart.builder()
+                    .partNumber(partNumber)
+                    .eTag(eTag)
+                    .build());
+            log.info("✅ Part uploaded successfully: partNumber={}, eTag={}", partNumber, eTag);
+        } catch (Exception e) {
+            log.error("❌ Failed to upload part {}: {}", partNumber, e.getMessage(), e);
+            throw e;
+        }
     }
 
     public void completeMultipartUpload(String key) {
         UploadState state = uploads.remove(key);
         if (state == null) {
+            log.warn("⚠️ No upload state found for key={}, skipping completion", key);
             return;
         }
+        
+        log.info("🏁 Completing multipart upload: key={}, uploadId={}, parts={}", 
+                key, state.uploadId, state.parts.size());
+        
         state.parts.sort(Comparator.comparingInt(CompletedPart::partNumber));
-        s3Client.completeMultipartUpload(CompleteMultipartUploadRequest.builder()
-                .bucket(properties.getBucket())
-                .key(key)
-                .multipartUpload(CompletedMultipartUpload.builder()
-                        .parts(state.parts)
-                        .build())
-                .build());
+        
+        try {
+            s3Client.completeMultipartUpload(CompleteMultipartUploadRequest.builder()
+                    .bucket(properties.getBucket())
+                    .key(key)
+                    .uploadId(state.uploadId)
+                    .multipartUpload(CompletedMultipartUpload.builder()
+                            .parts(state.parts)
+                            .build())
+                    .build());
+            log.info("✅ Multipart upload completed successfully: key={}", key);
+        } catch (Exception e) {
+            log.error("❌ Failed to complete multipart upload for key={}: {}", key, e.getMessage(), e);
+            throw e;
+        }
     }
 
     public void abortMultipartUpload(String key) {
