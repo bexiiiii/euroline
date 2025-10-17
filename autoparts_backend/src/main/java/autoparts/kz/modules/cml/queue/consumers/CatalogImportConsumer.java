@@ -60,7 +60,12 @@ public class CatalogImportConsumer {
         if (filename != null && filename.toLowerCase().endsWith(".zip")) {
             long limit = properties.getMaxUnzippedSizeMb() * 1024L * 1024L;
             ZipUtil.assertWithinLimit(payload, limit);
-            byte[] xml = ZipUtil.extractEntry(payload, "import.xml");
+            
+            // Ищем файл, начинающийся с "import" (например, import.xml, import0_1.xml и т.д.)
+            log.info("Extracting catalog XML from ZIP archive: {}", filename);
+            byte[] xml = ZipUtil.extractEntryByPrefix(payload, "import");
+            log.info("Successfully extracted catalog XML from archive");
+            
             return new ByteArrayInputStream(xml);
         }
         return new ByteArrayInputStream(payload);

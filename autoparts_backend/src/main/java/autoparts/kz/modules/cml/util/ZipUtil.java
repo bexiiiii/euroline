@@ -1,5 +1,8 @@
 package autoparts.kz.modules.cml.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -8,6 +11,8 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 public final class ZipUtil {
+
+    private static final Logger log = LoggerFactory.getLogger(ZipUtil.class);
 
     private ZipUtil() {
     }
@@ -38,6 +43,54 @@ public final class ZipUtil {
             }
         }
         throw new IllegalArgumentException("Entry " + targetName + " not found in archive");
+    }
+
+    /**
+     * Извлекает первый XML файл из архива, имя которого начинается с указанного префикса
+     */
+    public static byte[] extractEntryByPrefix(byte[] zipBytes, String prefix) throws IOException {
+        // Сначала выведем список всех файлов в архиве
+        log.info("📦 Analyzing ZIP archive contents for prefix '{}'", prefix);
+        listArchiveContents(zipBytes);
+        
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                String entryName = entry.getName();
+                // Получаем только имя файла без пути
+                String fileName = entryName.contains("/") 
+                    ? entryName.substring(entryName.lastIndexOf("/") + 1) 
+                    : entryName;
+                
+                if (!entry.isDirectory() 
+                    && fileName.toLowerCase().startsWith(prefix.toLowerCase())
+                    && fileName.toLowerCase().endsWith(".xml")) {
+                    log.info("✅ Found matching XML file: {} (full path: {})", fileName, entryName);
+                    return readEntry(zis);
+                }
+            }
+        }
+        throw new IllegalArgumentException("No XML entry starting with '" + prefix + "' found in archive");
+    }
+
+    /**
+     * Выводит список всех файлов в архиве
+     */
+    public static void listArchiveContents(byte[] zipBytes) throws IOException {
+        log.info("📋 Files in ZIP archive:");
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            ZipEntry entry;
+            int count = 0;
+            while ((entry = zis.getNextEntry()) != null) {
+                count++;
+                if (entry.isDirectory()) {
+                    log.info("  📁 [DIR]  {}", entry.getName());
+                } else {
+                    log.info("  📄 [FILE] {} ({} bytes)", entry.getName(), entry.getSize());
+                }
+            }
+            log.info("📊 Total entries: {}", count);
+        }
     }
 
     private static long drainEntry(InputStream is) throws IOException {

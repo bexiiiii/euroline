@@ -61,7 +61,12 @@ public class OffersImportConsumer {
         if (filename != null && filename.toLowerCase().endsWith(".zip")) {
             long limit = properties.getMaxUnzippedSizeMb() * 1024L * 1024L;
             ZipUtil.assertWithinLimit(payload, limit);
-            byte[] xml = ZipUtil.extractEntry(payload, "offers.xml");
+            
+            // Ищем файл, начинающийся с "offers" (например, offers.xml, offers0_1.xml и т.д.)
+            log.info("Extracting offers XML from ZIP archive: {}", filename);
+            byte[] xml = ZipUtil.extractEntryByPrefix(payload, "offers");
+            log.info("Successfully extracted offers XML from archive");
+            
             return new ByteArrayInputStream(xml);
         }
         return new ByteArrayInputStream(payload);
