@@ -42,6 +42,9 @@ public class OneCExchangeController {
         }
         
         log.info("🟢 1С GET: type='{}', mode='{}', filename='{}', requestId={}", type, mode, filename, requestId);
+        log.info("📋 All request parameters: {}", request.getParameterMap().entrySet().stream()
+                .map(e -> e.getKey() + "=" + String.join(",", e.getValue()))
+                .reduce((a, b) -> a + ", " + b).orElse("none"));
         
         try {
             String response = switch ((type + ":" + mode).toLowerCase()) {
@@ -85,8 +88,21 @@ public class OneCExchangeController {
         }
         
         log.info("🔵 1С POST: type='{}', mode='{}', filename='{}', requestId={}", type, mode, filename, requestId);
+        log.info("📋 All request parameters: {}", request.getParameterMap().entrySet().stream()
+                .map(e -> e.getKey() + "=" + String.join(",", e.getValue()))
+                .reduce((a, b) -> a + ", " + b).orElse("none"));
         
         try {
+            // Проверяем, может это запрос на импорт, а не загрузка файла
+            if ("import".equalsIgnoreCase(mode)) {
+                log.info("🔵 POST with mode=import detected, handling as import request");
+                String response = exchangeService.handleImport(type, filename, requestId);
+                log.info("🔵 POST import response: '{}'", response);
+                return ResponseEntity.ok()
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .body(response);
+            }
+            
             long contentLength = request.getContentLengthLong();
             log.info("🔵 Receiving file chunk: size={} bytes", contentLength);
             

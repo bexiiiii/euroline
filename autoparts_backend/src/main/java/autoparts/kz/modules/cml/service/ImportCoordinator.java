@@ -105,6 +105,22 @@ public class ImportCoordinator {
         sessions.clear();
     }
 
+    /**
+     * Получить информацию о текущих активных сессиях
+     */
+    public Map<String, Object> getSessionsInfo() {
+        Map<String, Object> info = new java.util.HashMap<>();
+        info.put("activeSessionsCount", sessions.size());
+        info.put("sessions", sessions.entrySet().stream()
+                .map(entry -> Map.of(
+                        "key", entry.getKey(),
+                        "objectKey", entry.getValue().objectKey,
+                        "initialized", entry.getValue().initialized
+                ))
+                .toList());
+        return info;
+    }
+
     private UploadSession newSession(String filename) {
         LocalDate today = LocalDate.now();
         String objectKey = "commerce-ml/inbox/%d/%02d/%02d/%s/%s".formatted(

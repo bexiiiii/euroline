@@ -65,6 +65,13 @@ public class OneCExchangeService {
         try {
             String objectKey = importCoordinator.storeChunk(type, filename, body, requestId);
             log.info("Stored chunk for {} {} at {}", type, filename, objectKey);
+            
+            // 🔥 НОВОЕ: Автоматически финализируем и запускаем импорт после загрузки
+            // Это нужно потому что некоторые версии 1С не вызывают mode=import
+            log.info("🔄 Auto-finalizing upload and triggering import for {}", filename);
+            String finalizedKey = importCoordinator.finalizeUpload(type, filename, requestId);
+            log.info("✅ Upload finalized and import queued: {}", finalizedKey);
+            
             return "success";
         } catch (IOException e) {
             log.error("Failed to store chunk {}", filename, e);
@@ -74,9 +81,16 @@ public class OneCExchangeService {
 
     public String handleImport(String type, String filename, String requestId) {
         log.info("🔄 handleImport called - type={}, filename={}, requestId={}", type, filename, requestId);
-        String objectKey = importCoordinator.finalizeUpload(type, filename, requestId);
-        log.info("✅ Queued import for {} {}", type, objectKey);
-        return "progress\nqueued";
+        
+        try {
+            String objectKey = importCoordinator.finalizeUpload(type, filename, requestId);
+            log.info("✅ Queued import for {} {}", type, objectKey);
+            return "progress\nqueued";
+        } catch (IllegalStateException e) {
+            // Сессия не найдена - возможно уже была финализирована при загрузке
+            log.warn("⚠️ Upload session not found - likely already finalized: {}", e.getMessage());
+            return "success\nalready imported";
+        }
     }
 
     public String handleSaleQuery(String requestId) {
