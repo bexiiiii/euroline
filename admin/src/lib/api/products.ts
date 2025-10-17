@@ -135,31 +135,24 @@ const normalizePageSize = (size?: number): number => {
   return Math.floor(size);
 };
 
-async function fetchProducts(): Promise<Product[]>;
-async function fetchProducts(filters: ProductFilters): Promise<PageResponse<Product>>;
-async function fetchProducts(filters?: ProductFilters): Promise<Product[] | PageResponse<Product>> {
-  // Если нет фильтров, используем legacy endpoint, который возвращает массив
-  if (!filters || Object.keys(filters).length === 0) {
-    return apiFetch<Product[]>('/api/admin/products/all-legacy');
-  }
-
-  // Если есть фильтры, используем пагинированный endpoint
-  const page = clampPage(filters.page);
-  const size = normalizePageSize(filters.size);
+// ✅ Всегда возвращаем PageResponse для оптимальной производительности
+async function fetchProducts(filters?: ProductFilters): Promise<PageResponse<Product>> {
+  const page = clampPage(filters?.page);
+  const size = normalizePageSize(filters?.size);
   
-  // Backend теперь возвращает Page<Product>, используем его напрямую
+  // Backend возвращает Page<Product>
   const pageResponse = await apiFetch<PageResponse<Product>>(
     `/api/admin/products/all?page=${page}&size=${size}`
   );
 
   // Применяем дополнительные фильтры на клиенте (если нужно)
   let filtered = pageResponse.content;
-  if (filters.q || filters.brand) {
+  if (filters?.q || filters?.brand) {
     filtered = filterProducts(pageResponse.content, filters);
   }
 
   // Применяем сортировку на клиенте (если нужно)
-  if (filters.sort) {
+  if (filters?.sort) {
     filtered = sortProducts(filtered, filters.sort);
   }
 
@@ -206,9 +199,11 @@ const getCategoryNames = async (): Promise<string[]> => {
 };
 
 const getBrandNames = async (): Promise<string[]> => {
-  const products = await apiFetch<Product[]>('/api/admin/products/all-legacy');
+  // ✅ Загружаем только первую страницу с большим размером для получения списка брендов
+  // TODO: Создать отдельный backend endpoint /api/admin/products/brands для оптимизации
+  const pageResponse = await apiFetch<PageResponse<Product>>('/api/admin/products/all?page=0&size=100');
   const brands = new Set<string>();
-  for (const product of products) {
+  for (const product of pageResponse.content) {
     const brand = normalizeQuery(product.brand);
     if (brand) {
       brands.add(brand);
