@@ -35,5 +35,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
            "GROUP BY c.name " +
            "ORDER BY COUNT(p) DESC")
     List<Object[]> countProductsByCategory();
+
+    // 🚀 Быстрые методы для статистики
+    long countByStockGreaterThan(Integer stock);
+    long countByExternalCodeIsNotNull();
 }
 

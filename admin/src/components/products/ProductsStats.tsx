@@ -6,39 +6,44 @@ interface ProductsStatsProps {
   refreshKey: number;
 }
 
+"use client";
+import React, { useState, useEffect } from "react";
+import { productApi } from "@/lib/api/products";
+
+interface ProductsStatsProps {
+  refreshKey: number;
+}
+
 const ProductsStats: React.FC<ProductsStatsProps> = ({ refreshKey }) => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    inStock: 0,
+    outOfStock: 0,
+    syncedWith1C: 0,
+  });
   const [loading, setLoading] = useState(true);
-  const [totalProducts, setTotalProducts] = useState(0);
 
   useEffect(() => {
-    loadProducts();
+    loadStats();
   }, [refreshKey]);
 
-  const loadProducts = async () => {
+  const loadStats = async () => {
     try {
       setLoading(true);
-      // 🚀 Загружаем большую страницу для статистики (1000 товаров)
-      // TODO: Лучше создать отдельный backend endpoint /api/admin/products/stats
-      const data = await productApi.getProducts(0, 1000);
-      setProducts(data.content);
-      setTotalProducts(data.totalElements); // ✅ Используем реальное общее количество
+      // 🚀 Используем быстрый endpoint со SQL-агрегацией
+      const data = await productApi.getStats();
+      setStats(data);
     } catch (error) {
-      console.error("Не удалось загрузить продукты:", error);
+      console.error("Не удалось загрузить статистику:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Вычисляем статистику на основе реальных данных
-  const syncedWith1C = products.filter(p => p.syncedWith1C).length;
-  const inStock = products.filter(p => (p.stock || 0) > 0).length;
-  const outOfStock = products.length - inStock; // Используем products.length для подсчета из загруженных
-
-  const stats = [
+  const statsConfig = [
     {
       title: "Всего товаров",
-      value: loading ? "—" : totalProducts.toString(),
+      value: loading ? "—" : stats.totalProducts.toString(),
       change: "+12%", // TODO: вычислить реальное изменение
       changeType: "positive" as const,
       icon: (
@@ -49,7 +54,7 @@ const ProductsStats: React.FC<ProductsStatsProps> = ({ refreshKey }) => {
     },
     {
       title: "В наличии",
-      value: loading ? "—" : inStock.toString(),
+      value: loading ? "—" : stats.inStock.toString(),
       change: "+8%", // TODO: вычислить реальное изменение
       changeType: "positive" as const,
       icon: (
@@ -60,7 +65,7 @@ const ProductsStats: React.FC<ProductsStatsProps> = ({ refreshKey }) => {
     },
     {
       title: "Нет в наличии",
-      value: loading ? "—" : outOfStock.toString(),
+      value: loading ? "—" : stats.outOfStock.toString(),
       change: "-3%", // TODO: вычислить реальное изменение
       changeType: "negative" as const,
       icon: (
@@ -71,7 +76,7 @@ const ProductsStats: React.FC<ProductsStatsProps> = ({ refreshKey }) => {
     },
     {
       title: "Из 1С",
-      value: loading ? "—" : syncedWith1C.toString(),
+      value: loading ? "—" : stats.syncedWith1C.toString(),
       change: "+15%", // TODO: вычислить реальное изменение
       changeType: "positive" as const,
       icon: (
@@ -84,7 +89,7 @@ const ProductsStats: React.FC<ProductsStatsProps> = ({ refreshKey }) => {
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {stats.map((stat, index) => (
+      {statsConfig.map((stat, index) => (
         <div
           key={index}
           className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-6"

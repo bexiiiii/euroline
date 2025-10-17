@@ -12,6 +12,13 @@ export interface ProductWarehouse {
   quantity: number;
 }
 
+export interface ProductStats {
+  totalProducts: number;
+  inStock: number;
+  outOfStock: number;
+  syncedWith1C: number;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -230,6 +237,11 @@ export const productApi = {
 
   getProductById: async (productId: number): Promise<Product> => {
     return apiFetch<Product>(`/api/admin/products/${productId}`);
+  },
+
+  // 🚀 НОВЫЙ: Быстрая статистика через SQL-агрегацию
+  getStats: async (): Promise<ProductStats> => {
+    return apiFetch<ProductStats>('/api/admin/products/stats');
   },
 
   createProduct: async (productData: ProductRequest): Promise<Product> => {

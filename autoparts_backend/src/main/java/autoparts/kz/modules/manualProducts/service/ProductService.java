@@ -347,4 +347,22 @@ public class ProductService {
         // total оставим равным авто-топу (для простой и предсказуемой пагинации)
         return new org.springframework.data.domain.PageImpl<>(merged, pageable, auto.getTotalElements());
     }
+
+    /**
+     * 🚀 Быстрая статистика по товарам через SQL-агрегацию
+     */
+    @Transactional(readOnly = true)
+    public autoparts.kz.modules.manualProducts.dto.ProductStatsResponse getStats() {
+        long totalProducts = productRepository.count();
+        long inStock = productRepository.countByStockGreaterThan(0);
+        long outOfStock = totalProducts - inStock;
+        long syncedWith1C = productRepository.countByExternalCodeIsNotNull();
+        
+        return new autoparts.kz.modules.manualProducts.dto.ProductStatsResponse(
+            totalProducts,
+            inStock,
+            outOfStock,
+            syncedWith1C
+        );
+    }
 }

@@ -2,6 +2,7 @@ package autoparts.kz.modules.manualProducts.controller;
 
 import autoparts.kz.modules.manualProducts.dto.ProductRequest;
 import autoparts.kz.modules.manualProducts.dto.ProductResponse;
+import autoparts.kz.modules.manualProducts.dto.ProductStatsResponse;
 import autoparts.kz.modules.manualProducts.dto.ProductWeeklyRequest;
 import autoparts.kz.modules.manualProducts.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -41,6 +42,12 @@ public class ProductController {
     @GetMapping("/all-legacy")
     public ResponseEntity<List<ProductResponse>> getAllLegacy() {
         return ResponseEntity.ok(productService.getAll());
+    }
+
+    // 🚀 НОВЫЙ: Быстрая статистика через SQL-агрегацию
+    @GetMapping("/stats")
+    public ResponseEntity<ProductStatsResponse> getStats() {
+        return ResponseEntity.ok(productService.getStats());
     }
 
     //  Получить товар по ID
