@@ -41,11 +41,16 @@ public class OneCExchangeController {
             requestId = java.util.UUID.randomUUID().toString();
         }
         
+        log.info("🟢 1С GET: type='{}', mode='{}', filename='{}', requestId={}", type, mode, filename, requestId);
+        
         try {
             String response = switch ((type + ":" + mode).toLowerCase()) {
                 case "catalog:checkauth" -> exchangeService.handleCheckAuth();
                 case "catalog:init" -> exchangeService.handleInit();
-                case "catalog:import" -> exchangeService.handleImport(type, filename != null ? filename : "import.xml", requestId);
+                case "catalog:import" -> {
+                    log.info("🟢 IMPORT mode triggered: type='{}', filename='{}'", type, filename);
+                    yield exchangeService.handleImport(type, filename != null ? filename : "import.xml", requestId);
+                }
                 case "sale:query" -> exchangeService.handleSaleQuery(requestId);
                 case "sale:success" -> exchangeService.handleSaleSuccess();
                 case "sale:import" -> exchangeService.handleImport(type, filename != null ? filename : "orders_changes.xml", requestId);
@@ -79,9 +84,15 @@ public class OneCExchangeController {
             requestId = java.util.UUID.randomUUID().toString();
         }
         
+        log.info("🔵 1С POST: type='{}', mode='{}', filename='{}', requestId={}", type, mode, filename, requestId);
+        
         try {
             long contentLength = request.getContentLengthLong();
+            log.info("🔵 Receiving file chunk: size={} bytes", contentLength);
+            
             String response = exchangeService.handleFileUpload(type, filename, request.getInputStream(), contentLength, requestId);
+            
+            log.info("🔵 POST response: '{}'", response);
             
             return ResponseEntity.ok()
                     .contentType(MediaType.TEXT_PLAIN)
