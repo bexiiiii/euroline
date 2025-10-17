@@ -5,6 +5,7 @@ import autoparts.kz.modules.cml.domain.dto.ExchangeJob;
 import autoparts.kz.modules.cml.parser.CmlImportParser;
 import autoparts.kz.modules.cml.parser.CmlImportParser.ProductRecord;
 import autoparts.kz.modules.cml.service.CatalogImportService;
+import autoparts.kz.modules.cml.service.ProductSyncService;
 import autoparts.kz.modules.cml.service.S3Storage;
 import autoparts.kz.modules.cml.util.IdempotencyGuard;
 import autoparts.kz.modules.cml.util.ZipUtil;
@@ -24,17 +25,20 @@ public class CatalogImportConsumer {
     private final S3Storage storage;
     private final CmlImportParser parser;
     private final CatalogImportService catalogImportService;
+    private final ProductSyncService productSyncService;
     private final CommerceMlProperties properties;
     private final IdempotencyGuard idempotencyGuard;
 
     public CatalogImportConsumer(S3Storage storage,
                                  CmlImportParser parser,
                                  CatalogImportService catalogImportService,
+                                 ProductSyncService productSyncService,
                                  CommerceMlProperties properties,
                                  IdempotencyGuard idempotencyGuard) {
         this.storage = storage;
         this.parser = parser;
         this.catalogImportService = catalogImportService;
+        this.productSyncService = productSyncService;
         this.properties = properties;
         this.idempotencyGuard = idempotencyGuard;
     }
@@ -46,10 +50,22 @@ public class CatalogImportConsumer {
             log.info("Skipping catalog import {} already processed", key);
             return;
         }
-        byte[] payload = storage.getObject(job.objectKey());
-        InputStream xmlStream = resolvePayloadStream(job.filename(), payload);
-        parser.parse(xmlStream, properties.getBatchSize(), this::processBatch);
-        log.info("Catalog import completed for {}", job.objectKey());
+        
+        try {
+            byte[] payload = storage.getObject(job.objectKey());
+            InputStream xmlStream = resolvePayloadStream(job.filename(), payload);
+            parser.parse(xmlStream, properties.getBatchSize(), this::processBatch);
+            log.info("✅ Catalog import completed for {}", job.objectKey());
+            
+            // Синхронизация товаров из cml_products в products
+            log.info("🔄 Starting product synchronization from staging to main tables...");
+            productSyncService.fullSync();
+            log.info("✅ Product synchronization completed successfully");
+            
+        } catch (Exception e) {
+            log.error("❌ Error during catalog import or sync: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     private void processBatch(java.util.List<ProductRecord> batch) {
