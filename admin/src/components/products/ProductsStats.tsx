@@ -9,6 +9,7 @@ interface ProductsStatsProps {
 const ProductsStats: React.FC<ProductsStatsProps> = ({ refreshKey }) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalProducts, setTotalProducts] = useState(0);
 
   useEffect(() => {
     loadProducts();
@@ -17,8 +18,11 @@ const ProductsStats: React.FC<ProductsStatsProps> = ({ refreshKey }) => {
   const loadProducts = async () => {
     try {
       setLoading(true);
-      const data = await productApi.getProducts();
+      // 🚀 Загружаем большую страницу для статистики (1000 товаров)
+      // TODO: Лучше создать отдельный backend endpoint /api/admin/products/stats
+      const data = await productApi.getProducts(0, 1000);
       setProducts(data.content);
+      setTotalProducts(data.totalElements); // ✅ Используем реальное общее количество
     } catch (error) {
       console.error("Не удалось загрузить продукты:", error);
     } finally {
@@ -27,10 +31,9 @@ const ProductsStats: React.FC<ProductsStatsProps> = ({ refreshKey }) => {
   };
 
   // Вычисляем статистику на основе реальных данных
-  const totalProducts = products.length;
   const syncedWith1C = products.filter(p => p.syncedWith1C).length;
   const inStock = products.filter(p => (p.stock || 0) > 0).length;
-  const outOfStock = totalProducts - inStock;
+  const outOfStock = products.length - inStock; // Используем products.length для подсчета из загруженных
 
   const stats = [
     {

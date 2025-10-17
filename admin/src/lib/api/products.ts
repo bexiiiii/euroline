@@ -213,7 +213,16 @@ const getBrandNames = async (): Promise<string[]> => {
 };
 
 export const productApi = {
-  getProducts: fetchProducts,
+  // Перегрузка: getProducts() или getProducts(page, size) или getProducts(filters)
+  getProducts: (pageOrFilters?: number | ProductFilters, size?: number): Promise<PageResponse<Product>> => {
+    if (typeof pageOrFilters === 'number') {
+      // Вызов: getProducts(0, 10)
+      return fetchProducts({ page: pageOrFilters, size });
+    } else {
+      // Вызов: getProducts() или getProducts({ page: 0, size: 10, q: 'test' })
+      return fetchProducts(pageOrFilters);
+    }
+  },
 
   searchProducts: async (query: string): Promise<Product[]> => {
     return apiFetch<Product[]>(`/api/admin/products/search?q=${encodeURIComponent(query)}`);

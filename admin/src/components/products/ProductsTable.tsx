@@ -47,16 +47,12 @@ const ProductsTable: React.FC<ProductsTableProps> = ({
       setLoading(true);
       setError(null);
       
-      const response = await productApi.getProducts();
+      // 🚀 Используем серверную пагинацию вместо клиентской
+      const response = await productApi.getProducts(currentPage - 1, itemsPerPage);
       
-      // Реализуем пагинацию на клиенте
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const endIndex = startIndex + itemsPerPage;
-      const paginatedProducts = response.content.slice(startIndex, endIndex);
-      
-      setProducts(paginatedProducts);
-      setTotalElements(response.content.length);
-      setTotalPages(Math.ceil(response.content.length / itemsPerPage));
+      setProducts(response.content);
+      setTotalElements(response.totalElements);
+      setTotalPages(response.totalPages);
     } catch (e: any) {
       setError(e.message || "Не удалось загрузить продукты");
       setProducts([]);
