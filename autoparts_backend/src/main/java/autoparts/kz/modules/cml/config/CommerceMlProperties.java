@@ -2,7 +2,6 @@ package autoparts.kz.modules.cml.config;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
@@ -22,7 +21,6 @@ public class CommerceMlProperties {
     @NotBlank
     private String password;
 
-    @NotEmpty
     private List<String> allowedIps = new ArrayList<>();
 
     @Min(1)
