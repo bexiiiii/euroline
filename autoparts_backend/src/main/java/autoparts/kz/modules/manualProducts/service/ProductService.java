@@ -93,11 +93,8 @@ public class ProductService {
 
     // ✅ ОПТИМИЗИРОВАННАЯ ВЕРСИЯ с пагинацией и кэшированием
     @Transactional(readOnly = true)
-    @org.springframework.cache.annotation.Cacheable(
-        cacheNames = "products", 
-        key = "'page_' + #page + '_' + #size",
-        unless = "#result == null || #result.isEmpty()"
-    )
+    // ⚠️ Кеширование Page объектов убрано - Jackson не может десериализовать PageImpl из Redis
+    // Пагинированные запросы обычно быстрые благодаря индексам БД
     public Page<ProductResponse> getAllPaginated(int page, int size) {
         return productRepository.findAll(PageRequest.of(page, size))
                 .map(this::toResponse)
