@@ -18,7 +18,7 @@ const ProductsStats: React.FC<ProductsStatsProps> = ({ refreshKey }) => {
     try {
       setLoading(true);
       const data = await productApi.getProducts();
-      setProducts(data);
+      setProducts(data.content);
     } catch (error) {
       console.error("Не удалось загрузить продукты:", error);
     } finally {

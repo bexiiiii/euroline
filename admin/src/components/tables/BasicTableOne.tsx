@@ -107,7 +107,7 @@ export default function BasicTableOne() {
       setLoading(true);
       setError(null);
       const data = await productApi.getProducts();
-      setProducts(data.map(mapProductToUi));
+      setProducts(data.content.map(mapProductToUi));
     } catch (err) {
       const message = err instanceof Error ? err.message : "Не удалось загрузить продукты";
       setError(message);

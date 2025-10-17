@@ -82,7 +82,7 @@ const ProductPromotionsPage = () => {
       ]);
 
       setPromotions(promotionsResponse.content);
-      setProducts(productsResponse);
+      setProducts(productsResponse.content);
       setCategories(categoriesResponse.content ?? []);
 
       const activePromotions = promotionsResponse.content.filter((p: Promotion) => p.isActive).length;
