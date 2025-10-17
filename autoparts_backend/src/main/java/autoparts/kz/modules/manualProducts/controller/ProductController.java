@@ -5,6 +5,7 @@ import autoparts.kz.modules.manualProducts.dto.ProductResponse;
 import autoparts.kz.modules.manualProducts.dto.ProductWeeklyRequest;
 import autoparts.kz.modules.manualProducts.service.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,9 +24,22 @@ public class ProductController {
         return ResponseEntity.ok(productService.create(request));
     }
 
-    //  Получить все товары
+    // ✅ ОПТИМИЗИРОВАННАЯ ВЕРСИЯ: Получить все товары с пагинацией
     @GetMapping("/all")
-    public ResponseEntity<List<ProductResponse>> getAll() {
+    public ResponseEntity<Page<ProductResponse>> getAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size) {
+        // Ограничиваем максимальный размер страницы для безопасности
+        if (size > 100) {
+            size = 100;
+        }
+        return ResponseEntity.ok(productService.getAllPaginated(page, size));
+    }
+
+    // ⚠️ DEPRECATED: Старый endpoint без пагинации (оставлен для совместимости)
+    @Deprecated
+    @GetMapping("/all-legacy")
+    public ResponseEntity<List<ProductResponse>> getAllLegacy() {
         return ResponseEntity.ok(productService.getAll());
     }
 
