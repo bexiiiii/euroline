@@ -100,6 +100,8 @@ logging:
     org.hibernate.SQL: WARN
     org.hibernate.type: WARN
     autoparts.kz: INFO
+    org.springframework.amqp: WARN
+    org.springframework.amqp.rabbit: WARN
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} %-5level [%X{traceId:-}] [%thread] %logger - %msg%n"
 
@@ -125,7 +127,7 @@ outbox:
 cml:
   username: 1c_exchange
   password: 234Euroline456
-  allowed-ips: ${CML_ALLOWED_IPS:127.0.0.1}
+  allowed-ips: ${CML_ALLOWED_IPS:}  # Пустое значение = разрешены все IP
   queue:
     exchange: ${CML_QUEUE_EXCHANGE:cml.exchange}
     catalog-routing-key: ${CML_CATALOG_ROUTING_KEY:catalog.import}

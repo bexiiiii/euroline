@@ -220,9 +220,9 @@ laximo:
 
 logging:
   level:
-    autoparts.kz.modules.cml: DEBUG
-    org.springframework.amqp: DEBUG
-    org.springframework.amqp.rabbit: DEBUG
+    autoparts.kz.modules.cml: INFO
+    org.springframework.amqp: WARN
+    org.springframework.amqp.rabbit: WARN
 
 # Настройки для production (закомментированы)
 # spring:

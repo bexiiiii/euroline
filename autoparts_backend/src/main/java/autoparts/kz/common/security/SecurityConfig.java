@@ -1,6 +1,7 @@
 package autoparts.kz.common.security;
 
 import autoparts.kz.modules.auth.service.AuthService;
+import autoparts.kz.modules.cml.config.CommerceMlProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,6 +14,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,6 +32,7 @@ public class SecurityConfig {
     private final JwtUtils jwtUtils;
     private final AuthService authService;
     private final PasswordEncoder passwordEncoder;
+    private final CommerceMlProperties cmlProperties;
 
     @Bean
     public UserDetailsService userDetailsService() {
@@ -40,6 +43,20 @@ public class SecurityConfig {
                         .roles(user.getRole().name())
                         .build())
                 .orElseThrow(() -> new UsernameNotFoundException("Пользователь не найден с email: " + email));
+    }
+
+    @Bean(name = "cmlUserDetailsService")
+    public UserDetailsService cmlUserDetailsService() {
+        return username -> {
+            if (cmlProperties.getUsername().equals(username)) {
+                return User.builder()
+                        .username(cmlProperties.getUsername())
+                        .password(cmlProperties.getPassword())
+                        .roles("CML")
+                        .build();
+            }
+            throw new UsernameNotFoundException("CML user not found: " + username);
+        };
     }
 
     @Bean
@@ -59,6 +76,23 @@ public class SecurityConfig {
     @Bean
     public JwtAuthFilter jwtAuthFilter() {
         return new JwtAuthFilter(jwtUtils, userDetailsService(), authService);
+    }
+
+    @Bean
+    @Order(1)
+    public SecurityFilterChain cmlSecurityFilterChain(HttpSecurity http) throws Exception {
+        // Создаем отдельный AuthenticationProvider для CML с NoOpPasswordEncoder
+        DaoAuthenticationProvider cmlAuthProvider = new DaoAuthenticationProvider();
+        cmlAuthProvider.setUserDetailsService(cmlUserDetailsService());
+        cmlAuthProvider.setPasswordEncoder(org.springframework.security.crypto.password.NoOpPasswordEncoder.getInstance());
+        
+        http
+                .securityMatcher("/api/1c-exchange/**")
+                .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())
+                .httpBasic(basic -> {})  // Enable Basic Auth for 1C
+                .authenticationProvider(cmlAuthProvider)
+                .csrf(AbstractHttpConfigurer::disable);
+        return http.build();
     }
 
     @Bean
