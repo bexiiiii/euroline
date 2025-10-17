@@ -59,13 +59,23 @@ public class ProductSyncService {
             """;
 
         // Сначала добавим unique constraint на external_code если его нет
+        // Используем DO NOTHING для PostgreSQL, чтобы избежать ошибки если constraint уже существует
         try {
-            jdbcTemplate.execute(
-                "ALTER TABLE products ADD CONSTRAINT uk_products_external_code UNIQUE (external_code)"
-            );
-            log.info("✅ Added unique constraint on products.external_code");
+            String checkConstraint = """
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint 
+                        WHERE conname = 'uk_products_external_code'
+                    ) THEN
+                        ALTER TABLE products ADD CONSTRAINT uk_products_external_code UNIQUE (external_code);
+                    END IF;
+                END $$;
+                """;
+            jdbcTemplate.execute(checkConstraint);
+            log.debug("✅ Ensured unique constraint exists on products.external_code");
         } catch (Exception e) {
-            log.debug("Unique constraint already exists or couldn't be added: {}", e.getMessage());
+            log.warn("Could not ensure unique constraint on external_code: {}", e.getMessage());
         }
 
         int count = jdbcTemplate.update(sql);
@@ -98,12 +108,21 @@ public class ProductSyncService {
 
         // Добавим unique constraint если его нет
         try {
-            jdbcTemplate.execute(
-                "ALTER TABLE product_properties ADD CONSTRAINT uk_product_properties_product_name UNIQUE (product_id, property_name)"
-            );
-            log.info("✅ Added unique constraint on product_properties");
+            String checkConstraint = """
+                DO $$ 
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint 
+                        WHERE conname = 'uk_product_properties_product_name'
+                    ) THEN
+                        ALTER TABLE product_properties ADD CONSTRAINT uk_product_properties_product_name UNIQUE (product_id, property_name);
+                    END IF;
+                END $$;
+                """;
+            jdbcTemplate.execute(checkConstraint);
+            log.debug("✅ Ensured unique constraint exists on product_properties");
         } catch (Exception e) {
-            log.debug("Unique constraint already exists or couldn't be added: {}", e.getMessage());
+            log.warn("Could not ensure unique constraint on product_properties: {}", e.getMessage());
         }
 
         int count = jdbcTemplate.update(sql);
