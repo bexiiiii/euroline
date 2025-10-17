@@ -175,8 +175,7 @@ aws:
 cml:
   username: ${CML_USERNAME:1c_exchange}
   password: ${CML_PASSWORD:changeit}
-  allowed-ips:
-    - 127.0.0.1
+  allowed-ips: []  # Пустой массив = разрешены все IP
   queue:
     exchange: cml.exchange
     catalog-routing-key: catalog.import
