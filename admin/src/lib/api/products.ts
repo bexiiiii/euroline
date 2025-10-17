@@ -138,28 +138,37 @@ const normalizePageSize = (size?: number): number => {
 async function fetchProducts(): Promise<Product[]>;
 async function fetchProducts(filters: ProductFilters): Promise<PageResponse<Product>>;
 async function fetchProducts(filters?: ProductFilters): Promise<Product[] | PageResponse<Product>> {
-  const allProducts = await apiFetch<Product[]>('/api/admin/products/all');
-
+  // Если нет фильтров, используем legacy endpoint, который возвращает массив
   if (!filters || Object.keys(filters).length === 0) {
-    return allProducts;
+    return apiFetch<Product[]>('/api/admin/products/all-legacy');
   }
 
+  // Если есть фильтры, используем пагинированный endpoint
   const page = clampPage(filters.page);
   const size = normalizePageSize(filters.size);
-  const filtered = filterProducts(allProducts, filters);
-  const sorted = sortProducts(filtered, filters.sort);
+  
+  // Backend теперь возвращает Page<Product>, используем его напрямую
+  const pageResponse = await apiFetch<PageResponse<Product>>(
+    `/api/admin/products/all?page=${page}&size=${size}`
+  );
 
-  const totalElements = sorted.length;
-  const totalPages = size > 0 ? Math.ceil(totalElements / size) : 0;
-  const start = page * size;
-  const content = size > 0 ? sorted.slice(start, start + size) : sorted;
+  // Применяем дополнительные фильтры на клиенте (если нужно)
+  let filtered = pageResponse.content;
+  if (filters.q || filters.brand) {
+    filtered = filterProducts(pageResponse.content, filters);
+  }
+
+  // Применяем сортировку на клиенте (если нужно)
+  if (filters.sort) {
+    filtered = sortProducts(filtered, filters.sort);
+  }
 
   return {
-    content,
-    totalElements,
-    totalPages,
-    size,
-    number: page,
+    content: filtered,
+    totalElements: pageResponse.totalElements,
+    totalPages: pageResponse.totalPages,
+    size: pageResponse.size,
+    number: pageResponse.number,
   };
 }
 
@@ -197,7 +206,7 @@ const getCategoryNames = async (): Promise<string[]> => {
 };
 
 const getBrandNames = async (): Promise<string[]> => {
-  const products = await apiFetch<Product[]>('/api/admin/products/all');
+  const products = await apiFetch<Product[]>('/api/admin/products/all-legacy');
   const brands = new Set<string>();
   for (const product of products) {
     const brand = normalizeQuery(product.brand);
