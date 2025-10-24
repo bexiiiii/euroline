@@ -19,7 +19,10 @@ public class CmlOffersParser {
     public record PriceRecord(String priceTypeGuid, BigDecimal value, String currency) {
     }
 
-    public record OfferRecord(String productGuid, BigDecimal quantity, String warehouseGuid, List<PriceRecord> prices) {
+    public record WarehouseStock(String warehouseGuid, BigDecimal quantity) {
+    }
+
+    public record OfferRecord(String productGuid, BigDecimal totalQuantity, List<WarehouseStock> warehouses, List<PriceRecord> prices) {
     }
 
     public void parse(InputStream inputStream, int batchSize, Consumer<List<OfferRecord>> consumer) throws XMLStreamException {
@@ -47,37 +50,39 @@ public class CmlOffersParser {
 
     private OfferRecord parseOffer(XMLStreamReader reader) throws XMLStreamException {
         String guid = null;
-        BigDecimal quantity = BigDecimal.ZERO;
-        String warehouseGuid = "default";
+        BigDecimal totalQuantity = BigDecimal.ZERO;
+        List<WarehouseStock> warehouses = new ArrayList<>();
         List<PriceRecord> prices = new ArrayList<>();
+        
         while (reader.hasNext()) {
             int event = reader.next();
             if (event == XMLStreamConstants.START_ELEMENT) {
                 switch (reader.getLocalName()) {
                     case "Ид" -> guid = reader.getElementText().trim();
-                    case "Количество" -> quantity = new BigDecimal(reader.getElementText().trim());
+                    case "Количество" -> totalQuantity = new BigDecimal(reader.getElementText().trim());
                     case "Цены" -> prices.addAll(parsePrices(reader));
-                    case "Склад" -> warehouseGuid = parseWarehouse(reader);
+                    case "Склад" -> {
+                        // Читаем атрибуты ИдСклада и КоличествоНаСкладе
+                        String warehouseId = reader.getAttributeValue(null, "ИдСклада");
+                        String qtyStr = reader.getAttributeValue(null, "КоличествоНаСкладе");
+                        if (warehouseId != null && qtyStr != null) {
+                            try {
+                                BigDecimal qty = new BigDecimal(qtyStr);
+                                if (qty.compareTo(BigDecimal.ZERO) > 0) {
+                                    warehouses.add(new WarehouseStock(warehouseId, qty));
+                                }
+                            } catch (NumberFormatException e) {
+                                // Пропускаем невалидные количества
+                            }
+                        }
+                    }
                     default -> skip(reader);
                 }
             } else if (event == XMLStreamConstants.END_ELEMENT && "Предложение".equals(reader.getLocalName())) {
                 break;
             }
         }
-        return new OfferRecord(guid, quantity, warehouseGuid, prices);
-    }
-
-    private String parseWarehouse(XMLStreamReader reader) throws XMLStreamException {
-        String warehouseGuid = "default";
-        while (reader.hasNext()) {
-            int event = reader.next();
-            if (event == XMLStreamConstants.START_ELEMENT && "Ид".equals(reader.getLocalName())) {
-                warehouseGuid = reader.getElementText().trim();
-            } else if (event == XMLStreamConstants.END_ELEMENT && "Склад".equals(reader.getLocalName())) {
-                break;
-            }
-        }
-        return warehouseGuid;
+        return new OfferRecord(guid, totalQuantity, warehouses, prices);
     }
 
     private List<PriceRecord> parsePrices(XMLStreamReader reader) throws XMLStreamException {

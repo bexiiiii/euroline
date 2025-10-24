@@ -42,10 +42,15 @@ public class OffersImportService {
     @Transactional
     public void upsertOffers(List<OfferRecord> offers) {
         for (OfferRecord offer : offers) {
-            jdbcTemplate.update(UPSERT_STOCK,
-                    offer.productGuid(),
-                    offer.warehouseGuid(),
-                    offer.quantity());
+            // Сохраняем остатки по каждому складу
+            for (var warehouse : offer.warehouses()) {
+                jdbcTemplate.update(UPSERT_STOCK,
+                        offer.productGuid(),
+                        warehouse.warehouseGuid(),
+                        warehouse.quantity());
+            }
+            
+            // Сохраняем цены
             for (PriceRecord price : offer.prices()) {
                 jdbcTemplate.update(UPSERT_PRICE,
                         offer.productGuid(),
