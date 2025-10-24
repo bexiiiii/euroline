@@ -21,10 +21,9 @@ class CmlOffersParserTest {
                     <Предложения>
                       <Предложение>
                         <Ид>prod-1</Ид>
-                        <Количество>42.5</Количество>
-                        <Склад>
-                          <Ид>main-warehouse</Ид>
-                        </Склад>
+                        <Количество>122</Количество>
+                        <Склад ИдСклада="main-warehouse" КоличествоНаСкладе="50"/>
+                        <Склад ИдСклада="secondary-warehouse" КоличествоНаСкладе="72"/>
                         <Цены>
                           <Цена>
                             <ИдТипаЦены>retail</ИдТипаЦены>
@@ -44,8 +43,12 @@ class CmlOffersParserTest {
         assertThat(offers).hasSize(1);
         CmlOffersParser.OfferRecord offer = offers.get(0);
         assertThat(offer.productGuid()).isEqualTo("prod-1");
-        assertThat(offer.quantity()).isEqualByComparingTo("42.5");
-        assertThat(offer.warehouseGuid()).isEqualTo("main-warehouse");
+        assertThat(offer.totalQuantity()).isEqualByComparingTo("122");
+        assertThat(offer.warehouses()).hasSize(2);
+        assertThat(offer.warehouses().get(0).warehouseGuid()).isEqualTo("main-warehouse");
+        assertThat(offer.warehouses().get(0).quantity()).isEqualByComparingTo("50");
+        assertThat(offer.warehouses().get(1).warehouseGuid()).isEqualTo("secondary-warehouse");
+        assertThat(offer.warehouses().get(1).quantity()).isEqualByComparingTo("72");
         assertThat(offer.prices()).hasSize(1);
         assertThat(offer.prices().get(0).priceTypeGuid()).isEqualTo("retail");
     }
