@@ -1,5 +1,6 @@
 package autoparts.kz.modules.cml.controller;
 
+import autoparts.kz.modules.cml.repo.CmlProcessedMessageRepository;
 import autoparts.kz.modules.cml.service.ImportCoordinator;
 import autoparts.kz.modules.cml.service.S3Storage;
 import org.slf4j.Logger;
@@ -8,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
@@ -24,10 +26,14 @@ public class CmlAdminController {
     
     private final ImportCoordinator importCoordinator;
     private final S3Storage s3Storage;
+    private final CmlProcessedMessageRepository processedMessageRepository;
 
-    public CmlAdminController(ImportCoordinator importCoordinator, S3Storage s3Storage) {
+    public CmlAdminController(ImportCoordinator importCoordinator, 
+                             S3Storage s3Storage,
+                             CmlProcessedMessageRepository processedMessageRepository) {
         this.importCoordinator = importCoordinator;
         this.s3Storage = s3Storage;
+        this.processedMessageRepository = processedMessageRepository;
     }
 
     /**
@@ -88,5 +94,45 @@ public class CmlAdminController {
         config.put("accessKey", props.getAccessKey().substring(0, Math.min(4, props.getAccessKey().length())) + "***");
         
         return ResponseEntity.ok(config);
+    }
+
+    /**
+     * Очистить записи об обработанных сообщениях (idempotency guard)
+     * Это позволяет пере-импортировать уже обработанные файлы
+     */
+    @PostMapping("/idempotency/clear")
+    public ResponseEntity<Map<String, Object>> clearIdempotency(
+            @RequestParam(required = false) String type) {
+        
+        long deletedCount;
+        if (type != null && !type.isBlank()) {
+            deletedCount = processedMessageRepository.deleteByType(type);
+            log.warn("Cleared {} idempotency records for type: {}", deletedCount, type);
+        } else {
+            deletedCount = processedMessageRepository.count();
+            processedMessageRepository.deleteAll();
+            log.warn("Cleared ALL {} idempotency records", deletedCount);
+        }
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("status", "success");
+        response.put("deletedCount", deletedCount);
+        response.put("type", type != null ? type : "all");
+        response.put("message", "Idempotency records cleared. Files can now be re-imported.");
+        
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Получить статистику по обработанным сообщениям
+     */
+    @GetMapping("/idempotency/stats")
+    public ResponseEntity<Map<String, Object>> getIdempotencyStats() {
+        long totalCount = processedMessageRepository.count();
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("totalProcessed", totalCount);
+        
+        return ResponseEntity.ok(response);
     }
 }
