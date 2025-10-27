@@ -27,6 +27,12 @@ public class CmlOrderItem {
     @Column(name = "product_guid", nullable = false)
     private String productGuid;
 
+    @Column(name = "product_name")
+    private String productName;
+
+    @Column(name = "article")
+    private String article;
+
     @Column(nullable = false)
     private BigDecimal price;
 
@@ -58,6 +64,22 @@ public class CmlOrderItem {
 
     public void setProductGuid(String productGuid) {
         this.productGuid = productGuid;
+    }
+
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = productName;
+    }
+
+    public String getArticle() {
+        return article;
+    }
+
+    public void setArticle(String article) {
+        this.article = article;
     }
 
     public BigDecimal getPrice() {

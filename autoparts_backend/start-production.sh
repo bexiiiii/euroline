@@ -13,6 +13,12 @@ JAR_FILE="target/${APP_NAME}-${APP_VERSION}.jar"
 LOG_DIR="/var/log/${APP_NAME}"
 PID_FILE="/var/run/${APP_NAME}.pid"
 
+# Environment Variables for RabbitMQ, Redis, S3
+export RABBIT_HOST="${RABBIT_HOST:-127.0.0.1}"
+export RABBIT_PORT="${RABBIT_PORT:-5672}"
+export RABBIT_USER="${RABBIT_USER:-cml}"
+export RABBIT_PASSWORD="${RABBIT_PASSWORD:-cml}"
+
 # JVM Settings для 8GB RAM сервера
 export JAVA_OPTS="-Xms4G -Xmx6G \
   -XX:+UseG1GC \

@@ -1,5 +1,8 @@
 package autoparts.kz.modules.cml.controller;
 
+import autoparts.kz.modules.cml.domain.dto.ExchangeJob;
+import autoparts.kz.modules.cml.queue.JobQueue;
+import autoparts.kz.modules.cml.queue.JobType;
 import autoparts.kz.modules.cml.repo.CmlProcessedMessageRepository;
 import autoparts.kz.modules.cml.service.ImportCoordinator;
 import autoparts.kz.modules.cml.service.S3Storage;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Административный контроллер для управления CML интеграцией
@@ -27,13 +31,16 @@ public class CmlAdminController {
     private final ImportCoordinator importCoordinator;
     private final S3Storage s3Storage;
     private final CmlProcessedMessageRepository processedMessageRepository;
+    private final JobQueue jobQueue;
 
     public CmlAdminController(ImportCoordinator importCoordinator, 
                              S3Storage s3Storage,
-                             CmlProcessedMessageRepository processedMessageRepository) {
+                             CmlProcessedMessageRepository processedMessageRepository,
+                             JobQueue jobQueue) {
         this.importCoordinator = importCoordinator;
         this.s3Storage = s3Storage;
         this.processedMessageRepository = processedMessageRepository;
+        this.jobQueue = jobQueue;
     }
 
     /**
@@ -134,5 +141,56 @@ public class CmlAdminController {
         response.put("totalProcessed", totalCount);
         
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * Вручную запустить импорт файла из S3
+     * Полезно после очистки idempotency для пере-импорта
+     */
+    @PostMapping("/import/trigger")
+    public ResponseEntity<Map<String, Object>> triggerImport(
+            @RequestParam String objectKey,
+            @RequestParam(defaultValue = "CATALOG_IMPORT") String jobTypeName) {
+        
+        try {
+            // Определяем JobType
+            JobType jobType;
+            try {
+                jobType = JobType.valueOf(jobTypeName);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Invalid job type. Use: CATALOG_IMPORT or OFFERS_IMPORT"));
+            }
+            
+            // Создаем новый requestId для обхода idempotency
+            String requestId = "manual-" + UUID.randomUUID().toString();
+            String filename = objectKey.substring(objectKey.lastIndexOf('/') + 1);
+            
+            // ExchangeJob(type, filename, objectKey, requestId, createdAt)
+            ExchangeJob job = new ExchangeJob(
+                    jobType.name(),
+                    filename,
+                    objectKey,
+                    requestId,
+                    java.time.Instant.now()
+            );
+            
+            jobQueue.submit(jobType, job);
+            
+            log.info("Manually triggered {} for file: {}", jobType, objectKey);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Import job submitted");
+            response.put("requestId", requestId);
+            response.put("objectKey", objectKey);
+            response.put("jobType", jobType.name());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Failed to trigger import", e);
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 }

@@ -89,3 +89,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/add-1c-integration-fields-to-refund-requests.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/22-add-product-info-to-cml-order-items.sql
+      relativeToChangelogFile: false
