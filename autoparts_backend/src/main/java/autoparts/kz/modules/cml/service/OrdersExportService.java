@@ -2,6 +2,7 @@ package autoparts.kz.modules.cml.service;
 
 import autoparts.kz.modules.cml.builder.OrdersCmlBuilder;
 import autoparts.kz.modules.cml.domain.entity.CmlOrder;
+import autoparts.kz.modules.cml.domain.entity.CmlOrderStatus;
 import autoparts.kz.modules.cml.repo.CmlOrderRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -11,9 +12,15 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.xml.stream.XMLStreamException;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
 
+/**
+ * Профессиональный сервис экспорта заказов в 1С через CommerceML XML.
+ * 
+ * Экспортирует только новые заказы (статус NEW), генерирует XML и сохраняет в MinIO.
+ * После успешного экспорта помечает заказы как CONFIRMED для предотвращения повторной отправки.
+ */
 @Service
 public class OrdersExportService {
 
@@ -31,32 +38,65 @@ public class OrdersExportService {
         this.storage = storage;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Экспортирует новые заказы в формате CommerceML XML.
+     * 
+     * @param requestId идентификатор запроса для логирования
+     * @return путь к созданному XML файлу в MinIO
+     */
+    @Transactional
     public String exportOrders(String requestId) {
         try {
-            List<CmlOrder> orders = orderRepository.findAll();
-            log.debug("Building XML for {} orders", orders.size());
-            byte[] xml = builder.build(orders);
-            log.debug("XML built, size: {} bytes", xml.length);
+            // ✅ Экспортируем только новые заказы (статус NEW)
+            List<CmlOrder> newOrders = orderRepository.findByStatusIn(
+                Arrays.asList(CmlOrderStatus.NEW)
+            );
             
-            // Use Asia/Almaty timezone for correct date
+            if (newOrders.isEmpty()) {
+                log.debug("No new orders to export (requestId: {})", requestId);
+                return null; // Нет новых заказов
+            }
+            
+            log.info("Found {} new orders to export (requestId: {})", newOrders.size(), requestId);
+            
+            // Генерируем XML
+            byte[] xml = builder.build(newOrders);
+            log.debug("XML built successfully, size: {} bytes", xml.length);
+            
+            // Сохраняем в MinIO с правильной структурой папок
             LocalDate today = LocalDate.now(ZoneId.of("Asia/Almaty"));
             String key = "commerce-ml/outbox/orders/%d/%02d/%02d/orders_%s.xml".formatted(
                     today.getYear(),
                     today.getMonthValue(),
                     today.getDayOfMonth(),
-                    UUID.randomUUID());
+                    requestId);
             
-            log.debug("Saving to MinIO: {}", key);
             storage.putObject(key, xml, "application/xml");
-            log.info("Exported {} orders to {}", orders.size(), key);
+            log.info("✅ Exported {} orders to MinIO: {}", newOrders.size(), key);
+            
+            // ✅ Обновляем статус заказов - теперь они отправлены в 1С
+            markOrdersAsExported(newOrders);
+            
             return key;
+            
         } catch (XMLStreamException e) {
-            log.error("XML building failed", e);
+            log.error("❌ XML generation failed for requestId {}: {}", requestId, e.getMessage(), e);
             throw new IllegalStateException("Unable to build orders XML", e);
         } catch (Exception e) {
-            log.error("Orders export failed", e);
+            log.error("❌ Orders export failed for requestId {}: {}", requestId, e.getMessage(), e);
             throw new RuntimeException("Unable to export orders", e);
         }
+    }
+    
+    /**
+     * Помечает заказы как экспортированные (статус CONFIRMED).
+     * Это предотвращает повторную отправку одних и тех же заказов.
+     */
+    private void markOrdersAsExported(List<CmlOrder> orders) {
+        for (CmlOrder order : orders) {
+            order.setStatus(CmlOrderStatus.CONFIRMED);
+        }
+        orderRepository.saveAll(orders);
+        log.info("Marked {} orders as CONFIRMED (exported to 1C)", orders.size());
     }
 }

@@ -11,4 +11,6 @@ public interface CmlProductRepository extends JpaRepository<CmlProduct, Long> {
     Optional<CmlProduct> findByGuid(String guid);
 
     List<CmlProduct> findByGuidIn(Collection<String> guids);
+    
+    Optional<CmlProduct> findBySku(String sku);
 }

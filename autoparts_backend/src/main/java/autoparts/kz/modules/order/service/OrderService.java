@@ -45,6 +45,10 @@ public class OrderService {
     private final autoparts.kz.modules.telegram.service.TelegramNotificationService telegramNotificationService;
     private final autoparts.kz.modules.cml.service.OneCBridgePublisher oneCBridgePublisher;
     private final UserRepository userRepository;
+    
+    // ✅ НОВОЕ: Конвертер для CommerceML интеграции
+    private final autoparts.kz.modules.cml.service.OrderToCmlConverter orderToCmlConverter;
+    private final autoparts.kz.modules.cml.repo.CmlOrderRepository cmlOrderRepository;
 
     @Transactional
     public Order createOrderFromCart(Long userId, CreateOrderRequest req) {
@@ -66,6 +70,16 @@ public class OrderService {
         // Создать заказ
         Order order = createOrder(userId, req, cart);
         order = orderRepository.save(order);
+
+        // ✅ НОВОЕ: Создать CmlOrder для автоматической интеграции с 1С через CommerceML
+        try {
+            autoparts.kz.modules.cml.domain.entity.CmlOrder cmlOrder = orderToCmlConverter.convert(order);
+            cmlOrderRepository.save(cmlOrder);
+            log.info("CmlOrder created for order {}, will be exported to 1C", order.getId());
+        } catch (Exception e) {
+            log.error("Failed to create CmlOrder for order {}: {}", order.getId(), e.getMessage(), e);
+            // Не бросаем исключение - заказ уже создан, интеграцию попробуем позже
+        }
 
         // Сформировать событие и положить в outbox
         enqueueOrderCreated(order);

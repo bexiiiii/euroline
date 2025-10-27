@@ -39,5 +39,12 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     // 🚀 Быстрые методы для статистики
     long countByStockGreaterThan(Integer stock);
     long countByExternalCodeIsNotNull();
+
+    // 🔍 НОВЫЕ МЕТОДЫ: Поиск по артикулу для обогащения результатов поиска данными из 1С
+    @Query("SELECT p FROM Product p WHERE LOWER(p.code) = LOWER(:article) OR LOWER(p.sku) = LOWER(:article)")
+    java.util.Optional<Product> findByArticle(@Param("article") String article);
+
+    @Query("SELECT p FROM Product p WHERE p.externalCode = :externalCode")
+    java.util.Optional<Product> findByExternalCode(@Param("externalCode") String externalCode);
 }
 

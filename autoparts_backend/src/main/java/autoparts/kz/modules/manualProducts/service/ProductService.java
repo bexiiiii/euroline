@@ -1,5 +1,6 @@
 package autoparts.kz.modules.manualProducts.service;
 
+import autoparts.kz.modules.cml.service.ProductEnrichmentService;
 import autoparts.kz.modules.manualProducts.dto.ProductQuery;
 import autoparts.kz.modules.manualProducts.dto.ProductRequest;
 import autoparts.kz.modules.manualProducts.dto.ProductResponse;
@@ -9,7 +10,6 @@ import autoparts.kz.modules.manualProducts.repository.ProductRepository;
 import autoparts.kz.modules.manualProducts.spec.ProductSpecs;
 import autoparts.kz.modules.order.orderStatus.OrderStatus;
 import autoparts.kz.modules.order.repository.OrderItemRepository;
-import autoparts.kz.modules.stockOneC.service.OneCService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -30,7 +30,7 @@ import java.util.stream.Collectors;
 public class ProductService {
 
     private final ProductRepository productRepository;
-    private final OneCService oneCService;
+    private final ProductEnrichmentService enrichmentService; // ✅ НОВЫЙ сервис для обогащения данными 1С
     private final OrderItemRepository orderItemRepository;
 
     public ProductResponse create(ProductRequest request) {
@@ -55,8 +55,12 @@ public class ProductService {
         return toResponse(saved);
     }
 
-    public ProductResponse toResponsePublic(Product product) { return toResponse(product); }
+    public ProductResponse toResponsePublic(Product product) { return toResponseEnriched(product); }
     
+    /**
+     * Конвертирует Product в ProductResponse БЕЗ обогащения данными 1С.
+     * Используется для внутренних операций.
+     */
     private ProductResponse toResponse(Product product) {
         ProductResponse response = new ProductResponse();
         response.setId(product.getId());
@@ -80,14 +84,61 @@ public class ProductService {
         response.setProperties(props);
         return response;
     }
+    
+    /**
+     * ✅ НОВЫЙ МЕТОД: Конвертирует Product в ProductResponse С обогащением данными 1С.
+     * Обогащает цены, остатки и склады из таблиц cml_products, cml_prices, cml_stocks.
+     */
+    private ProductResponse toResponseEnriched(Product product) {
+        ProductResponse response = toResponse(product);
+        
+        // Обогащаем данными из 1С по артикулу
+        try {
+            enrichmentService.enrichByArticle(product.getCode()).ifPresent(enrichmentData -> {
+                // Обновляем цену из cml_prices
+                if (enrichmentData.getPrice() != null) {
+                    response.setPrice(enrichmentData.getPrice().intValue());
+                }
+                
+                // Обновляем остатки из cml_stocks  
+                if (enrichmentData.getStock() != null) {
+                    response.setStock(enrichmentData.getStock().intValue());
+                }
+                
+                // ✅ НОВОЕ: Добавляем информацию о складах
+                if (enrichmentData.getWarehouses() != null && !enrichmentData.getWarehouses().isEmpty()) {
+                    List<ProductResponse.WarehouseDTO> warehouseDTOs = 
+                        enrichmentData.getWarehouses().stream()
+                            .map(w -> {
+                                ProductResponse.WarehouseDTO dto = new ProductResponse.WarehouseDTO();
+                                dto.setName(w.getWarehouseName());
+                                dto.setQuantity(w.getQuantity().intValue());
+                                return dto;
+                            })
+                            .toList();
+                    response.setWarehouses(warehouseDTOs);
+                }
+                
+                response.setSyncedWith1C(enrichmentData.isFoundInLocalDb());
+                
+                log.debug("✅ Enriched product {}: price={}, stock={}, warehouses={}", 
+                    product.getCode(), enrichmentData.getPrice(), enrichmentData.getStock(), 
+                    enrichmentData.getWarehouses() != null ? enrichmentData.getWarehouses().size() : 0);
+            });
+        } catch (Exception e) {
+            log.error("❌ Failed to enrich product {}: {}", product.getCode(), e.getMessage());
+            // Возвращаем базовый response без обогащения
+        }
+        
+        return response;
+    }
 
     @Transactional(readOnly = true)
     @Deprecated // ⚠️ Не использовать! Загружает ВСЕ продукты в память. Используйте getAllPaginated()
     public List<ProductResponse> getAll() {
         log.warn("getAll() вызван - это неоптимально! Рекомендуется использовать getAllPaginated()");
         return productRepository.findAll(PageRequest.of(0, 1000)).stream() // Ограничиваем 1000 записями
-                .map(this::toResponse)
-                .map(p -> oneCService.enrichWithOneCData(p).orElse(p))
+                .map(this::toResponseEnriched) // ✅ Используем обогащенную версию
                 .toList();
     }
 
@@ -97,8 +148,7 @@ public class ProductService {
     // Пагинированные запросы обычно быстрые благодаря индексам БД
     public Page<ProductResponse> getAllPaginated(int page, int size) {
         return productRepository.findAll(PageRequest.of(page, size))
-                .map(this::toResponse)
-                .map(p -> oneCService.enrichWithOneCData(p).orElse(p));
+                .map(this::toResponseEnriched); // ✅ Используем обогащенную версию
     }
 
     @Transactional(readOnly = true)
@@ -110,7 +160,7 @@ public class ProductService {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
         ProductResponse response = toResponse(product);
-        return oneCService.enrichWithOneCData(response).orElse(response);
+        return toResponseEnriched(product);
     }
 
     @Transactional(readOnly = true)
@@ -122,7 +172,7 @@ public class ProductService {
         return productRepository.findFirstByCodeIgnoreCase(code)
                 .map(product -> {
                     ProductResponse response = toResponse(product);
-                    return oneCService.enrichWithOneCData(response).orElse(response);
+                    return toResponseEnriched(product);
                 })
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Product not found"));
     }
@@ -171,7 +221,7 @@ public class ProductService {
         List<Product> products = productRepository.searchByQuery(query);
         return products.stream()
                 .map(this::toResponse)
-                .map(p -> oneCService.enrichWithOneCData(p).orElse(p))
+                
                 .toList();
     }
 
@@ -190,14 +240,14 @@ public class ProductService {
 
         return productRepository.findAll(spec, pageable)
                 .map(this::toResponse)
-                .map(p -> oneCService.enrichWithOneCData(p).orElse(p));
+                ;
     }
 
     @Transactional(readOnly = true)
     public Page<ProductResponse> listWeekly(Pageable pageable) {
         return productRepository.findByIsWeeklyTrue(pageable)
                 .map(this::toResponse)
-                .map(p -> oneCService.enrichWithOneCData(p).orElse(p));
+                ;
     }
 
     @Transactional(readOnly = true)
@@ -238,7 +288,7 @@ public class ProductService {
 
         return productRepository.findAll(spec, pageable)
                 .map(this::toResponse)
-                .map(p -> oneCService.enrichWithOneCData(p).orElse(p));
+                ;
     }
 
     @Transactional(readOnly = true)
@@ -289,7 +339,7 @@ public class ProductService {
 
         var responses = products.stream()
                 .map(this::toResponse)
-                .map(p -> oneCService.enrichWithOneCData(p).orElse(p))
+                
                 .toList();
 
         return new org.springframework.data.domain.PageImpl<>(responses, unsorted, total);
@@ -338,7 +388,7 @@ public class ProductService {
         int need = pageable.getPageSize() - auto.getContent().size();
         var filler = productRepository.findAll(spec, org.springframework.data.domain.PageRequest.of(0, need))
                 .map(this::toResponse)
-                .map(p -> oneCService.enrichWithOneCData(p).orElse(p))
+                
                 .getContent();
 
         var merged = new java.util.ArrayList<ProductResponse>(auto.getContent());
