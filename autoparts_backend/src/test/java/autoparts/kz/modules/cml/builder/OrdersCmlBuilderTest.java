@@ -24,6 +24,13 @@ class OrdersCmlBuilderTest {
         order.setGuid("order-guid-123");
         order.setNumber("ORD-001");
         order.setCustomerGuid("customer-guid-456");
+        order.setCustomerName("Иванов Иван Иванович");
+        order.setCustomerClientName("ТОО \"АвтоСервис Алматы\"");
+        order.setCustomerEmail("ivanov@example.com");
+        order.setCustomerPhone("+77001234567");
+        order.setCustomerCountry("Казахстан");
+        order.setCustomerCity("Алматы");
+        order.setCustomerAddress("ул. Абая, д. 10, офис 5");
         order.setStatus(CmlOrderStatus.NEW);
         order.setTotal(new BigDecimal("15000.00"));
         order.setCreatedAt(LocalDateTime.of(2025, 10, 27, 10, 30));
@@ -81,7 +88,24 @@ class OrdersCmlBuilderTest {
         assertThat(xmlString).contains("<Контрагенты>");
         assertThat(xmlString).contains("<Контрагент>");
         assertThat(xmlString).contains("<Ид>customer-guid-456</Ид>");
+        assertThat(xmlString).contains("ТОО \"АвтоСервис Алматы\"");
+        assertThat(xmlString).contains("Иванов Иван Иванович");
         assertThat(xmlString).contains("<Роль>Покупатель</Роль>");
+        
+        // Проверка контактов
+        assertThat(xmlString).contains("<Контакты>");
+        assertThat(xmlString).contains("<Контакт>");
+        assertThat(xmlString).contains("<Тип>Почта</Тип>");
+        assertThat(xmlString).contains("<Значение>ivanov@example.com</Значение>");
+        assertThat(xmlString).contains("<Тип>Телефон</Тип>");
+        assertThat(xmlString).contains("<Значение>+77001234567</Значение>");
+        
+        // Проверка адреса
+        assertThat(xmlString).contains("<АдресРегистрации>");
+        assertThat(xmlString).contains("<Представление>Казахстан, Алматы, ул. Абая, д. 10, офис 5</Представление>");
+        assertThat(xmlString).contains("<Страна>Казахстан</Страна>");
+        assertThat(xmlString).contains("<Город>Алматы</Город>");
+        assertThat(xmlString).contains("<АдресВСвободнойФорме>ул. Абая, д. 10, офис 5</АдресВСвободнойФорме>");
         
         // Проверка товаров
         assertThat(xmlString).contains("<Товары>");

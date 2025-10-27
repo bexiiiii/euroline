@@ -92,3 +92,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/22-add-product-info-to-cml-order-items.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/23-add-customer-info-to-cml-orders.sql
+      relativeToChangelogFile: false

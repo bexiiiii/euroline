@@ -1,3 +1,4 @@
+-- Active: 1760214685003@@164.90.180.120@5432@eurolinecloud
 -- liquibase formatted sql
 
 -- changeset system:22-add-product-info-to-cml-order-items
@@ -14,7 +15,7 @@ COMMENT ON COLUMN cml_order_items.article IS 'Артикул товара для
 UPDATE cml_order_items coi
 SET 
     product_name = p.name,
-    article = p.article
+    article = p.sku
 FROM products p
 WHERE coi.product_guid = p.external_code
   AND (coi.product_name IS NULL OR coi.article IS NULL);

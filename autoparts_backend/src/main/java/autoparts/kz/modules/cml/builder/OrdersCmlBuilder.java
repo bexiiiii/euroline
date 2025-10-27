@@ -57,9 +57,54 @@ public class OrdersCmlBuilder {
         writer.writeStartElement("Контрагенты");
         writer.writeStartElement("Контрагент");
         element(writer, "Ид", order.getCustomerGuid());
-        element(writer, "Наименование", "Покупатель"); // TODO: можно добавить реальное имя из заказа
+        
+        // Полное имя клиента
+        String fullName = buildCustomerFullName(order);
+        element(writer, "Наименование", fullName);
+        element(writer, "ПолноеНаименование", fullName);
         element(writer, "Роль", "Покупатель");
-        element(writer, "ПолноеНаименование", "Покупатель");
+        
+        // Контактная информация
+        if (order.getCustomerEmail() != null || order.getCustomerPhone() != null) {
+            writer.writeStartElement("Контакты");
+            
+            if (order.getCustomerEmail() != null && !order.getCustomerEmail().isEmpty()) {
+                writer.writeStartElement("Контакт");
+                element(writer, "Тип", "Почта");
+                element(writer, "Значение", order.getCustomerEmail());
+                writer.writeEndElement(); // Контакт
+            }
+            
+            if (order.getCustomerPhone() != null && !order.getCustomerPhone().isEmpty()) {
+                writer.writeStartElement("Контакт");
+                element(writer, "Тип", "Телефон");
+                element(writer, "Значение", order.getCustomerPhone());
+                writer.writeEndElement(); // Контакт
+            }
+            
+            writer.writeEndElement(); // Контакты
+        }
+        
+        // Адрес
+        if (hasAddress(order)) {
+            writer.writeStartElement("АдресРегистрации");
+            writer.writeStartElement("Представление");
+            writer.writeCharacters(buildAddressString(order));
+            writer.writeEndElement(); // Представление
+            
+            if (order.getCustomerCountry() != null && !order.getCustomerCountry().isEmpty()) {
+                element(writer, "Страна", order.getCustomerCountry());
+            }
+            if (order.getCustomerCity() != null && !order.getCustomerCity().isEmpty()) {
+                element(writer, "Город", order.getCustomerCity());
+            }
+            if (order.getCustomerAddress() != null && !order.getCustomerAddress().isEmpty()) {
+                element(writer, "АдресВСвободнойФорме", order.getCustomerAddress());
+            }
+            
+            writer.writeEndElement(); // АдресРегистрации
+        }
+        
         writer.writeEndElement(); // Контрагент
         writer.writeEndElement(); // Контрагенты
 
@@ -148,13 +193,51 @@ public class OrdersCmlBuilder {
         writer.writeEndElement();
     }
     
-    private String escapeXml(String value) {
-        if (value == null) return "";
-        return value
-                .replace("&", "&amp;")
-                .replace("<", "&lt;")
-                .replace(">", "&gt;")
-                .replace("\"", "&quot;")
-                .replace("'", "&apos;");
+    private String buildCustomerFullName(CmlOrder order) {
+        StringBuilder name = new StringBuilder();
+        
+        // Приоритет: название заведения, затем ФИО
+        if (order.getCustomerClientName() != null && !order.getCustomerClientName().isEmpty()) {
+            name.append(order.getCustomerClientName());
+            
+            // Если есть и ФИО, добавляем в скобках
+            if (order.getCustomerName() != null && !order.getCustomerName().isEmpty()) {
+                name.append(" (").append(order.getCustomerName()).append(")");
+            }
+        } else if (order.getCustomerName() != null && !order.getCustomerName().isEmpty()) {
+            name.append(order.getCustomerName());
+        } else if (order.getCustomerEmail() != null && !order.getCustomerEmail().isEmpty()) {
+            name.append(order.getCustomerEmail());
+        } else {
+            name.append("Покупатель");
+        }
+        
+        return name.toString();
+    }
+    
+    private boolean hasAddress(CmlOrder order) {
+        return (order.getCustomerCountry() != null && !order.getCustomerCountry().isEmpty()) ||
+               (order.getCustomerCity() != null && !order.getCustomerCity().isEmpty()) ||
+               (order.getCustomerAddress() != null && !order.getCustomerAddress().isEmpty());
+    }
+    
+    private String buildAddressString(CmlOrder order) {
+        StringBuilder address = new StringBuilder();
+        
+        if (order.getCustomerCountry() != null && !order.getCustomerCountry().isEmpty()) {
+            address.append(order.getCustomerCountry());
+        }
+        
+        if (order.getCustomerCity() != null && !order.getCustomerCity().isEmpty()) {
+            if (address.length() > 0) address.append(", ");
+            address.append(order.getCustomerCity());
+        }
+        
+        if (order.getCustomerAddress() != null && !order.getCustomerAddress().isEmpty()) {
+            if (address.length() > 0) address.append(", ");
+            address.append(order.getCustomerAddress());
+        }
+        
+        return address.length() > 0 ? address.toString() : "Не указан";
     }
 }
