@@ -95,15 +95,29 @@ public class OneCExchangeService {
 
     public String handleSaleQuery(String requestId) {
         try {
+            log.info("🔍 [{}] handleSaleQuery called - searching for orders file", requestId);
+            
             Optional<String> latest = findLatestOrdersFile();
             if (latest.isEmpty()) {
+                log.warn("⚠️ [{}] No orders file found in MinIO, queuing export", requestId);
                 queueOrdersExport(requestId);
                 return "progress\norders export scheduled";
             }
+            
+            log.info("📄 [{}] Found orders file: {}", requestId, latest.get());
             byte[] data = storage.getObject(latest.get());
-            return new String(data);
+            String xmlContent = new String(data);
+            
+            // Логируем первые 500 символов XML для диагностики
+            String preview = xmlContent.length() > 500 
+                ? xmlContent.substring(0, 500) + "..." 
+                : xmlContent;
+            log.info("📦 [{}] Returning orders XML ({} bytes): {}", 
+                requestId, data.length, preview);
+            
+            return xmlContent;
         } catch (Exception e) {
-            log.error("Error in handleSaleQuery", e);
+            log.error("❌ [{}] Error in handleSaleQuery", requestId, e);
             e.printStackTrace();
             return "failure\nerror fetching orders";
         }
@@ -155,11 +169,26 @@ public class OneCExchangeService {
     }
 
     private Optional<String> findLatestOrdersFile() {
+        log.debug("🔍 Listing objects in commerce-ml/outbox/orders/");
         List<software.amazon.awssdk.services.s3.model.S3Object> objects =
                 storage.listObjects("commerce-ml/outbox/orders/");
-        return objects.stream()
+        
+        log.info("📂 Found {} objects in orders outbox", objects.size());
+        objects.forEach(obj -> 
+            log.debug("  - {} (modified: {})", obj.key(), obj.lastModified())
+        );
+        
+        Optional<String> result = objects.stream()
                 .max(Comparator.comparing(software.amazon.awssdk.services.s3.model.S3Object::lastModified))
                 .map(software.amazon.awssdk.services.s3.model.S3Object::key);
+        
+        if (result.isPresent()) {
+            log.info("✅ Latest orders file: {}", result.get());
+        } else {
+            log.warn("⚠️ No orders files found in outbox");
+        }
+        
+        return result;
     }
 
     private void queueOrdersExport(String requestId) {
