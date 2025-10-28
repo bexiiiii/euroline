@@ -5,6 +5,7 @@ import autoparts.kz.modules.cml.domain.dto.ExchangeJob;
 import autoparts.kz.modules.cml.parser.CmlOffersParser;
 import autoparts.kz.modules.cml.parser.CmlOffersParser.OfferRecord;
 import autoparts.kz.modules.cml.service.OffersImportService;
+import autoparts.kz.modules.cml.service.ProductSyncService;
 import autoparts.kz.modules.cml.service.S3Storage;
 import autoparts.kz.modules.cml.util.IdempotencyGuard;
 import autoparts.kz.modules.cml.util.ZipUtil;
@@ -25,17 +26,20 @@ public class OffersImportConsumer {
     private final S3Storage storage;
     private final CmlOffersParser parser;
     private final OffersImportService offersImportService;
+    private final ProductSyncService productSyncService;
     private final CommerceMlProperties properties;
     private final IdempotencyGuard idempotencyGuard;
 
     public OffersImportConsumer(S3Storage storage,
                                 CmlOffersParser parser,
                                 OffersImportService offersImportService,
+                                ProductSyncService productSyncService,
                                 CommerceMlProperties properties,
                                 IdempotencyGuard idempotencyGuard) {
         this.storage = storage;
         this.parser = parser;
         this.offersImportService = offersImportService;
+        this.productSyncService = productSyncService;
         this.properties = properties;
         this.idempotencyGuard = idempotencyGuard;
     }
@@ -47,10 +51,22 @@ public class OffersImportConsumer {
             log.info("Skip offers import {} already processed", key);
             return;
         }
-        byte[] payload = storage.getObject(job.objectKey());
-        InputStream xmlStream = resolvePayloadStream(job.filename(), payload);
-        parser.parse(xmlStream, properties.getBatchSize(), this::processBatch);
-        log.info("Offers import done for {}", job.objectKey());
+        
+        try {
+            byte[] payload = storage.getObject(job.objectKey());
+            InputStream xmlStream = resolvePayloadStream(job.filename(), payload);
+            parser.parse(xmlStream, properties.getBatchSize(), this::processBatch);
+            log.info("✅ Offers import completed for {}", job.objectKey());
+            
+            // ✅ ВАЖНО: Синхронизация цен и остатков в таблицу products
+            log.info("🔄 Syncing prices and stocks to products table...");
+            productSyncService.syncProductsFromCml();
+            log.info("✅ Prices and stocks synchronized successfully");
+            
+        } catch (Exception e) {
+            log.error("❌ Error during offers import or sync: {}", e.getMessage(), e);
+            throw e;
+        }
     }
 
     private void processBatch(List<OfferRecord> batch) {
