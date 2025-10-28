@@ -169,11 +169,16 @@ public class OneCExchangeService {
     }
 
     private Optional<String> findLatestOrdersFile() {
-        log.debug("🔍 Listing objects in commerce-ml/outbox/orders/");
-        List<software.amazon.awssdk.services.s3.model.S3Object> objects =
-                storage.listObjects("commerce-ml/outbox/orders/");
+        // Ищем файлы только за сегодняшнюю дату для избежания получения старых файлов
+        java.time.LocalDate today = java.time.LocalDate.now();
+        String todayPrefix = String.format("commerce-ml/outbox/orders/%d/%02d/%02d/", 
+            today.getYear(), today.getMonthValue(), today.getDayOfMonth());
         
-        log.info("📂 Found {} objects in orders outbox", objects.size());
+        log.info("🔍 Listing objects in {}", todayPrefix);
+        List<software.amazon.awssdk.services.s3.model.S3Object> objects =
+                storage.listObjects(todayPrefix);
+        
+        log.info("📂 Found {} objects in today's orders outbox", objects.size());
         objects.forEach(obj -> 
             log.debug("  - {} (modified: {})", obj.key(), obj.lastModified())
         );
@@ -185,7 +190,7 @@ public class OneCExchangeService {
         if (result.isPresent()) {
             log.info("✅ Latest orders file: {}", result.get());
         } else {
-            log.warn("⚠️ No orders files found in outbox");
+            log.warn("⚠️ No orders files found in today's outbox: {}", todayPrefix);
         }
         
         return result;
