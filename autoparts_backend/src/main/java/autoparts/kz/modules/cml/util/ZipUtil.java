@@ -74,6 +74,32 @@ public final class ZipUtil {
     }
 
     /**
+     * Проверяет, содержит ли архив XML файл с указанным префиксом
+     */
+    public static boolean hasEntryWithPrefix(byte[] zipBytes, String prefix) {
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipBytes))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                String entryName = entry.getName();
+                // Получаем только имя файла без пути
+                String fileName = entryName.contains("/") 
+                    ? entryName.substring(entryName.lastIndexOf("/") + 1) 
+                    : entryName;
+                
+                if (!entry.isDirectory() 
+                    && fileName.toLowerCase().startsWith(prefix.toLowerCase())
+                    && fileName.toLowerCase().endsWith(".xml")) {
+                    return true;
+                }
+            }
+        } catch (IOException e) {
+            log.warn("⚠️ Failed to inspect ZIP archive: {}", e.getMessage());
+            return false;
+        }
+        return false;
+    }
+
+    /**
      * Выводит список всех файлов в архиве
      */
     public static void listArchiveContents(byte[] zipBytes) throws IOException {

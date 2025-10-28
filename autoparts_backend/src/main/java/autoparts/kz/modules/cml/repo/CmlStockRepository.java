@@ -14,4 +14,8 @@ public interface CmlStockRepository extends JpaRepository<CmlStock, Long> {
     // 🔍 НОВЫЙ МЕТОД: Получить все остатки товара по складам для детализации
     @Query("SELECT s FROM CmlStock s WHERE s.productGuid = :productGuid ORDER BY s.quantity DESC")
     List<CmlStock> findAllByProductGuid(@Param("productGuid") String productGuid);
+    
+    // 🚀 BATCH OPTIMIZATION: Получить остатки нескольких товаров одним запросом
+    @Query("SELECT s FROM CmlStock s WHERE s.productGuid IN :productGuids ORDER BY s.productGuid, s.quantity DESC")
+    List<CmlStock> findAllByProductGuidIn(@Param("productGuids") List<String> productGuids);
 }

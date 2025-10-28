@@ -93,8 +93,8 @@ public class ProductEnrichmentService {
     }
 
     /**
-     * Массовое обогащение списка артикулов
-     * Полезно для оптимизации множественных поисков
+     * 🚀 OPTIMIZED: Массовое обогащение списка артикулов
+     * Вместо N×3 запросов делает всего 2 запроса (products + stocks)
      * 
      * @param articleNumbers список артикулов
      * @return мапа: артикул → данные обогащения
@@ -105,17 +105,80 @@ public class ProductEnrichmentService {
             return java.util.Map.of();
         }
 
-        return articleNumbers.stream()
+        // Шаг 1: Нормализуем артикулы (lowercase, trim, distinct)
+        List<String> normalizedArticles = articleNumbers.stream()
+                .filter(article -> article != null && !article.trim().isEmpty())
+                .map(String::trim)
+                .map(String::toLowerCase)
                 .distinct()
-                .map(this::enrichByArticle)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .collect(Collectors.toMap(
-                        // Используем external_code как ключ, но можно сделать по-другому
-                        EnrichmentData::getExternalCode,
-                        data -> data,
-                        (existing, replacement) -> existing // если дубликаты, берём первый
+                .toList();
+        
+        if (normalizedArticles.isEmpty()) {
+            return java.util.Map.of();
+        }
+
+        log.debug("🚀 Batch enriching {} articles with 2 queries instead of {}×3", 
+                  normalizedArticles.size(), normalizedArticles.size());
+
+        // Шаг 2: ⚡ ОДИН ЗАПРОС для всех товаров (вместо N запросов)
+        List<Product> products = productRepository.findAllByArticleIn(normalizedArticles);
+        
+        if (products.isEmpty()) {
+            log.debug("No products found in local DB for {} articles", normalizedArticles.size());
+            return java.util.Map.of();
+        }
+
+        // Шаг 3: ⚡ ОДИН ЗАПРОС для всех остатков по складам (вместо N запросов)
+        List<String> productGuids = products.stream()
+                .map(Product::getExternalCode)
+                .filter(guid -> guid != null && !guid.trim().isEmpty())
+                .distinct()
+                .toList();
+        
+        List<CmlStock> allStocks = productGuids.isEmpty() 
+                ? List.of() 
+                : cmlStockRepository.findAllByProductGuidIn(productGuids);
+
+        // Шаг 4: Группируем остатки по GUID товара для быстрого доступа
+        java.util.Map<String, List<WarehouseStockDTO>> stocksByGuid = allStocks.stream()
+                .collect(Collectors.groupingBy(
+                        CmlStock::getProductGuid,
+                        Collectors.mapping(
+                                stock -> new WarehouseStockDTO(stock.getWarehouseGuid(), stock.getQuantity()),
+                                Collectors.toList()
+                        )
                 ));
+
+        // Шаг 5: Собираем результат в мапу: артикул → EnrichmentData
+        java.util.Map<String, EnrichmentData> result = new java.util.HashMap<>();
+        
+        for (Product product : products) {
+            EnrichmentData data = new EnrichmentData();
+            data.setProductId(product.getId());
+            data.setPrice(product.getPrice());
+            data.setStock(product.getStock());
+            data.setExternalCode(product.getExternalCode());
+            data.setFoundInLocalDb(true);
+            
+            // Добавляем остатки по складам (если есть)
+            List<WarehouseStockDTO> warehouses = stocksByGuid.getOrDefault(
+                    product.getExternalCode(), 
+                    List.of()
+            );
+            data.setWarehouses(warehouses);
+            
+            // Используем код товара как ключ (нормализованный)
+            String articleKey = product.getCode() != null 
+                    ? product.getCode().toLowerCase().trim() 
+                    : product.getSku().toLowerCase().trim();
+            
+            result.put(articleKey, data);
+        }
+
+        log.debug("✅ Batch enrichment completed: found {}/{} products in 2 queries", 
+                  result.size(), normalizedArticles.size());
+
+        return result;
     }
 
     /**

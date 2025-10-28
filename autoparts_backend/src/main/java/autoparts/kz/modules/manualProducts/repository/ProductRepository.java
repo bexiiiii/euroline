@@ -46,5 +46,9 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
 
     @Query("SELECT p FROM Product p WHERE p.externalCode = :externalCode")
     java.util.Optional<Product> findByExternalCode(@Param("externalCode") String externalCode);
+    
+    // 🚀 BATCH OPTIMIZATION: Найти несколько товаров по артикулам одним запросом
+    @Query("SELECT p FROM Product p WHERE LOWER(p.code) IN :articles OR LOWER(p.sku) IN :articles")
+    List<Product> findAllByArticleIn(@Param("articles") List<String> articles);
 }
 

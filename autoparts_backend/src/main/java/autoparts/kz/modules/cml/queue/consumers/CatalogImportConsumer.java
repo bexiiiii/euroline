@@ -77,12 +77,31 @@ public class CatalogImportConsumer {
             long limit = properties.getMaxUnzippedSizeMb() * 1024L * 1024L;
             ZipUtil.assertWithinLimit(payload, limit);
             
-            // Ищем файл, начинающийся с "import" (например, import.xml, import0_1.xml и т.д.)
-            log.info("Extracting catalog XML from ZIP archive: {}", filename);
-            byte[] xml = ZipUtil.extractEntryByPrefix(payload, "import");
-            log.info("Successfully extracted catalog XML from archive");
-            
-            return new ByteArrayInputStream(xml);
+            // 🔍 Определяем тип файла внутри архива
+            try {
+                log.info("Extracting catalog XML from ZIP archive: {}", filename);
+                byte[] xml = ZipUtil.extractEntryByPrefix(payload, "import");
+                log.info("✅ Successfully extracted catalog XML (import*.xml) from archive");
+                return new ByteArrayInputStream(xml);
+            } catch (IllegalArgumentException e) {
+                // Если не найден import*.xml, проверяем, может это offers*.xml
+                if (e.getMessage().contains("No XML entry starting with 'import'")) {
+                    log.warn("⚠️ Archive {} contains offers*.xml instead of import*.xml - this should be processed by OffersImportConsumer", filename);
+                    log.info("🔄 Attempting to extract offers XML to verify...");
+                    try {
+                        byte[] offersXml = ZipUtil.extractEntryByPrefix(payload, "offers");
+                        log.error("❌ Found offers*.xml in catalog queue! This file should be routed to offers.import.q queue. Please check ImportCoordinator routing logic.");
+                        throw new IllegalStateException(
+                            "Archive contains offers*.xml but was routed to catalog import queue. " +
+                            "This indicates a routing misconfiguration. File: " + filename
+                        );
+                    } catch (IllegalArgumentException ex2) {
+                        log.error("❌ Archive contains neither import*.xml nor offers*.xml - invalid CommerceML archive");
+                        throw new IllegalArgumentException("Invalid CommerceML archive: must contain import*.xml or offers*.xml", e);
+                    }
+                }
+                throw e;
+            }
         }
         return new ByteArrayInputStream(payload);
     }

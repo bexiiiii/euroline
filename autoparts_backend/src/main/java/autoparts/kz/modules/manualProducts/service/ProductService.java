@@ -1,5 +1,6 @@
 package autoparts.kz.modules.manualProducts.service;
 
+import autoparts.kz.common.config.CacheConfig;
 import autoparts.kz.modules.cml.service.ProductEnrichmentService;
 import autoparts.kz.modules.manualProducts.dto.ProductQuery;
 import autoparts.kz.modules.manualProducts.dto.ProductRequest;
@@ -12,6 +13,7 @@ import autoparts.kz.modules.order.orderStatus.OrderStatus;
 import autoparts.kz.modules.order.repository.OrderItemRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -132,6 +134,103 @@ public class ProductService {
         
         return response;
     }
+    
+    /**
+     * 🚀 OPTIMIZED: Массовое обогащение списка товаров данными из 1С.
+     * Делает 2 запроса для всех товаров вместо N×3 запросов.
+     * Используется для оптимизации списков и результатов поиска.
+     */
+    private List<ProductResponse> toResponseEnrichedBatch(List<Product> products) {
+        if (products == null || products.isEmpty()) {
+            return List.of();
+        }
+        
+        // Шаг 1: Собираем все артикулы для batch enrichment
+        List<String> articleNumbers = products.stream()
+                .map(Product::getCode)
+                .filter(code -> code != null && !code.trim().isEmpty())
+                .toList();
+        
+        if (articleNumbers.isEmpty()) {
+            // Если артикулов нет, возвращаем базовые responses
+            return products.stream()
+                    .map(this::toResponse)
+                    .toList();
+        }
+        
+        // Шаг 2: ⚡ Получаем данные обогащения ОДНИМ запросом (2 SQL queries вместо N×3)
+        java.util.Map<String, ProductEnrichmentService.EnrichmentData> enrichmentMap = 
+                enrichmentService.enrichBatch(articleNumbers);
+        
+        log.debug("🚀 Batch enriched {} products in 2 queries (instead of {}×3)", 
+                  products.size(), products.size());
+        
+        // Шаг 3: Обогащаем каждый product данными из мапы
+        return products.stream()
+                .map(product -> {
+                    ProductResponse response = toResponse(product);
+                    
+                    // Достаем enrichment data из мапы (O(1) вместо N запросов)
+                    String articleKey = product.getCode() != null 
+                            ? product.getCode().toLowerCase().trim() 
+                            : null;
+                    
+                    if (articleKey != null) {
+                        ProductEnrichmentService.EnrichmentData enrichmentData = 
+                                enrichmentMap.get(articleKey);
+                        
+                        if (enrichmentData != null) {
+                            // Обновляем цену
+                            if (enrichmentData.getPrice() != null) {
+                                response.setPrice(enrichmentData.getPrice().intValue());
+                            }
+                            
+                            // Обновляем остатки
+                            if (enrichmentData.getStock() != null) {
+                                response.setStock(enrichmentData.getStock().intValue());
+                            }
+                            
+                            // Добавляем информацию о складах
+                            if (enrichmentData.getWarehouses() != null && !enrichmentData.getWarehouses().isEmpty()) {
+                                List<ProductResponse.WarehouseDTO> warehouseDTOs = 
+                                    enrichmentData.getWarehouses().stream()
+                                        .map(w -> {
+                                            ProductResponse.WarehouseDTO dto = new ProductResponse.WarehouseDTO();
+                                            dto.setName(w.getWarehouseName());
+                                            dto.setQuantity(w.getQuantity().intValue());
+                                            return dto;
+                                        })
+                                        .toList();
+                                response.setWarehouses(warehouseDTOs);
+                            }
+                            
+                            response.setSyncedWith1C(enrichmentData.isFoundInLocalDb());
+                        }
+                    }
+                    
+                    return response;
+                })
+                .toList();
+    }
+    
+    /**
+     * 🚀 Helper: Конвертирует Page<Product> в Page<ProductResponse> с batch enrichment
+     */
+    private Page<ProductResponse> toPageEnrichedBatch(Page<Product> productPage) {
+        if (productPage.isEmpty()) {
+            return Page.empty(productPage.getPageable());
+        }
+        
+        // Используем batch enrichment для всех товаров на странице
+        List<ProductResponse> enrichedResponses = toResponseEnrichedBatch(productPage.getContent());
+        
+        // Создаем новую Page с обогащенными данными
+        return new org.springframework.data.domain.PageImpl<>(
+                enrichedResponses,
+                productPage.getPageable(),
+                productPage.getTotalElements()
+        );
+    }
 
     @Transactional(readOnly = true)
     @Deprecated // ⚠️ Не использовать! Загружает ВСЕ продукты в память. Используйте getAllPaginated()
@@ -147,8 +246,10 @@ public class ProductService {
     // ⚠️ Кеширование Page объектов убрано - Jackson не может десериализовать PageImpl из Redis
     // Пагинированные запросы обычно быстрые благодаря индексам БД
     public Page<ProductResponse> getAllPaginated(int page, int size) {
-        return productRepository.findAll(PageRequest.of(page, size))
-                .map(this::toResponseEnriched); // ✅ Используем обогащенную версию
+        Page<Product> productPage = productRepository.findAll(PageRequest.of(page, size));
+        
+        // 🚀 OPTIMIZED: используем batch enrichment
+        return toPageEnrichedBatch(productPage);
     }
 
     @Transactional(readOnly = true)
@@ -216,13 +317,14 @@ public class ProductService {
 
     public Product save(Product p) { return productRepository.save(p); }
 
+    @Cacheable(value = CacheConfig.PRODUCT_SEARCH_CACHE, key = "#query")
     @Transactional(readOnly = true)
     public List<ProductResponse> search(String query) {
+        log.debug("🔍 Searching products with query: {} (cache miss)", query);
         List<Product> products = productRepository.searchByQuery(query);
-        return products.stream()
-                .map(this::toResponse)
-                
-                .toList();
+        
+        // 🚀 OPTIMIZED: используем batch enrichment (2 SQL queries вместо N×3)
+        return toResponseEnrichedBatch(products);
     }
 
     @Transactional(readOnly = true)
@@ -238,16 +340,18 @@ public class ProductService {
                 ProductSpecs.inStock(q.inStock())
         );
 
-        return productRepository.findAll(spec, pageable)
-                .map(this::toResponse)
-                ;
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
+        
+        // 🚀 OPTIMIZED: используем batch enrichment для всей страницы (2 queries вместо N×3)
+        return toPageEnrichedBatch(productPage);
     }
 
     @Transactional(readOnly = true)
     public Page<ProductResponse> listWeekly(Pageable pageable) {
-        return productRepository.findByIsWeeklyTrue(pageable)
-                .map(this::toResponse)
-                ;
+        Page<Product> productPage = productRepository.findByIsWeeklyTrue(pageable);
+        
+        // 🚀 OPTIMIZED: используем batch enrichment
+        return toPageEnrichedBatch(productPage);
     }
 
     @Transactional(readOnly = true)
@@ -286,9 +390,10 @@ public class ProductService {
                 }
         );
 
-        return productRepository.findAll(spec, pageable)
-                .map(this::toResponse)
-                ;
+        Page<Product> productPage = productRepository.findAll(spec, pageable);
+        
+        // 🚀 OPTIMIZED: используем batch enrichment
+        return toPageEnrichedBatch(productPage);
     }
 
     @Transactional(readOnly = true)
@@ -337,10 +442,8 @@ public class ProductService {
             }
         }
 
-        var responses = products.stream()
-                .map(this::toResponse)
-                
-                .toList();
+        // 🚀 OPTIMIZED: используем batch enrichment
+        var responses = toResponseEnrichedBatch(products);
 
         return new org.springframework.data.domain.PageImpl<>(responses, unsorted, total);
     }
@@ -386,10 +489,11 @@ public class ProductService {
         );
 
         int need = pageable.getPageSize() - auto.getContent().size();
-        var filler = productRepository.findAll(spec, org.springframework.data.domain.PageRequest.of(0, need))
-                .map(this::toResponse)
-                
-                .getContent();
+        Page<Product> fillerPage = productRepository.findAll(spec, org.springframework.data.domain.PageRequest.of(0, need));
+        
+        // 🚀 OPTIMIZED: используем batch enrichment
+        Page<ProductResponse> fillerPageEnriched = toPageEnrichedBatch(fillerPage);
+        var filler = fillerPageEnriched.getContent();
 
         var merged = new java.util.ArrayList<ProductResponse>(auto.getContent());
         merged.addAll(filler);

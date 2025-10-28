@@ -18,8 +18,9 @@ import java.util.List;
 /**
  * Профессиональный сервис экспорта заказов в 1С через CommerceML XML.
  * 
- * Экспортирует только новые заказы (статус NEW), генерирует XML и сохраняет в MinIO.
- * После успешного экспорта помечает заказы как CONFIRMED для предотвращения повторной отправки.
+ * Экспортирует только NEW заказы, генерирует XML и сохраняет в MinIO.
+ * После успешного экспорта помечает заказы как CONFIRMED.
+ * Заказы в статусе CONFIRMED не экспортируются повторно - это предотвращает дубликаты.
  */
 @Service
 public class OrdersExportService {
@@ -47,15 +48,18 @@ public class OrdersExportService {
     @Transactional
     public String exportOrders(String requestId) {
         try {
-            // ✅ Экспортируем только новые заказы (статус NEW)
+            // ✅ Экспортируем только NEW заказы
+            // После экспорта они станут CONFIRMED, и больше не будут экспортироваться
             List<CmlOrder> newOrders = orderRepository.findByStatusIn(
                 Arrays.asList(CmlOrderStatus.NEW)
             );
             
             if (newOrders.isEmpty()) {
-                log.debug("No new orders to export (requestId: {})", requestId);
-                return null; // Нет новых заказов
+                log.info("📭 No NEW orders to export (requestId: {})", requestId);
+                return null; // Нет заказов для экспорта
             }
+            
+            log.info("📦 Found {} NEW orders to export (requestId: {})", newOrders.size(), requestId);
             
             log.info("Found {} new orders to export (requestId: {})", newOrders.size(), requestId);
             

@@ -3,6 +3,7 @@ package autoparts.kz.modules.cml.service;
 import autoparts.kz.modules.cml.domain.dto.ExchangeJob;
 import autoparts.kz.modules.cml.queue.JobQueue;
 import autoparts.kz.modules.cml.queue.JobType;
+import autoparts.kz.modules.cml.util.ZipUtil;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,7 +71,8 @@ public class ImportCoordinator {
         storage.completeMultipartUpload(session.objectKey);
         log.info("✅ Multipart upload completed");
         
-        JobType jobType = resolveJobType(type, filename);
+        // 🔍 Определяем тип работы на основе содержимого файла (для ZIP)
+        JobType jobType = resolveJobType(type, filename, session.objectKey);
         log.info("📋 Resolved job type: {}", jobType);
         
         ExchangeJob job = new ExchangeJob(jobType.routingKey(), filename, session.objectKey, requestId, Instant.now());
@@ -80,11 +82,44 @@ public class ImportCoordinator {
         return session.objectKey;
     }
 
-    public JobType resolveJobType(String type, String filename) {
+    public JobType resolveJobType(String type, String filename, String objectKey) {
         if ("catalog".equalsIgnoreCase(type)) {
+            // Проверяем имя файла на наличие "offer"
             if (filename.toLowerCase().contains("offer")) {
+                log.info("🔍 Filename contains 'offer' -> routing to OFFERS_IMPORT");
                 return JobType.OFFERS_IMPORT;
             }
+            
+            // 🔍 Если файл ZIP, проверяем его содержимое
+            if (filename.toLowerCase().endsWith(".zip")) {
+                try {
+                    log.debug("🔍 ZIP archive detected: {}, inspecting contents...", filename);
+                    byte[] zipData = storage.getObject(objectKey);
+                    
+                    // Проверяем, содержит ли архив offers*.xml или import*.xml
+                    boolean hasOffers = ZipUtil.hasEntryWithPrefix(zipData, "offers");
+                    boolean hasImport = ZipUtil.hasEntryWithPrefix(zipData, "import");
+                    
+                    if (hasOffers && !hasImport) {
+                        log.info("✅ ZIP contains offers*.xml -> routing to OFFERS_IMPORT");
+                        return JobType.OFFERS_IMPORT;
+                    } else if (hasImport && !hasOffers) {
+                        log.info("✅ ZIP contains import*.xml -> routing to CATALOG_IMPORT");
+                        return JobType.CATALOG_IMPORT;
+                    } else if (hasOffers && hasImport) {
+                        log.warn("⚠️ ZIP contains BOTH import*.xml and offers*.xml - defaulting to CATALOG_IMPORT");
+                        return JobType.CATALOG_IMPORT;
+                    } else {
+                        log.error("❌ ZIP contains neither import*.xml nor offers*.xml");
+                        throw new IllegalArgumentException("Invalid CommerceML archive: must contain import*.xml or offers*.xml");
+                    }
+                } catch (Exception e) {
+                    log.warn("⚠️ Failed to inspect ZIP {}: {} - defaulting to CATALOG_IMPORT", filename, e.getMessage());
+                    return JobType.CATALOG_IMPORT;
+                }
+            }
+            
+            log.debug("No specific routing detected -> defaulting to CATALOG_IMPORT");
             return JobType.CATALOG_IMPORT;
         }
         if ("sale".equalsIgnoreCase(type)) {

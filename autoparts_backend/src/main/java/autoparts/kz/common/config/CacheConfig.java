@@ -53,6 +53,9 @@ public class CacheConfig {
     public static final String UMAPI_ARTICLES_CACHE = "umapi-articles";
     public static final String UMAPI_BRAND_SEARCH_CACHE = "umapi-brand-search";
     public static final String UMAPI_ANALOGS_CACHE = "umapi-analogs";
+    
+    // Product Search Cache
+    public static final String PRODUCT_SEARCH_CACHE = "product-search";
 
     @Bean
     public RedisCacheManager redisCacheManager(RedisConnectionFactory cf) {
@@ -188,6 +191,10 @@ public class CacheConfig {
         // Аналоги запчастей — кешируем на 6 часов
         cacheConfigurations.put(UMAPI_ANALOGS_CACHE,
             defaultConfig.entryTtl(Duration.ofHours(6)));
+        
+        // Поиск товаров — кешируем на 5 минут (часто меняющиеся цены и остатки)
+        cacheConfigurations.put(PRODUCT_SEARCH_CACHE,
+            defaultConfig.entryTtl(Duration.ofMinutes(5)));
 
         return RedisCacheManager.builder(cf)
                 .cacheDefaults(defaultConfig)
