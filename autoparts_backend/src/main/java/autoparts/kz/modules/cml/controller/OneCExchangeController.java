@@ -54,10 +54,13 @@ public class OneCExchangeController {
                     log.info("🟢 IMPORT mode triggered: type='{}', filename='{}'", type, filename);
                     yield exchangeService.handleImport(type, filename != null ? filename : "import.xml", requestId);
                 }
+                // ✅ Обработка заказов (sale)
+                case "sale:checkauth" -> exchangeService.handleCheckAuth();
                 case "sale:query" -> exchangeService.handleSaleQuery(requestId);
                 case "sale:success" -> exchangeService.handleSaleSuccess();
                 case "sale:import" -> exchangeService.handleImport(type, filename != null ? filename : "orders_changes.xml", requestId);
                 // ✅ НОВОЕ: Обработка возвратов
+                case "return:checkauth" -> exchangeService.handleCheckAuth();
                 case "return:query" -> exchangeService.handleReturnQuery(requestId);
                 case "return:success" -> exchangeService.handleReturnSuccess();
                 default -> "failure\nunknown mode " + type + ":" + mode;
