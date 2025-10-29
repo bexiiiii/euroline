@@ -131,16 +131,29 @@ function SearchPage() {
     });
   }, [primaryResults, filters.brands, filters.photoOnly]);
 
+  const normalizedBrandFilter = brandFilter.trim().toLowerCase();
   const filteredBrandItems = useMemo(() => {
-    return filteredPrimarySearchResults.filter((item) =>
-      brandFilter ? (item.brand || "").toLowerCase().includes(brandFilter.toLowerCase()) : true
-    );
-  }, [filteredPrimarySearchResults, brandFilter]);
+    return filteredPrimarySearchResults.filter((item) => {
+      if (!normalizedBrandFilter) return true;
+      return (item.brand || "").toLowerCase().includes(normalizedBrandFilter);
+    });
+  }, [filteredPrimarySearchResults, normalizedBrandFilter]);
   const displayedBrandItems = showAllBrands ? filteredBrandItems : filteredBrandItems.slice(0, 5);
 
-  const filteredAnalogs = analogResults.filter((analog) =>
-    !analogFilter ? true : (analog.brand || "").toLowerCase().includes(analogFilter.toLowerCase())
-  );
+  const normalizedAnalogFilter = analogFilter.trim().toLowerCase();
+  const filteredAnalogs = useMemo(() => {
+    return analogResults.filter((analog) => {
+      if (filters.brands.length > 0) {
+        if (!analog.brand) return false;
+        if (!filters.brands.includes(analog.brand)) return false;
+      }
+      if (filters.photoOnly && !analog.imageUrl) {
+        return false;
+      }
+      if (!normalizedAnalogFilter) return true;
+      return (analog.brand || "").toLowerCase().includes(normalizedAnalogFilter);
+    });
+  }, [analogResults, filters.brands, filters.photoOnly, normalizedAnalogFilter]);
   const displayedAnalogs = showAllAnalogs ? filteredAnalogs : filteredAnalogs.slice(0, 5);
 
   const hasAnyResults = filteredPrimarySearchResults.length > 0 || filteredAnalogs.length > 0;
