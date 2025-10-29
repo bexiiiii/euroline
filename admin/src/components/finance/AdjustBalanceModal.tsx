@@ -75,7 +75,7 @@ const AdjustBalanceModal: React.FC<AdjustBalanceModalProps> = ({
   const contactName = useMemo(() => {
     if (!accountData) return undefined;
     return (
-      accountData.displayName ??
+      accountData.contactName ??
       accountData.customerName ??
       accountData.email ??
       accountData.customerEmail ??

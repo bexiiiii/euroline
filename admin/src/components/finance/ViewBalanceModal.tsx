@@ -82,14 +82,14 @@ const ViewBalanceModal: React.FC<ViewBalanceModalProps> = ({ isOpen, onClose, ac
         <header className="space-y-3">
           <div>
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Баланс {accountData.establishmentName || accountData.displayName || `пользователя #${accountData.clientId}`}
+              Баланс {accountData.establishmentName || accountData.contactName || `пользователя #${accountData.clientId}`}
             </h2>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
               Клиент #{accountData.clientId}
-              {accountData.displayName && accountData.displayName !== accountData.establishmentName && (
+              {accountData.contactName && accountData.contactName !== accountData.establishmentName && (
                 <>
                   <span className="mx-2 text-gray-300 dark:text-gray-600">•</span>
-                  <span>{accountData.displayName}</span>
+                  <span>{accountData.contactName}</span>
                 </>
               )}
             </p>
