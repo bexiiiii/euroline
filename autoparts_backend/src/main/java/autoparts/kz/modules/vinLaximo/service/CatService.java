@@ -5,6 +5,7 @@ import autoparts.kz.common.config.CacheConfig;
 import autoparts.kz.modules.vinLaximo.XmlParser.CatXmlParser;
 import autoparts.kz.modules.vinLaximo.client.LaximoSoapClient;
 import autoparts.kz.modules.vinLaximo.dto.*;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 
 @Service
+@Slf4j
 public class CatService {
 
     private final LaximoSoapClient soap;
@@ -744,8 +746,13 @@ public class CatService {
         String cmd = "FindApplicableVehicles:OEM=" + oem
                 + "|Catalog=" + catalog
                 + "|Locale=" + locale;
-        String xml = soap.execCommands(List.of(cmd));
-        return CatXmlParser.parseFindApplicableVehicles(xml);
+        try {
+            String xml = soap.execCommands(List.of(cmd));
+            return CatXmlParser.parseFindApplicableVehicles(xml);
+        } catch (Exception e) {
+            log.warn("Failed to fetch applicable vehicles for catalog {} and OEM {}: {}", catalog, oem, e.getMessage());
+            return List.of();
+        }
     }
 
     //
