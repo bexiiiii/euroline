@@ -145,40 +145,6 @@ function Cart() {
                     Сумма к оплате: {total.toLocaleString()} ₸
                   </DialogDescription>
                 </DialogHeader>
-                {balanceInfo && (
-                  <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600">Будет списано с баланса:</span>
-                      <span className="font-semibold text-slate-900">
-                        {Math.min(balanceInfo.balance, total).toLocaleString()} ₸
-                      </span>
-                    </div>
-                    {total > balanceInfo.balance && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Будет использовано кредита:</span>
-                        <span className="font-semibold text-orange-600">
-                          {(total - balanceInfo.balance).toLocaleString()} ₸
-                        </span>
-                      </div>
-                    )}
-                    <div className="border-t border-emerald-300 pt-2 mt-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-slate-700">Останется на балансе:</span>
-                        <span className="font-bold text-slate-900">
-                          {Math.max(0, balanceInfo.balance - total).toLocaleString()} ₸
-                        </span>
-                      </div>
-                      {total > balanceInfo.balance && (
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="font-medium text-slate-700">Доступно кредита после заказа:</span>
-                          <span className="font-bold text-emerald-600">
-                            {Math.max(0, balanceInfo.availableCredit - (total - balanceInfo.balance)).toLocaleString()} ₸
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
                 <div className="mt-3">
                   <label className="block text-sm font-medium mb-2">Комментарий (опционально)</label>
                   <Textarea value={comment} onChange={(e)=>setComment(e.target.value)} placeholder="Напишите комментарий к заказу" />
