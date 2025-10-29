@@ -1,5 +1,7 @@
 package autoparts.kz.modules.mainSearch.service;
 
+import autoparts.kz.modules.cml.dto.WarehouseStockDTO;
+import autoparts.kz.modules.cml.service.ProductEnrichmentService;
 import autoparts.kz.modules.mainSearch.dto.SearchResponse;
 import autoparts.kz.modules.stockOneC.dto.StockBulkResponse;
 import autoparts.kz.modules.vinLaximo.dto.DetailDto;
@@ -9,13 +11,13 @@ import autoparts.kz.modules.vinLaximo.dto.OemPartReferenceDto;
 import autoparts.kz.modules.stockOneC.client.OneCClient;
 import autoparts.kz.integration.umapi.service.UmapiIntegrationService;
 import autoparts.kz.integration.umapi.dto.BrandRefinementDto;
-import autoparts.kz.integration.umapi.dto.AnalogDto;
 import autoparts.kz.common.util.ArticleNormalizationUtil;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -28,6 +30,7 @@ public class MainSearchService {
     private final CatService cat;
     private final OneCClient oneC;
     private final UmapiIntegrationService umapiService;
+    private final ProductEnrichmentService productEnrichmentService;
 
     // VIN - точно 17 символов, без букв I, O, Q (расширенный паттерн)
     private static final Pattern VIN = Pattern.compile("^[A-HJ-NPR-Z0-9]{17}$", Pattern.CASE_INSENSITIVE);
@@ -95,24 +98,14 @@ public class MainSearchService {
         
 
         boolean looksLikeOem = isLikelyOemNumber(query);
-    resp.setDetectedType(looksLikeOem ? SearchResponse.DetectedType.OEM
-                                      : SearchResponse.DetectedType.TEXT);
+        resp.setDetectedType(looksLikeOem ? SearchResponse.DetectedType.OEM
+                                          : SearchResponse.DetectedType.TEXT);
 
-    List<DetailDto> found = List.of();
-        // 1) Сначала точный OEM (если похоже на OEM)
-    if (looksLikeOem) {
-        try {
-            List<DetailDto> exact = cat.searchDetailsByOem(query, catalog);
-            if (exact != null && !exact.isEmpty()) {
-                found = exact;
-            }
-        } catch (Exception e) {
-            System.out.println("[SEARCH] exact OEM failed: " + e.getMessage());
+        if (looksLikeOem) {
+            return searchByOem(query, resp);
         }
-    }
 
-    // 2) Если пока пусто — добиваем полнотекстом
-    if (found.isEmpty()) {
+        List<DetailDto> found;
         try {
             found = cat.searchDetails(query, catalog);
         } catch (Exception e) {
@@ -120,7 +113,6 @@ public class MainSearchService {
             resp.setResults(List.of());
             return resp;
         }
-    }
 
         // Собираем OEM для батча в 1С
         List<String> oems = found.stream()
@@ -132,16 +124,14 @@ public class MainSearchService {
 
         StockBulkResponse stock = getStock(oems);
 
-        // Для OEM поиска: обогащаем данными из UMAPI
-        Map<String, UmapiEnrichmentData> umapiDataMap = new HashMap<>();
-        if (looksLikeOem && !oems.isEmpty()) {
-            umapiDataMap = enrichWithUmapiData(oems);
-        }
+        Set<String> enrichmentCodes = new LinkedHashSet<>(oems);
+        Map<String, ProductEnrichmentService.EnrichmentData> enrichmentMap = enrichmentCodes.isEmpty()
+                ? Map.of()
+                : productEnrichmentService.enrichByCodes(new ArrayList<>(enrichmentCodes));
 
-        final Map<String, UmapiEnrichmentData> finalUmapiDataMap = umapiDataMap;
-        
-        var items = found.stream().map(d -> {
-            var it = new SearchResponse.Item();
+        List<SearchResponse.Item> items = new ArrayList<>();
+        for (DetailDto d : found) {
+            SearchResponse.Item it = new SearchResponse.Item();
             it.setOem(d.getOem());
             it.setName(d.getName());
             it.setBrand(d.getBrand());
@@ -157,61 +147,198 @@ public class MainSearchService {
             }
 
             it.setVehicleHints(Collections.emptyList());
-            
-            // Обогащение UMAPI данными
-            UmapiEnrichmentData umapiData = finalUmapiDataMap.get(ArticleNormalizationUtil.normalize(d.getOem()));
-            if (umapiData != null) {
-                it.setUmapiSuppliers(umapiData.suppliers);
-                it.setAnalogsCount(umapiData.analogsCount);
-                it.setOeNumbers(umapiData.oeNumbers);
-                it.setTradeNumbers(umapiData.tradeNumbers);
-                it.setEanNumbers(umapiData.eanNumbers);
-                it.setCriteria(umapiData.criteria);
-                it.setUmapiImages(umapiData.images);
-            }
-            
-            return it;
-        }).toList();
 
-        // ДОПОЛНЕНИЕ: если это похоже на OEM и в Laximo ничего не нашлось по самому запросу,
-        // но есть запись в 1С — показываем позицию из 1С как отдельный элемент результата.
-        if (looksLikeOem) {
-            boolean queryExistsInFound = oems.stream().anyMatch(o -> o.equalsIgnoreCase(query));
-            boolean queryExistsInItems = items.stream().anyMatch(i -> query.equalsIgnoreCase(i.getOem()));
+            ProductEnrichmentService.EnrichmentData enrichment =
+                    enrichmentMap.get(ArticleNormalizationUtil.normalize(d.getOem()));
+            applyEnrichment(it, enrichment);
 
-            if (!queryExistsInFound && !queryExistsInItems) {
-                try {
-                    StockBulkResponse single = getStock(List.of(query));
-                    if (single != null && single.getItems() != null) {
-                        for (StockBulkResponse.Item s : single.getItems()) {
-                            if (s.getOem() != null && s.getOem().equalsIgnoreCase(query)) {
-                                SearchResponse.Item it = new SearchResponse.Item();
-                                it.setOem(s.getOem());
-                                it.setName(s.getOem()); // нет имени от Laximo — используем OEM
-                                it.setBrand(null);
-                                it.setCatalog("1C");
-                                it.setImageUrl(null);
-                                it.setPrice(s.getPrice());
-                                it.setCurrency(s.getCurrency());
-                                it.setQuantity(s.getTotalQty());
-                                it.setWarehouses(StockBulkResponse.toWarehouses(s));
-                                it.setVehicleHints(Collections.emptyList());
-
-                                // Добавляем в общий список результатов
-                                List<SearchResponse.Item> merged = new ArrayList<>(items);
-                                merged.add(it);
-                                resp.setResults(merged);
-                                return resp;
-                            }
-                        }
-                    }
-                } catch (Exception ignore) {
-                    // Не мешаем основному потоку
-                }
-            }
+            items.add(it);
         }
 
         resp.setResults(items);
+        return resp;
+    }
+
+    private void applyEnrichment(SearchResponse.Item item, ProductEnrichmentService.EnrichmentData enrichment) {
+        if (enrichment == null) {
+            return;
+        }
+
+        if ((item.getName() == null || item.getName().isBlank()) && enrichment.getName() != null) {
+            item.setName(enrichment.getName());
+        }
+        if ((item.getBrand() == null || item.getBrand().isBlank()) && enrichment.getBrand() != null) {
+            item.setBrand(enrichment.getBrand());
+        }
+        if (item.getImageUrl() == null && enrichment.getImageUrl() != null) {
+            item.setImageUrl(enrichment.getImageUrl());
+        }
+        if (item.getPrice() == null && enrichment.getPrice() != null) {
+            item.setPrice(BigDecimal.valueOf(enrichment.getPrice()));
+        }
+        if (item.getQuantity() == null && enrichment.getStock() != null) {
+            item.setQuantity(enrichment.getStock());
+        }
+        if ((item.getWarehouses() == null || item.getWarehouses().isEmpty()) && enrichment.getWarehouses() != null) {
+            item.setWarehouses(convertWarehouses(enrichment.getWarehouses()));
+        }
+    }
+
+    private List<SearchResponse.Warehouse> convertWarehouses(List<WarehouseStockDTO> warehouses) {
+        if (warehouses == null || warehouses.isEmpty()) {
+            return List.of();
+        }
+        List<SearchResponse.Warehouse> result = new ArrayList<>(warehouses.size());
+        for (WarehouseStockDTO warehouse : warehouses) {
+            SearchResponse.Warehouse dto = new SearchResponse.Warehouse();
+            dto.setCode(warehouse.getWarehouseCode() != null ? warehouse.getWarehouseCode() : warehouse.getWarehouseGuid());
+            dto.setName(
+                    warehouse.getWarehouseName() != null ? warehouse.getWarehouseName() : warehouse.getWarehouseGuid());
+            dto.setAddress(null);
+            dto.setQty(warehouse.getQuantity() != null ? warehouse.getQuantity().intValue() : null);
+            result.add(dto);
+        }
+        return result;
+    }
+
+    private SearchResponse searchByOem(String query, SearchResponse resp) {
+        List<BrandRefinementDto> brandMatches = Collections.emptyList();
+        try {
+            List<BrandRefinementDto> result = umapiService.searchByArticle(query);
+            if (result != null) {
+                brandMatches = result;
+            }
+        } catch (Exception e) {
+            log.warn("UMAPI search failed for article {}: {}", query, e.getMessage());
+        }
+
+        List<String> codesForBatch = brandMatches.stream()
+                .map(BrandRefinementDto::getArticle)
+                .filter(code -> code != null && !code.isBlank())
+                .map(String::trim)
+                .distinct()
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        boolean queryAlreadyIncluded = codesForBatch.stream()
+                .anyMatch(code -> code.equalsIgnoreCase(query));
+        if (!queryAlreadyIncluded) {
+            codesForBatch.add(query);
+        }
+
+        StockBulkResponse stock = codesForBatch.isEmpty()
+                ? new StockBulkResponse()
+                : getStock(codesForBatch);
+
+        Map<String, ProductEnrichmentService.EnrichmentData> enrichmentMap = codesForBatch.isEmpty()
+                ? Map.of()
+                : productEnrichmentService.enrichByCodes(codesForBatch);
+
+        List<SearchResponse.Item> items = new ArrayList<>();
+        for (BrandRefinementDto match : brandMatches) {
+            String oem = (match.getArticle() != null && !match.getArticle().isBlank())
+                    ? match.getArticle()
+                    : query;
+
+            SearchResponse.Item item = new SearchResponse.Item();
+            item.setOem(oem);
+            item.setCatalog("UMAPI");
+            item.setName(match.getTitle() != null && !match.getTitle().isBlank() ? match.getTitle() : oem);
+            item.setBrand(match.getBrand());
+            item.setImageUrl(match.getImg());
+            item.setVehicleHints(Collections.emptyList());
+
+            StockBulkResponse.Item stockItem = stock.getByOem(oem);
+            if (stockItem != null) {
+                item.setPrice(stockItem.getPrice());
+                item.setCurrency(stockItem.getCurrency());
+                item.setQuantity(stockItem.getTotalQty());
+                item.setWarehouses(StockBulkResponse.toWarehouses(stockItem));
+            }
+
+            SearchResponse.UmapiSupplier supplier = new SearchResponse.UmapiSupplier();
+            supplier.setId(null);
+            supplier.setName(match.getBrand());
+            supplier.setMatchType(match.getType());
+            supplier.setArticleCount(1);
+            item.setUmapiSuppliers(List.of(supplier));
+            if (match.getImg() != null && !match.getImg().isBlank()) {
+                item.setUmapiImages(List.of(match.getImg()));
+            }
+
+            ProductEnrichmentService.EnrichmentData enrichment =
+                    enrichmentMap.get(ArticleNormalizationUtil.normalize(oem));
+            applyEnrichment(item, enrichment);
+
+            if (stockItem != null) {
+                if (item.getCurrency() == null) {
+                    item.setCurrency(stockItem.getCurrency());
+                }
+                if (item.getWarehouses() == null || item.getWarehouses().isEmpty()) {
+                    item.setWarehouses(StockBulkResponse.toWarehouses(stockItem));
+                }
+                if (item.getPrice() == null && stockItem.getPrice() != null) {
+                    item.setPrice(stockItem.getPrice());
+                }
+                if (item.getQuantity() == null) {
+                    item.setQuantity(stockItem.getTotalQty());
+                }
+            }
+
+            items.add(item);
+        }
+
+        if (!items.isEmpty()) {
+            resp.setResults(items);
+            return resp;
+        }
+
+        String normalizedQuery = ArticleNormalizationUtil.normalize(query);
+        ProductEnrichmentService.EnrichmentData enrichment = enrichmentMap.get(normalizedQuery);
+        StockBulkResponse.Item stockItem = stock.getByOem(query);
+
+        if (enrichment != null || stockItem != null) {
+            SearchResponse.Item item = new SearchResponse.Item();
+            item.setOem(query);
+            item.setCatalog("1C");
+            item.setVehicleHints(Collections.emptyList());
+
+            if (enrichment != null) {
+                item.setName(enrichment.getName() != null ? enrichment.getName() : query);
+                item.setBrand(enrichment.getBrand());
+                item.setImageUrl(enrichment.getImageUrl());
+            } else {
+                item.setName(query);
+            }
+
+            if (stockItem != null) {
+                item.setPrice(stockItem.getPrice());
+                item.setCurrency(stockItem.getCurrency());
+                item.setQuantity(stockItem.getTotalQty());
+                item.setWarehouses(StockBulkResponse.toWarehouses(stockItem));
+            }
+
+            applyEnrichment(item, enrichment);
+
+            if (stockItem != null) {
+                if (item.getCurrency() == null) {
+                    item.setCurrency(stockItem.getCurrency());
+                }
+                if (item.getWarehouses() == null || item.getWarehouses().isEmpty()) {
+                    item.setWarehouses(StockBulkResponse.toWarehouses(stockItem));
+                }
+                if (item.getPrice() == null && stockItem.getPrice() != null) {
+                    item.setPrice(stockItem.getPrice());
+                }
+                if (item.getQuantity() == null) {
+                    item.setQuantity(stockItem.getTotalQty());
+                }
+            }
+
+            resp.setResults(List.of(item));
+            return resp;
+        }
+
+        resp.setResults(List.of());
         return resp;
     }
 
@@ -265,81 +392,4 @@ public class MainSearchService {
         }
     }
     
-    /**
-     * Обогащает данные информацией из UMAPI (бренды, аналоги, OE коды, характеристики)
-     */
-    private Map<String, UmapiEnrichmentData> enrichWithUmapiData(List<String> oems) {
-        Map<String, UmapiEnrichmentData> result = new HashMap<>();
-        
-        // Ограничиваем количество запросов к UMAPI
-        List<String> limitedOems = oems.stream().limit(50).toList();
-        
-        for (String oem : limitedOems) {
-            try {
-                String normalized = ArticleNormalizationUtil.normalize(oem);
-                
-                // 1. Получаем информацию о брендах (brand refinement)
-                List<BrandRefinementDto> brandMatches = umapiService.searchByArticle(oem);
-                
-                if (brandMatches != null && !brandMatches.isEmpty()) {
-                    UmapiEnrichmentData enrichment = new UmapiEnrichmentData();
-                    
-                    // Конвертируем brand matches в suppliers
-                    enrichment.suppliers = brandMatches.stream()
-                            .map(brand -> {
-                                var supplier = new SearchResponse.UmapiSupplier();
-                                supplier.setId(null); // API не возвращает ID
-                                supplier.setName(brand.getBrand());
-                                supplier.setMatchType(brand.getType());
-                                supplier.setArticleCount(1); // Каждый бренд = 1 артикул
-                                return supplier;
-                            })
-                            .collect(Collectors.toList());
-                    
-                    // 2. Пробуем получить аналоги (берём первый бренд)
-                    if (!brandMatches.isEmpty()) {
-                        String mainBrand = brandMatches.get(0).getBrand();
-                        try {
-                            List<AnalogDto> analogsList = umapiService.getAnalogs(oem, mainBrand);
-                            
-                            if (analogsList != null && !analogsList.isEmpty()) {
-                                enrichment.analogsCount = analogsList.size();
-                                
-                                // Собираем OE номера из аналогов (по типу "OEM" или "Original")
-                                Set<String> oeSet = new HashSet<>();
-                                for (AnalogDto analog : analogsList) {
-                                    if ("OEM".equalsIgnoreCase(analog.getType()) || 
-                                        "Original".equalsIgnoreCase(analog.getTarget())) {
-                                        oeSet.add(analog.getArticle());
-                                    }
-                                }
-                                enrichment.oeNumbers = new ArrayList<>(oeSet);
-                            }
-                        } catch (Exception e) {
-                            log.debug("Failed to fetch analogs for article {}: {}", oem, e.getMessage());
-                        }
-                    }
-                    
-                    result.put(normalized, enrichment);
-                }
-            } catch (Exception e) {
-                log.debug("Failed to enrich UMAPI data for article {}: {}", oem, e.getMessage());
-            }
-        }
-        
-        return result;
-    }
-    
-    /**
-     * Вспомогательный класс для хранения данных UMAPI
-     */
-    private static class UmapiEnrichmentData {
-        List<SearchResponse.UmapiSupplier> suppliers = new ArrayList<>();
-        Integer analogsCount = 0;
-        List<String> oeNumbers = new ArrayList<>();
-        List<String> tradeNumbers = new ArrayList<>();
-        List<String> eanNumbers = new ArrayList<>();
-        List<SearchResponse.TechnicalCriteria> criteria = new ArrayList<>();
-        List<String> images = new ArrayList<>();
-    }
 }

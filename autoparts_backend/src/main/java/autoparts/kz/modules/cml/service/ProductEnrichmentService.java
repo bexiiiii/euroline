@@ -1,5 +1,6 @@
 package autoparts.kz.modules.cml.service;
 
+import autoparts.kz.common.util.ArticleNormalizationUtil;
 import autoparts.kz.modules.cml.domain.entity.CmlPrice;
 import autoparts.kz.modules.cml.domain.entity.CmlStock;
 import autoparts.kz.modules.cml.dto.WarehouseStockDTO;
@@ -22,13 +23,11 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Сервис для обогащения результатов поиска данными из 1С.
+ * Сервис для обогащения поиска и карточек товара данными, синхронизированными из 1С.
  *
- * Основные задачи:
- * 1. Найти товар в нашей БД по идентификаторам 1С
- * 2. Подставить актуальные цены из cml_prices
- * 3. Подставить актуальные остатки из cml_stocks
- * 4. Добавить детализацию по складам
+ * Источники:
+ *  - таблица products (локальная копия каталогов)
+ *  - cml_prices / cml_stocks (последние выгрузки CommerceML)
  */
 @Service
 @RequiredArgsConstructor
@@ -40,10 +39,7 @@ public class ProductEnrichmentService {
     private final CmlPriceRepository cmlPriceRepository;
 
     /**
-     * Обогатить данные о товаре ценой и остатками из 1С по артикулу.
-     *
-     * @param articleNumber артикул товара (OEM код)
-     * @return данные о цене и остатках, если товар найден
+     * Обогатить данные о товаре по OEM.
      */
     @Transactional(readOnly = true)
     public Optional<EnrichmentData> enrichByArticle(String articleNumber) {
@@ -56,10 +52,7 @@ public class ProductEnrichmentService {
     }
 
     /**
-     * Обогатить единичный товар.
-     *
-     * @param product сущность товара
-     * @return данные обогащения, если удалось собрать информацию
+     * Обогащение отдельного товара.
      */
     @Transactional(readOnly = true)
     public Optional<EnrichmentData> enrichProduct(Product product) {
@@ -71,11 +64,7 @@ public class ProductEnrichmentService {
     }
 
     /**
-     * 🚀 Оптимизированное обогащение списка товаров.
-     * Делает суммарно по два запроса в таблицы cml_prices и cml_stocks вместо N×3.
-     *
-     * @param products список товаров
-     * @return мапа: ID товара → данные обогащения
+     * Обогатить список товаров сущностей.
      */
     @Transactional(readOnly = true)
     public Map<Long, EnrichmentData> enrichProducts(List<Product> products) {
@@ -104,8 +93,11 @@ public class ProductEnrichmentService {
             EnrichmentData data = new EnrichmentData();
             data.setProductId(product.getId());
             data.setExternalCode(product.getExternalCode());
+            data.setName(product.getName());
+            data.setBrand(product.getBrand());
+            data.setImageUrl(product.getImageUrl());
+            data.setProductCode(product.getCode());
 
-            // Базовые значения из таблицы products
             Integer price = product.getPrice();
             Integer stock = product.getStock();
 
@@ -125,10 +117,7 @@ public class ProductEnrichmentService {
             data.setPrice(price);
             data.setStock(stock);
             data.setWarehouses(warehouses.isEmpty() ? List.of() : List.copyOf(warehouses));
-
-            boolean hasExternalData = pricesByGuid.containsKey(product.getExternalCode())
-                    || !warehouses.isEmpty();
-            data.setFoundInLocalDb(hasExternalData);
+            data.setFoundInLocalDb(true);
 
             log.debug("Enriched product {} (externalCode={}): price={}, stock={}, warehouses={}",
                     product.getId(),
@@ -144,10 +133,58 @@ public class ProductEnrichmentService {
     }
 
     /**
-     * Получить детализацию остатков по складам.
-     *
-     * @param productGuid GUID товара в 1С (external_code)
-     * @return список складов с остатками
+     * Обогащение по списку OEM кодов. Возвращает мапу: нормализованный OEM → данные.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, EnrichmentData> enrichByCodes(List<String> codes) {
+        if (codes == null || codes.isEmpty()) {
+            return Map.of();
+        }
+
+        List<String> normalized = codes.stream()
+                .filter(Objects::nonNull)
+                .map(ArticleNormalizationUtil::normalize)
+                .filter(s -> s != null && !s.isBlank())
+                .distinct()
+                .toList();
+
+        if (normalized.isEmpty()) {
+            return Map.of();
+        }
+
+        List<String> normalizedLower = normalized.stream()
+                .map(String::toLowerCase)
+                .toList();
+
+        List<Product> products = productRepository.findAllByArticleIn(normalizedLower);
+        if (products.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, EnrichmentData> byId = enrichProducts(products);
+        Map<String, EnrichmentData> result = new HashMap<>();
+
+        for (Product product : products) {
+            EnrichmentData data = byId.get(product.getId());
+            if (data == null) {
+                continue;
+            }
+
+            String article = product.getCode() != null ? product.getCode() : product.getSku();
+            if (article == null || article.isBlank()) {
+                continue;
+            }
+            String normalizedKey = ArticleNormalizationUtil.normalize(article);
+            if (normalizedKey != null && !normalizedKey.isBlank()) {
+                result.put(normalizedKey, data);
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Детализация складов по GUID товара.
      */
     @Transactional(readOnly = true)
     public List<WarehouseStockDTO> getWarehouseStocks(String productGuid) {
@@ -212,40 +249,21 @@ public class ProductEnrichmentService {
     }
 
     /**
-     * DTO для обогащенных данных.
+     * DTO для обогащенных CommerceML данных.
      */
     @lombok.Data
     @lombok.NoArgsConstructor
     @lombok.AllArgsConstructor
     public static class EnrichmentData {
-        /**
-         * ID товара в нашей БД.
-         */
         private Long productId;
-
-        /**
-         * Актуальная цена из 1С.
-         */
         private Integer price;
-
-        /**
-         * Суммарный остаток со всех складов.
-         */
         private Integer stock;
-
-        /**
-         * GUID товара в 1С для связи.
-         */
         private String externalCode;
-
-        /**
-         * Детализация по складам.
-         */
         private List<WarehouseStockDTO> warehouses;
-
-        /**
-         * Флаг: найдены ли данные в cml_* таблицах.
-         */
         private boolean foundInLocalDb;
+        private String name;
+        private String brand;
+        private String imageUrl;
+        private String productCode;
     }
 }
