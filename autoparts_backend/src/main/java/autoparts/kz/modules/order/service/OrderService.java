@@ -69,8 +69,16 @@ public class OrderService {
 
         // ✅ НОВОЕ: Проверить достаточность средств (баланс + кредит) ДО создания заказа
         BigDecimal orderTotal = cart.getItems().stream()
+                .filter(item -> item.getPrice() != null) // Пропустить товары без цены
                 .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // Проверка что все товары имеют цену
+        boolean hasItemsWithoutPrice = cart.getItems().stream()
+                .anyMatch(item -> item.getPrice() == null);
+        if (hasItemsWithoutPrice) {
+            throw new IllegalStateException("В корзине есть товары без цены. Пожалуйста, обновите корзину.");
+        }
         
         financeService.validateSufficientFunds(userId, orderTotal);
 
