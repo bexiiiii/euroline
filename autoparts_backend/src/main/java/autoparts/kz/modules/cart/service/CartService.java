@@ -67,11 +67,15 @@ public class CartService {
                 .findFirst();
         if (existing.isPresent()) {
             existing.get().setQuantity(existing.get().getQuantity() + quantity);
+            // Обновляем цену на случай если она изменилась
+            existing.get().setPrice(product.getPrice() != null ? java.math.BigDecimal.valueOf(product.getPrice()) : null);
         } else {
             CartItem item = new CartItem();
             item.setCart(cart);
             item.setProduct(product);
             item.setQuantity(quantity);
+            // ✅ ИСПРАВЛЕНИЕ: Устанавливаем цену из продукта при добавлении в корзину
+            item.setPrice(product.getPrice() != null ? java.math.BigDecimal.valueOf(product.getPrice()) : null);
             cart.getItems().add(item);
         }
         return cartRepository.save(cart);
@@ -155,12 +159,19 @@ public class CartService {
                     .findFirst();
             if (itemOpt.isPresent()) {
                 itemOpt.get().setQuantity(quantity);
+                // Обновляем цену на случай если она изменилась
+                Product product = productRepository.findById(productId).orElse(null);
+                if (product != null && product.getPrice() != null) {
+                    itemOpt.get().setPrice(java.math.BigDecimal.valueOf(product.getPrice()));
+                }
             } else {
                 Product product = productRepository.findById(productId).orElseThrow();
                 CartItem item = new CartItem();
                 item.setCart(cart);
                 item.setProduct(product);
                 item.setQuantity(quantity);
+                // ✅ ИСПРАВЛЕНИЕ: Устанавливаем цену из продукта
+                item.setPrice(product.getPrice() != null ? java.math.BigDecimal.valueOf(product.getPrice()) : null);
                 cart.getItems().add(item);
             }
         }

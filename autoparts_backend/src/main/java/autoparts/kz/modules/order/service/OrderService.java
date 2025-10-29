@@ -69,13 +69,33 @@ public class OrderService {
 
         // ✅ НОВОЕ: Проверить достаточность средств (баланс + кредит) ДО создания заказа
         BigDecimal orderTotal = cart.getItems().stream()
-                .filter(item -> item.getPrice() != null) // Пропустить товары без цены
-                .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .filter(item -> {
+                    // Используем цену из CartItem или из Product
+                    BigDecimal itemPrice = item.getPrice();
+                    if (itemPrice == null && item.getProduct() != null && item.getProduct().getPrice() != null) {
+                        itemPrice = BigDecimal.valueOf(item.getProduct().getPrice());
+                    }
+                    return itemPrice != null;
+                })
+                .map(item -> {
+                    BigDecimal itemPrice = item.getPrice();
+                    if (itemPrice == null) {
+                        itemPrice = BigDecimal.valueOf(item.getProduct().getPrice());
+                    }
+                    return itemPrice.multiply(BigDecimal.valueOf(item.getQuantity()));
+                })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         
         // Проверка что все товары имеют цену
         boolean hasItemsWithoutPrice = cart.getItems().stream()
-                .anyMatch(item -> item.getPrice() == null);
+                .anyMatch(item -> {
+                    BigDecimal itemPrice = item.getPrice();
+                    if (itemPrice == null && item.getProduct() != null) {
+                        Integer productPrice = item.getProduct().getPrice();
+                        itemPrice = productPrice != null ? BigDecimal.valueOf(productPrice) : null;
+                    }
+                    return itemPrice == null;
+                });
         if (hasItemsWithoutPrice) {
             throw new IllegalStateException("В корзине есть товары без цены. Пожалуйста, обновите корзину.");
         }
@@ -176,8 +196,14 @@ public class OrderService {
         orderItem.setSku(cartItem.getProduct().getSku());
         orderItem.setQuantity(cartItem.getQuantity());
         
-        Integer priceInt = cartItem.getProduct().getPrice();
-        orderItem.setPrice(priceInt == null ? BigDecimal.ZERO : BigDecimal.valueOf(priceInt.longValue()));
+        // ✅ ИСПРАВЛЕНИЕ: Используем цену из CartItem (она может быть зафиксирована при добавлении)
+        // Если в CartItem цена null, берем из Product
+        BigDecimal price = cartItem.getPrice();
+        if (price == null) {
+            Integer priceInt = cartItem.getProduct().getPrice();
+            price = priceInt == null ? BigDecimal.ZERO : BigDecimal.valueOf(priceInt.longValue());
+        }
+        orderItem.setPrice(price);
         
         return orderItem;
     }
