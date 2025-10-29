@@ -106,6 +106,15 @@ public class OrderService {
         Order order = createOrder(userId, req, cart);
         order = orderRepository.save(order);
 
+        // ✅ НОВОЕ: Списать сумму заказа с баланса/кредита клиента
+        try {
+            financeService.chargeForOrder(userId, orderTotal);
+            log.info("Charged {} ₸ for order {}", orderTotal, order.getId());
+        } catch (Exception e) {
+            log.error("Failed to charge for order {}: {}", order.getId(), e.getMessage(), e);
+            throw new IllegalStateException("Не удалось списать средства за заказ: " + e.getMessage(), e);
+        }
+
         // ✅ НОВОЕ: Создать CmlOrder для автоматической интеграции с 1С через CommerceML
         try {
             autoparts.kz.modules.cml.domain.entity.CmlOrder cmlOrder = orderToCmlConverter.convert(order);

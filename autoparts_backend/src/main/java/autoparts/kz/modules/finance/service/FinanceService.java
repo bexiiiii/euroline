@@ -17,6 +17,7 @@ import autoparts.kz.modules.notifications.entity.Notification;
 import autoparts.kz.modules.notifications.service.NotificationService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -33,6 +34,7 @@ import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class FinanceService {
     private final ClientBalanceRepository balances;
     private final TopUpRepository topups;
@@ -104,6 +106,24 @@ public class FinanceService {
                     requiredAmount, totalAvailable, currentBalance, creditAvailable)
             );
         }
+    }
+
+    /**
+     * Списывает сумму заказа с баланса и/или кредита клиента.
+     * Сначала списывается с баланса, затем используется кредит если нужно.
+     */
+    public void chargeForOrder(Long clientId, BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            return;
+        }
+        ClientBalance balance = ensureBalance(clientId);
+        
+        // Списываем с enforceLimit=false, т.к. мы уже проверили достаточность средств в validateSufficientFunds
+        applyChargeAmount(balance, amount, false);
+        
+        balances.save(balance);
+        log.info("Charged {} ₸ from client {} balance. New balance: {}, credit used: {}", 
+            amount, clientId, balance.getBalance(), balance.getCreditUsed());
     }
 
     private void applyPositiveAmount(ClientBalance balance, BigDecimal amount) {
