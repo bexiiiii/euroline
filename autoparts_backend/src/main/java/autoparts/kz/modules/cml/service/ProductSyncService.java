@@ -28,7 +28,8 @@ public class ProductSyncService {
     public int syncProductsFromCml() {
         log.info("🔄 Starting product synchronization from cml_products to products...");
 
-        String sql = """
+        // 1. Синхронизируем товары (INSERT новых + UPDATE существующих)
+        String syncProductsSql = """
             INSERT INTO products (name, code, description, external_code, price, stock)
             SELECT 
                 cp.name,
@@ -59,7 +60,6 @@ public class ProductSyncService {
             """;
 
         // Сначала добавим unique constraint на external_code если его нет
-        // Используем DO NOTHING для PostgreSQL, чтобы избежать ошибки если constraint уже существует
         try {
             String checkConstraint = """
                 DO $$ 
@@ -78,11 +78,38 @@ public class ProductSyncService {
             log.warn("Could not ensure unique constraint on external_code: {}", e.getMessage());
         }
 
-        int count = jdbcTemplate.update(sql);
+        int productsCount = jdbcTemplate.update(syncProductsSql);
+        log.info("✅ Synchronized {} products from cml_products to products", productsCount);
         
-        log.info("✅ Synchronized {} products from cml_products to products", count);
+        // 2. НОВОЕ: Обновляем цены и остатки для ВСЕХ товаров по external_code
+        // Даже для тех, что не были синхронизированы из cml_products
+        String updatePricesSql = """
+            UPDATE products p
+            SET 
+                price = COALESCE(
+                    (SELECT pr.value 
+                     FROM cml_prices pr 
+                     WHERE pr.product_guid = p.external_code 
+                     LIMIT 1), 
+                    p.price
+                ),
+                stock = COALESCE(
+                    (SELECT SUM(st.quantity) 
+                     FROM cml_stocks st 
+                     WHERE st.product_guid = p.external_code), 
+                    p.stock
+                )
+            WHERE p.external_code IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM cml_prices pr2 
+                  WHERE pr2.product_guid = p.external_code
+              )
+            """;
         
-        return count;
+        int updatedPrices = jdbcTemplate.update(updatePricesSql);
+        log.info("✅ Updated prices and stocks for {} additional products", updatedPrices);
+        
+        return productsCount + updatedPrices;
     }
 
     /**
