@@ -27,6 +27,7 @@ function Cart() {
   const [mode, setMode] = useState<'check'|'insufficient'|'confirm'>('check')
   const [comment, setComment] = useState('')
   const [loading, setLoading] = useState(false)
+  const [balanceInfo, setBalanceInfo] = useState<{ balance: number; availableCredit: number; totalAvailable: number } | null>(null)
 
   const handleCheckout = async () => {
     if (!hasItems) {
@@ -38,8 +39,13 @@ function Cart() {
     setMode('check')
     try {
       const bal = await getMyBalance()
-      const balNum = (bal as any)?.balance ?? 0
-      if (Number(balNum) >= total) {
+      const balance = Number(bal?.balance ?? 0)
+      const availableCredit = Number(bal?.availableCredit ?? 0)
+      const totalAvailable = balance + availableCredit
+      
+      setBalanceInfo({ balance, availableCredit, totalAvailable })
+      
+      if (totalAvailable >= total) {
         setMode('confirm')
       } else {
         setMode('insufficient')
@@ -96,9 +102,35 @@ function Cart() {
                 <DialogHeader>
                   <DialogTitle>Недостаточно средств</DialogTitle>
                   <DialogDescription>
-                    На вашем балансе недостаточно средств для оформления заказа. Пополните баланс и повторите попытку.
+                    На вашем балансе недостаточно средств для оформления заказа.
                   </DialogDescription>
                 </DialogHeader>
+                {balanceInfo && (
+                  <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Сумма заказа:</span>
+                      <span className="font-semibold text-slate-900">{total.toLocaleString()} ₸</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Ваш баланс:</span>
+                      <span className="font-semibold text-slate-900">{balanceInfo.balance.toLocaleString()} ₸</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Доступный кредит:</span>
+                      <span className="font-semibold text-emerald-600">{balanceInfo.availableCredit.toLocaleString()} ₸</span>
+                    </div>
+                    <div className="border-t border-slate-300 pt-2 mt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-700">Всего доступно:</span>
+                        <span className="font-bold text-slate-900">{balanceInfo.totalAvailable.toLocaleString()} ₸</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-red-600 font-semibold">
+                      <span>Не хватает:</span>
+                      <span>{Math.max(0, total - balanceInfo.totalAvailable).toLocaleString()} ₸</span>
+                    </div>
+                  </div>
+                )}
                 <DialogFooter className="gap-2 sm:gap-2">
                   <Button variant="outline" onClick={() => setOpen(false)}>Закрыть</Button>
                   <Button onClick={() => router.push('/finances')}>Пополнить баланс</Button>
@@ -113,13 +145,47 @@ function Cart() {
                     Сумма к оплате: {total.toLocaleString()} ₸
                   </DialogDescription>
                 </DialogHeader>
+                {balanceInfo && (
+                  <div className="space-y-2 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-600">Будет списано с баланса:</span>
+                      <span className="font-semibold text-slate-900">
+                        {Math.min(balanceInfo.balance, total).toLocaleString()} ₸
+                      </span>
+                    </div>
+                    {total > balanceInfo.balance && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-600">Будет использовано кредита:</span>
+                        <span className="font-semibold text-orange-600">
+                          {(total - balanceInfo.balance).toLocaleString()} ₸
+                        </span>
+                      </div>
+                    )}
+                    <div className="border-t border-emerald-300 pt-2 mt-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-slate-700">Останется на балансе:</span>
+                        <span className="font-bold text-slate-900">
+                          {Math.max(0, balanceInfo.balance - total).toLocaleString()} ₸
+                        </span>
+                      </div>
+                      {total > balanceInfo.balance && (
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="font-medium text-slate-700">Доступно кредита после заказа:</span>
+                          <span className="font-bold text-emerald-600">
+                            {Math.max(0, balanceInfo.availableCredit - (total - balanceInfo.balance)).toLocaleString()} ₸
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div className="mt-3">
                   <label className="block text-sm font-medium mb-2">Комментарий (опционально)</label>
                   <Textarea value={comment} onChange={(e)=>setComment(e.target.value)} placeholder="Напишите комментарий к заказу" />
                 </div>
                 <DialogFooter className="gap-2 sm:gap-2">
                   <Button variant="outline" onClick={() => setOpen(false)}>Отмена</Button>
-                  <Button onClick={handleCreate} disabled={loading}>{loading ? 'Создание...' : 'Продолжить'}</Button>
+                  <Button onClick={handleCreate} disabled={loading}>{loading ? 'Создание...' : 'Подтвердить заказ'}</Button>
                 </DialogFooter>
               </>
             )}
