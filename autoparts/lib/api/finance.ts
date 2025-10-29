@@ -37,6 +37,10 @@ export type TopUp = {
 export type BalanceResponse = {
   clientId: number;
   balance: number;
+  creditLimit: number;
+  creditUsed: number;
+  availableCredit: number;
+  qrCodeUrl?: string | null;
   updatedAt: string;
 }
 

@@ -1,5 +1,5 @@
 "use client"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import Breadcrumbs from "@/components/Breadcrumb"
 import { FileUploader } from "@/components/FileUploader"
 import { Stats } from "@/components/ui/stats-section"
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { createMyTopUp, getMyBalance, getMyTopUps, getMyTransactions, uploadMyTopUpReceipt, type BalanceResponse, type FinanceTxn, type TopUp, type PageResponse } from "@/lib/api/finance"
 import { toast } from "sonner"
-import { CirclePlus } from "lucide-react"
+import { AlertTriangle, CirclePlus } from "lucide-react"
 
 const items = [
   { label: "Главная", href: "/" },
@@ -103,7 +103,7 @@ export default function FinancePage() {
     setSubmitting(true)
     try {
       const created = await createMyTopUp(value)
-      await uploadMyTopUpReceipt(created.id as unknown as number, receipt)
+      await uploadMyTopUpReceipt(created.id, receipt)
       toast.success('Заявка на пополнение создана')
       setAmount("")
       setReceipt(null)
@@ -115,14 +115,19 @@ export default function FinancePage() {
     }
   }
 
-  const totalTopUps = (topUps?.content || []).reduce((sum, t) => sum + (t.status === 'APPROVED' ? (t.amount as unknown as number) : 0), 0)
+  const totalTopUps = (topUps?.content || []).reduce((sum, t) => sum + (t.status === 'APPROVED' ? t.amount : 0), 0)
   const spent = (txns?.content || []).reduce((sum, tx) => {
-    const amt = tx.amount as unknown as number
+    const amt = tx.amount
     if (tx.type === 'CHARGE') return sum + amt
     if (amt < 0) return sum + (-amt)
     return sum
   }, 0)
-  const remaining = (balance?.balance as unknown as number) || 0
+  const remaining = balance?.balance ?? 0
+  const creditLimit = balance?.creditLimit ?? 0
+  const creditUsed = balance?.creditUsed ?? 0
+  const availableCredit = balance?.availableCredit ?? Math.max(creditLimit - creditUsed, 0)
+  const qrCodeUrl = balance?.qrCodeUrl || "/images/payments/kaspi-qr.png"
+  const hasPersonalQr = Boolean(balance?.qrCodeUrl)
 
   return (
     <div className="min-h-screen pt-20 md:pt-24">
@@ -154,13 +159,68 @@ export default function FinancePage() {
                   )}
                 </div>
 
-                <div className="rounded-lg bg-orange-50 border border-orange-200 p-3 text-sm text-orange-900 mb-4">
-                  Переведите сумму на Kaspi Gold: <span className="font-semibold">+7 706 426 7143</span> или оплатите по QR ниже, затем прикрепите чек.
+                <div
+                  className={`mb-4 rounded-lg border p-3 text-sm ${
+                    hasPersonalQr
+                      ? "border-orange-200 bg-orange-50 text-orange-900"
+                      : "border-slate-200 bg-slate-50 text-slate-700"
+                  }`}
+                >
+                  {hasPersonalQr ? (
+                    <>
+                      <p>
+                        Отсканируйте ваш персональный QR-код ниже и оплатите
+                        необходимую сумму.
+                      </p>
+                      <p className="mt-1">
+                        После оплаты прикрепите чек. Пополнение сначала
+                        погасит долг по лимиту, затем поступит на баланс.
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        Для вашего аккаунта пока не закреплён персональный QR-код.
+                      </p>
+                      <p className="mt-1">
+                        Пожалуйста, свяжитесь с менеджером, чтобы получить реквизиты
+                        для оплаты.
+                      </p>
+                    </>
+                  )}
                 </div>
 
-                <div className="flex items-center justify-center mb-4">
-                  {/* Замените изображение QR на актуальное */}
-                  <img src="/images/payments/kaspi-qr.png" alt="Kaspi QR" className="w-48 h-48 object-contain border rounded" onError={(e)=>{(e.currentTarget as HTMLImageElement).style.display='none'}} />
+                {hasPersonalQr && (
+                  <div className="mb-4 flex items-center justify-center">
+                    <img
+                      src={qrCodeUrl}
+                      alt="Персональный QR для пополнения"
+                      className="h-48 w-48 rounded border object-contain"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display =
+                          "none";
+                      }}
+                    />
+                  </div>
+                )}
+
+                <div className="mb-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                  <div className="flex items-center justify-between">
+                    <span>Лимит доступа</span>
+                    <span className="font-semibold">{fmtKzt(creditLimit)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Использовано лимита</span>
+                    <span className="font-semibold text-orange-600">
+                      {fmtKzt(creditUsed)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Доступно без пополнения</span>
+                    <span className="font-semibold text-emerald-600">
+                      {fmtKzt(Math.max(availableCredit, 0))}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-2 mb-4">
@@ -177,7 +237,58 @@ export default function FinancePage() {
             {/* Правая колонка: Статистика и таблицы */}
             <div className="lg:col-span-2 space-y-6">
               <div className="rounded-2xl border bg-white p-4">
-                <Stats totalTopUps={totalTopUps} spent={spent} remaining={remaining} updatedAt={balance?.updatedAt} />
+                <Stats
+                  totalTopUps={totalTopUps}
+                  spent={spent}
+                  remaining={remaining}
+                  creditLimit={creditLimit}
+                  creditUsed={creditUsed}
+                  availableCredit={availableCredit}
+                  updatedAt={balance?.updatedAt}
+                />
+              </div>
+              <div
+                className={`rounded-2xl border p-4 flex items-start gap-3 ${
+                  creditUsed > 0
+                    ? "border-orange-200 bg-orange-50"
+                    : "border-emerald-200 bg-emerald-50"
+                }`}
+              >
+                <AlertTriangle
+                  className={`mt-1 h-5 w-5 ${
+                    creditUsed > 0 ? "text-orange-600" : "text-emerald-600"
+                  }`}
+                />
+                <div className="space-y-1 text-sm leading-relaxed text-muted-foreground">
+                  {creditUsed > 0 ? (
+                    <>
+                      <p>
+                        Текущий долг по кредитному лимиту:{" "}
+                        <span className="font-semibold text-orange-700">
+                          {fmtKzt(creditUsed)}
+                        </span>
+                        .
+                      </p>
+                      <p>
+                        Осталось доступно без пополнения:{" "}
+                        <span className="font-semibold text-orange-700">
+                          {fmtKzt(Math.max(availableCredit, 0))}
+                        </span>
+                        . После достижения лимита новые заказы потребуют
+                        пополнения счёта.
+                      </p>
+                    </>
+                  ) : (
+                    <p>
+                      Баланс и кредитный лимит в порядке. Вы можете размещать
+                      заказы в пределах установленного лимита{" "}
+                      <span className="font-semibold text-emerald-700">
+                        {fmtKzt(creditLimit)}
+                      </span>
+                      .
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="rounded-2xl border bg-white p-4">

@@ -1,62 +1,107 @@
-import { MoveDownLeft, MoveUpRight } from "lucide-react";
+import { Banknote, CreditCard, MoveDownLeft, MoveUpRight } from "lucide-react";
 
 type StatsProps = {
-  totalTopUps: number; // суммарно пополнено, ₸
-  spent: number;       // потрачено, ₸ (положительное число)
-  remaining: number;   // остаток на счёте, ₸
-  updatedAt?: string;  // ISO время последнего обновления баланса
+  totalTopUps: number;
+  spent: number;
+  remaining: number;
+  creditLimit: number;
+  creditUsed: number;
+  availableCredit: number;
+  updatedAt?: string;
 }
 
-function Stats({ totalTopUps, spent, remaining, updatedAt }: StatsProps) {
-  const fmt = (n: number) => new Intl.NumberFormat('ru-KZ', { style: 'currency', currency: 'KZT', maximumFractionDigits: 0 }).format(n || 0)
+function Stats({
+  totalTopUps,
+  spent,
+  remaining,
+  creditLimit,
+  creditUsed,
+  availableCredit,
+  updatedAt,
+}: StatsProps) {
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("ru-KZ", {
+      style: "currency",
+      currency: "KZT",
+      maximumFractionDigits: 0,
+    }).format(n || 0);
+
   const fmtUpdated = (iso?: string) => {
-    if (!iso) return null
+    if (!iso) return null;
     try {
-      const d = new Date(iso)
-      const s = d.toLocaleString('ru-RU', {
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit'
-      })
-      return s
+      const d = new Date(iso);
+      return d.toLocaleString("ru-RU", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
     } catch {
-      return null
+      return null;
     }
-  }
+  };
+
+  const cards = [
+    {
+      icon: <MoveUpRight className="w-4 h-4 mb-10 text-primary" />,
+      value: fmt(totalTopUps),
+      label: "Общая сумма пополнений счёта",
+    },
+    {
+      icon: <MoveDownLeft className="w-4 h-4 mb-10 text-destructive" />,
+      value: fmt(spent),
+      label: "Потрачено на заказы",
+    },
+    {
+      icon: <MoveUpRight className="w-4 h-4 mb-10 text-success" />,
+      value: fmt(remaining),
+      label: "Доступный остаток на счёте",
+      footer: fmtUpdated(updatedAt)
+        ? `Обновлено: ${fmtUpdated(updatedAt)}`
+        : undefined,
+    },
+    {
+      icon: <CreditCard className="w-4 h-4 mb-10 text-blue-500" />,
+      value: fmt(creditLimit),
+      label: "Установленный кредитный лимит",
+    },
+    {
+      icon: <MoveDownLeft className="w-4 h-4 mb-10 text-orange-500" />,
+      value: fmt(creditUsed),
+      label: "Использовано из лимита (текущий долг)",
+    },
+    {
+      icon: <Banknote className="w-4 h-4 mb-10 text-emerald-500" />,
+      value: fmt(availableCredit),
+      label: "Ещё доступно по лимиту",
+    },
+  ];
 
   return (
     <div className="w-full py-8 lg:py-10">
       <div className="container mx-auto">
-        <div className="grid text-left grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 w-full gap-4 lg:gap-8">
-          <div className="flex gap-0 flex-col justify-between p-6 border rounded-md bg-white">
-            <MoveUpRight className="w-4 h-4 mb-10 text-primary" />
-            <h2 className="text-3xl lg:text-4xl tracking-tighter max-w-xl text-left font-regular flex flex-row gap-3 items-end">
-              {fmt(totalTopUps)}
-            </h2>
-            <p className="text-base leading-relaxed tracking-tight text-muted-foreground max-w-xl text-left">
-              Общее сумма пополнений в счёт
-            </p>
-          </div>
-          <div className="flex gap-0 flex-col justify-between p-6 border rounded-md bg-white">
-            <MoveDownLeft className="w-4 h-4 mb-10 text-destructive" />
-            <h2 className="text-3xl lg:text-4xl tracking-tighter max-w-xl text-left font-regular flex flex-row gap-3 items-end">
-              {fmt(spent)}
-            </h2>
-            <p className="text-base leading-relaxed tracking-tight text-muted-foreground max-w-xl text-left">
-              Сколько потрачено на покупку запчастей
-            </p>
-          </div>
-          <div className="flex gap-0 flex-col justify-between p-6 border rounded-md bg-white">
-            <MoveUpRight className="w-4 h-4 mb-10 text-success" />
-            <h2 className="text-3xl lg:text-4xl tracking-tighter max-w-xl text-left font-regular flex flex-row gap-3 items-end">
-              {fmt(remaining)}
-            </h2>
-            <p className="text-base leading-relaxed tracking-tight text-muted-foreground max-w-xl text-left">
-              Остаток на счёте
-            </p>
-            {fmtUpdated(updatedAt) && (
-              <p className="text-xs text-muted-foreground mt-1">Обновлено: {fmtUpdated(updatedAt)}</p>
-            )}
-          </div>
+        <div className="grid text-left grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 w-full gap-4 lg:gap-6">
+          {cards.map((card) => (
+            <div
+              key={card.label}
+              className="flex flex-col justify-between gap-0 rounded-md border bg-white p-6"
+            >
+              {card.icon}
+              <h2 className="flex flex-row items-end gap-3 text-left text-3xl font-medium tracking-tighter lg:text-4xl">
+                {card.value}
+              </h2>
+              <p className="text-left text-sm font-normal leading-relaxed tracking-tight text-muted-foreground">
+                {card.label}
+              </p>
+              {card.footer && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {card.footer}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       </div>
     </div>
