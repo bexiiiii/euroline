@@ -75,6 +75,9 @@ public class ProductService {
         response.setWeekly(product.getIsWeekly());
         response.setWeeklyStartAt(product.getWeeklyStartAt());
         response.setWeeklyEndAt(product.getWeeklyEndAt());
+        response.setPrice(product.getPrice());
+        response.setStock(product.getStock());
+        response.setSyncedWith1C(false);
 
         List<ProductResponse.PropertyDTO> props = product.getProperties().stream().map(p -> {
             ProductResponse.PropertyDTO dto = new ProductResponse.PropertyDTO();
@@ -96,7 +99,7 @@ public class ProductService {
         
         // Обогащаем данными из 1С по артикулу
         try {
-            enrichmentService.enrichByArticle(product.getCode()).ifPresent(enrichmentData -> {
+            enrichmentService.enrichProduct(product).ifPresent(enrichmentData -> {
                 // Обновляем цену из cml_prices
                 if (enrichmentData.getPrice() != null) {
                     response.setPrice(enrichmentData.getPrice().intValue());
@@ -114,7 +117,7 @@ public class ProductService {
                             .map(w -> {
                                 ProductResponse.WarehouseDTO dto = new ProductResponse.WarehouseDTO();
                                 dto.setName(w.getWarehouseName());
-                                dto.setQuantity(w.getQuantity().intValue());
+                                dto.setQuantity(w.getQuantity() != null ? w.getQuantity().intValue() : null);
                                 return dto;
                             })
                             .toList();
@@ -124,11 +127,11 @@ public class ProductService {
                 response.setSyncedWith1C(enrichmentData.isFoundInLocalDb());
                 
                 log.debug("✅ Enriched product {}: price={}, stock={}, warehouses={}", 
-                    product.getCode(), enrichmentData.getPrice(), enrichmentData.getStock(), 
+                    product.getId(), enrichmentData.getPrice(), enrichmentData.getStock(), 
                     enrichmentData.getWarehouses() != null ? enrichmentData.getWarehouses().size() : 0);
             });
         } catch (Exception e) {
-            log.error("❌ Failed to enrich product {}: {}", product.getCode(), e.getMessage());
+            log.error("❌ Failed to enrich product {}: {}", product.getId(), e.getMessage());
             // Возвращаем базовый response без обогащения
         }
         
@@ -144,70 +147,45 @@ public class ProductService {
         if (products == null || products.isEmpty()) {
             return List.of();
         }
-        
-        // Шаг 1: Собираем все артикулы для batch enrichment
-        List<String> articleNumbers = products.stream()
-                .map(Product::getCode)
-                .filter(code -> code != null && !code.trim().isEmpty())
-                .toList();
-        
-        if (articleNumbers.isEmpty()) {
-            // Если артикулов нет, возвращаем базовые responses
-            return products.stream()
-                    .map(this::toResponse)
-                    .toList();
-        }
-        
-        // Шаг 2: ⚡ Получаем данные обогащения ОДНИМ запросом (2 SQL queries вместо N×3)
-        java.util.Map<String, ProductEnrichmentService.EnrichmentData> enrichmentMap = 
-                enrichmentService.enrichBatch(articleNumbers);
-        
-        log.debug("🚀 Batch enriched {} products in 2 queries (instead of {}×3)", 
-                  products.size(), products.size());
-        
-        // Шаг 3: Обогащаем каждый product данными из мапы
+
+        java.util.Map<Long, ProductEnrichmentService.EnrichmentData> enrichmentMap =
+                enrichmentService.enrichProducts(products);
+
+        log.debug("🚀 Batch enriched {} products in 2 queries (instead of {}×3)",
+                products.size(), products.size());
+
         return products.stream()
                 .map(product -> {
                     ProductResponse response = toResponse(product);
-                    
-                    // Достаем enrichment data из мапы (O(1) вместо N запросов)
-                    String articleKey = product.getCode() != null 
-                            ? product.getCode().toLowerCase().trim() 
-                            : null;
-                    
-                    if (articleKey != null) {
-                        ProductEnrichmentService.EnrichmentData enrichmentData = 
-                                enrichmentMap.get(articleKey);
-                        
-                        if (enrichmentData != null) {
-                            // Обновляем цену
-                            if (enrichmentData.getPrice() != null) {
-                                response.setPrice(enrichmentData.getPrice().intValue());
-                            }
-                            
-                            // Обновляем остатки
-                            if (enrichmentData.getStock() != null) {
-                                response.setStock(enrichmentData.getStock().intValue());
-                            }
-                            
-                            // Добавляем информацию о складах
-                            if (enrichmentData.getWarehouses() != null && !enrichmentData.getWarehouses().isEmpty()) {
-                                List<ProductResponse.WarehouseDTO> warehouseDTOs = 
-                                    enrichmentData.getWarehouses().stream()
-                                        .map(w -> {
-                                            ProductResponse.WarehouseDTO dto = new ProductResponse.WarehouseDTO();
-                                            dto.setName(w.getWarehouseName());
-                                            dto.setQuantity(w.getQuantity().intValue());
-                                            return dto;
-                                        })
-                                        .toList();
-                                response.setWarehouses(warehouseDTOs);
-                            }
-                            
-                            response.setSyncedWith1C(enrichmentData.isFoundInLocalDb());
+
+                    ProductEnrichmentService.EnrichmentData enrichmentData =
+                            enrichmentMap.get(product.getId());
+
+                    if (enrichmentData != null) {
+                        if (enrichmentData.getPrice() != null) {
+                            response.setPrice(enrichmentData.getPrice().intValue());
                         }
+
+                        if (enrichmentData.getStock() != null) {
+                            response.setStock(enrichmentData.getStock().intValue());
+                        }
+
+                        if (enrichmentData.getWarehouses() != null && !enrichmentData.getWarehouses().isEmpty()) {
+                            List<ProductResponse.WarehouseDTO> warehouseDTOs =
+                                    enrichmentData.getWarehouses().stream()
+                                            .map(w -> {
+                                                ProductResponse.WarehouseDTO dto = new ProductResponse.WarehouseDTO();
+                                                dto.setName(w.getWarehouseName());
+                                                dto.setQuantity(w.getQuantity() != null ? w.getQuantity().intValue() : null);
+                                                return dto;
+                                            })
+                                            .toList();
+                            response.setWarehouses(warehouseDTOs);
+                        }
+
+                        response.setSyncedWith1C(enrichmentData.isFoundInLocalDb());
                     }
-                    
+
                     return response;
                 })
                 .toList();
