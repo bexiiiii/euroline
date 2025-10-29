@@ -47,32 +47,6 @@ export default function SearchResultsTable(props: SearchResultsTableProps) {
     () => combinedResults.filter((item) => item.catalog === 'UMAPI_ANALOG'),
     [combinedResults]
   );
-  const [analogBrandFilter, setAnalogBrandFilter] = useState('');
-  const [showAllAnalogs, setShowAllAnalogs] = useState(false);
-
-  const filteredAnalogItems = useMemo(() => {
-    const normalizedFilter = analogBrandFilter.trim().toLowerCase();
-    if (!normalizedFilter) {
-      return analogItems;
-    }
-    return analogItems.filter((item) => {
-      if (!item.brand) return false;
-      return item.brand.toLowerCase().includes(normalizedFilter);
-    });
-  }, [analogItems, analogBrandFilter]);
-
-  const analogDisplayLimit = 5;
-  const displayedAnalogItems = useMemo(() => {
-    if (showAllAnalogs) {
-      return filteredAnalogItems;
-    }
-    return filteredAnalogItems.slice(0, analogDisplayLimit);
-  }, [filteredAnalogItems, showAllAnalogs]);
-
-  useEffect(() => {
-    setShowAllAnalogs(false);
-  }, [analogBrandFilter]);
-  const hiddenAnalogsCount = Math.max(filteredAnalogItems.length - analogDisplayLimit, 0);
 
   const isLoading = isLoadingProp ?? searchStore.isLoading;
   const detectedType = detectedTypeProp ?? searchStore.detectedType ?? null;
@@ -142,79 +116,40 @@ export default function SearchResultsTable(props: SearchResultsTableProps) {
 
       {analogItems.length > 0 && (
         <div className="border-t border-gray-200 bg-gray-50">
-          <div className="px-4 py-4 border-b border-gray-200 bg-white">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                  Аналоги и заменители ({filteredAnalogItems.length})
-                </h4>
-                <p className="text-xs text-gray-600 mt-1">
-                  Эти предложения найдены в UMAPI и дополнены данными по остаткам из 1С.
-                </p>
-              </div>
-              <div className="w-full md:w-64">
-                <label htmlFor="analog-brand-filter" className="sr-only">
-                  Фильтр по бренду
-                </label>
-                <input
-                  id="analog-brand-filter"
-                  type="text"
-                  value={analogBrandFilter}
-                  onChange={(event) => setAnalogBrandFilter(event.target.value)}
-                  placeholder="Фильтр по бренду"
-                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-            </div>
+          <div className="px-4 py-3 border-b border-gray-200">
+            <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+              Аналоги и заменители ({analogItems.length})
+            </h4>
+            <p className="text-xs text-gray-600 mt-1">
+              Эти предложения найдены в UMAPI и обогащены локальными остатками 1С.
+            </p>
           </div>
 
-          {filteredAnalogItems.length === 0 ? (
-            <div className="px-4 py-6 bg-white text-sm text-gray-600">
-              {analogBrandFilter.trim()
-                ? `Нет аналогов для бренда "${analogBrandFilter.trim()}".`
-                : 'Аналогичные предложения отсутствуют.'}
-            </div>
-          ) : (
-            <>
-              <div className="hidden md:block overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-white">
-                    <tr>
-                      <Th>Аналог</Th>
-                      <Th>Артикул / Бренд</Th>
-                      <Th>Склады</Th>
-                      <Th>Цена</Th>
-                      <Th className="text-center">Количество</Th>
-                      <Th className="text-center">Действия</Th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-100">
-                    {displayedAnalogItems.map((item) => (
-                      <DesktopRow key={`${item.oem}-${item.brand ?? 'analog'}-analog`} item={item} />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="md:hidden divide-y divide-gray-100 bg-white">
-                {displayedAnalogItems.map((item) => (
-                  <MobileCard key={`${item.oem}-${item.brand ?? 'analog'}-analog-mobile`} item={item} />
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-white">
+                <tr>
+                  <Th>Аналог</Th>
+                  <Th>Артикул / Бренд</Th>
+                  <Th>Склады</Th>
+                  <Th>Цена</Th>
+                  <Th className="text-center">Количество</Th>
+                  <Th className="text-center">Действия</Th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {analogItems.map((item) => (
+                  <DesktopRow key={`${item.oem}-${item.brand ?? 'analog'}-analog`} item={item} variant="analog" />
                 ))}
-              </div>
+              </tbody>
+            </table>
+          </div>
 
-              {hiddenAnalogsCount > 0 && (
-                <div className="px-4 py-3 bg-white border-t border-gray-200 text-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowAllAnalogs((prev) => !prev)}
-                    className="text-sm font-medium text-orange-600 hover:text-orange-700 hover:underline"
-                  >
-                    {showAllAnalogs ? 'Свернуть' : `Показать все (${hiddenAnalogsCount})`}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+          <div className="md:hidden divide-y divide-gray-100 bg-white">
+            {analogItems.map((item) => (
+              <MobileCard key={`${item.oem}-${item.brand ?? 'analog'}-analog-mobile`} item={item} variant="analog" />
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -251,7 +186,7 @@ function Header({
   );
 }
 
-function DesktopRow({ item }: { item: SearchItem }) {
+function DesktopRow({ item, variant = 'primary' }: { item: SearchItem; variant?: 'primary' | 'analog' }) {
   const { addByOem } = useCartStore();
   const [quantity, setQuantity] = useState(1);
   const maxQuantity = useMemo(() => computeAvailableQuantity(item), [item]);
@@ -296,7 +231,7 @@ function DesktopRow({ item }: { item: SearchItem }) {
           <div className="min-w-0">
             <div className="text-sm font-semibold text-gray-900 line-clamp-2">{item.name}</div>
             {item.catalog && (
-              <div className="text-xs text-gray-500 mt-1">Каталог: {item.catalog}</div>
+              <div className="text-xs text-gray-500 mt-1">{variant === 'analog' ? 'Источник: UMAPI' : `Каталог: ${item.catalog}`}</div>
             )}
           </div>
         </div>
@@ -305,6 +240,7 @@ function DesktopRow({ item }: { item: SearchItem }) {
         <div className="space-y-1">
           <div className="text-sm font-mono font-medium text-gray-900">{item.oem}</div>
           {item.brand && <div className="text-sm text-gray-600">{item.brand}</div>}
+          {variant === 'analog' && <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">Аналог</span>}
         </div>
       </Td>
       <Td>
@@ -341,7 +277,7 @@ function DesktopRow({ item }: { item: SearchItem }) {
   );
 }
 
-function MobileCard({ item }: { item: SearchItem }) {
+function MobileCard({ item, variant = 'primary' }: { item: SearchItem; variant?: 'primary' | 'analog' }) {
   const { addByOem } = useCartStore();
   const [quantity, setQuantity] = useState(1);
   const maxQuantity = useMemo(() => computeAvailableQuantity(item), [item]);
@@ -386,6 +322,11 @@ function MobileCard({ item }: { item: SearchItem }) {
           <div className="text-sm font-semibold text-gray-900">{item.name}</div>
           <div className="text-xs font-mono text-gray-700">{item.oem}</div>
           {item.brand && <div className="text-xs text-gray-600">{item.brand}</div>}
+          {variant === 'analog' && (
+            <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700 rounded">
+              Аналог
+            </span>
+          )}
         </div>
       </div>
 
