@@ -72,24 +72,27 @@ const AccountBalancesTable: React.FC<AccountBalancesTableProps> = ({
     const matchesEstablishment = balance.establishmentName
       ? balance.establishmentName.toLowerCase().includes(term)
       : false;
-    const matchesDisplayName = balance.displayName
-      ? balance.displayName.toLowerCase().includes(term)
+    const matchesContactName = balance.contactName
+      ? balance.contactName.toLowerCase().includes(term)
+      : false;
+    const matchesEmail = balance.email
+      ? balance.email.toLowerCase().includes(term)
       : false;
 
-    return matchesId || matchesEstablishment || matchesDisplayName;
+    return matchesId || matchesEstablishment || matchesContactName || matchesEmail;
   });
 
   const getPrimaryTitle = (balance: ClientBalance) => {
     return (
       balance.establishmentName?.trim() ||
-      balance.displayName?.trim() ||
+      balance.contactName?.trim() ||
       `Пользователь #${balance.clientId}`
     );
   };
 
   const getSecondaryTitle = (balance: ClientBalance) => {
     const primary = getPrimaryTitle(balance);
-    const contact = balance.displayName?.trim();
+    const contact = balance.contactName?.trim();
     if (contact && contact !== primary) {
       return contact;
     }
