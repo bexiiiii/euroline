@@ -204,25 +204,6 @@ export default function FinancePage() {
                   </div>
                 )}
 
-                <div className="mb-4 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                  <div className="flex items-center justify-between">
-                    <span>Лимит доступа</span>
-                    <span className="font-semibold">{fmtKzt(creditLimit)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Использовано лимита</span>
-                    <span className="font-semibold text-orange-600">
-                      {fmtKzt(creditUsed)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Доступно без пополнения</span>
-                    <span className="font-semibold text-emerald-600">
-                      {fmtKzt(Math.max(availableCredit, 0))}
-                    </span>
-                  </div>
-                </div>
-
                 <div className="space-y-2 mb-4">
                  
                   <FileUploader onFileSelected={setReceipt} />
