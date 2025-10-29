@@ -11,7 +11,7 @@ import PaginationButton from "@/components/PaginationWithPrimaryButton";
 import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { searchApi, type BrandRefinementItem, type AnalogItem } from "@/lib/api/search";
+import { searchApi, type BrandRefinementItem, type SearchItem } from "@/lib/api/search";
 import AnalogsTable from "@/components/AnalogsTable";
 import { toast } from "sonner";
 
@@ -19,14 +19,11 @@ function SearchPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filtersVersion, setFiltersVersion] = useState(0);
   const [brandItems, setBrandItems] = useState<BrandRefinementItem[]>([]);
-  const [analogs, setAnalogs] = useState<AnalogItem[]>([]);
   const [loadingBrands, setLoadingBrands] = useState(false);
-  const [loadingAnalogs, setLoadingAnalogs] = useState(false);
   const [showAllBrands, setShowAllBrands] = useState(false);
   const [showAllAnalogs, setShowAllAnalogs] = useState(false);
   const [brandFilter, setBrandFilter] = useState<string>('');
   const [analogFilter, setAnalogFilter] = useState<string>('');
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
   
   const searchParams = useSearchParams();
   const { 
@@ -53,13 +50,12 @@ function SearchPage() {
         search(queryParam);
         // Сбрасываем UMAPI данные при новом поиске
         setBrandItems([]);
-        setAnalogs([]);
+        // Аналоги будут вычисляться из результатов поиска
       }
     } else {
       // Clear results when there's no query parameter
       clearResults();
       setBrandItems([]);
-      setAnalogs([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]); // Only depend on searchParams to avoid duplicate searches
@@ -74,18 +70,6 @@ function SearchPage() {
           setBrandItems(brandsResponse || []);
           
           // Автоматически загружаем аналоги для первого бренда
-          if (brandsResponse && brandsResponse.length > 0) {
-            const firstBrand = brandsResponse[0].brand;
-            setLoadingAnalogs(true);
-            try {
-              const analogsResponse = await searchApi.getAnalogs(query, firstBrand);
-              setAnalogs(analogsResponse || []);
-            } catch (err) {
-              console.error('Failed to load analogs:', err);
-            } finally {
-              setLoadingAnalogs(false);
-            }
-          }
         } catch (err) {
           console.error('Failed to load brand items:', err);
         } finally {
@@ -98,7 +82,17 @@ function SearchPage() {
   }, [detectedType, query]);
 
   // Применяем клиентские фильтры и конвертируем в AutoPart
-  const parts = results
+  const primaryResults = useMemo(
+    () => results.filter((r: SearchItem) => r.catalog !== 'UMAPI_ANALOG'),
+    [results]
+  );
+
+  const analogResults = useMemo(
+    () => results.filter((r: SearchItem) => r.catalog === 'UMAPI_ANALOG'),
+    [results]
+  );
+
+  const parts = primaryResults
     .filter(r => {
       // brand filter
       if (filters.brands.length > 0 && !filters.brands.includes(r.brand)) {
@@ -119,7 +113,7 @@ function SearchPage() {
   const displayedBrandItems = showAllBrands ? filteredBrandItems : filteredBrandItems.slice(0, 5);
   
   // Фильтрация и пагинация для Analogs
-  const filteredAnalogs = analogs.filter(analog => 
+  const filteredAnalogs = analogResults.filter(analog => 
     !analogFilter || analog.brand.toLowerCase().includes(analogFilter.toLowerCase())
   );
   const displayedAnalogs = showAllAnalogs ? filteredAnalogs : filteredAnalogs.slice(0, 5);
@@ -127,7 +121,7 @@ function SearchPage() {
   // OEM flow helpers
   const isOem = detectedType === 'OEM';
   const uniqueCatalogs: { brand: string; catalog: string }[] = isOem
-    ? Array.from(new Map(results.map(r => [
+    ? Array.from(new Map(primaryResults.map(r => [
         `${r.brand}|${r.catalog}`,
         { brand: r.brand, catalog: r.catalog }
       ])).values())
@@ -437,7 +431,7 @@ function SearchPage() {
               )}
 
               {/* Таблица с аналогами */}
-              {analogs && analogs.length > 0 && (
+              {analogResults && analogResults.length > 0 && (
                 <div className="rounded-lg border overflow-hidden mt-6">
                   <div className="px-6 py-4 bg-orange-50 border-b border-orange-200">
                     <div className="flex items-center justify-between mb-3">
@@ -456,14 +450,7 @@ function SearchPage() {
                       Альтернативные запчасти для артикула <span className="font-mono font-medium">{query}</span>
                     </p>
                   </div>
-                  <AnalogsTable 
-                    analogs={displayedAnalogs} 
-                    isLoading={loadingAnalogs}
-                    quantities={quantities}
-                    onQuantityChange={(key: string, value: number) => {
-                      setQuantities(prev => ({ ...prev, [key]: value }));
-                    }}
-                  />
+                  <AnalogsTable analogs={displayedAnalogs} />
                   {filteredAnalogs.length > 5 && (
                     <div className="px-6 py-3 bg-orange-50 border-t flex justify-center">
                       <button

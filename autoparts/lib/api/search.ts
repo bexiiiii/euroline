@@ -146,12 +146,6 @@ export const searchApi = {
     const params = new URLSearchParams({ article });
     return apiRequest<BrandRefinementResponse>(`/parts-search/by-article?${params.toString()}`);
   },
-  
-  // UMAPI: получить аналоги
-  async getAnalogs(article: string, brand: string): Promise<AnalogsResponse> {
-    const params = new URLSearchParams({ article, brand });
-    return apiRequest<AnalogsResponse>(`/parts-search/analogs?${params.toString()}`);
-  },
 };
 
 export { SearchApiError };
@@ -198,21 +192,6 @@ export interface OemApplicabilityResponse {
 export type BrandRefinementResponse = BrandRefinementItem[];
 
 export interface BrandRefinementItem {
-  article: string;
-  articleSearch: string;
-  title: string;
-  img: string | null;
-  artId: number | null;
-  type: string;        // "Indefinite", "OEM", "OES"
-  target: string;      // "Cross", "Original"
-  brand: string;
-  brandSearch: string;
-}
-
-// Analogs response - теперь это просто массив
-export type AnalogsResponse = AnalogItem[];
-
-export interface AnalogItem {
   article: string;
   articleSearch: string;
   title: string;

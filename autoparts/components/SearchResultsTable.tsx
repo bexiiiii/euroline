@@ -1,18 +1,21 @@
+/* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState } from 'react';
-import { ShoppingCart, Package, MapPin, Info, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
-import { SearchItem, SearchWarehouse, SearchVehicle, type AnalogItem } from '@/lib/api/search';
+import { useMemo, useState, useEffect } from 'react';
+import type { PropsWithChildren } from 'react';
+import { Package, ShoppingCart, MapPin } from 'lucide-react';
+import { SearchItem, SearchVehicle, SearchWarehouse } from '@/lib/api/search';
 import { useSearchStore } from '@/lib/stores/searchStore';
 import { useCartStore } from '@/lib/stores/cartStore';
 import { toast } from 'sonner';
-import { searchApi } from '@/lib/api/search';
+
+type SearchType = 'VIN' | 'FRAME' | 'PLATE' | 'OEM' | 'TEXT' | null;
 
 interface SearchResultsTableProps {
   className?: string;
   items?: SearchItem[];
   isLoading?: boolean;
-  detectedType?: 'VIN' | 'FRAME' | 'PLATE' | 'OEM' | 'TEXT' | null;
+  detectedType?: SearchType;
   vehicle?: SearchVehicle | null;
   total?: number;
   page?: number;
@@ -20,620 +23,162 @@ interface SearchResultsTableProps {
   emptyMessage?: string;
 }
 
-export default function SearchResultsTable({
-  className,
-  items,
-  isLoading: isLoadingProp,
-  detectedType: detectedTypeProp,
-  vehicle: vehicleProp,
-  total,
-  page,
-  pageSize,
-  emptyMessage,
-}: SearchResultsTableProps) {
-  const store = useSearchStore();
-  const results = items ?? store.results;
-  const isLoading = isLoadingProp ?? store.isLoading;
-  const detectedType = detectedTypeProp ?? store.detectedType;
-  const vehicle = vehicleProp ?? store.vehicle;
-  const itemsToRender = results ?? [];
-  const totalCount = typeof total === 'number' ? total : itemsToRender.length;
+export default function SearchResultsTable(props: SearchResultsTableProps) {
+  const {
+    className,
+    items,
+    isLoading: isLoadingProp,
+    detectedType: detectedTypeProp,
+    vehicle: vehicleProp,
+    total,
+    page,
+    pageSize,
+    emptyMessage,
+  } = props;
+
+  const searchStore = useSearchStore();
+  const resultsFromStore = searchStore.results ?? [];
+  const combinedResults = items ?? resultsFromStore;
+  const primaryItems = useMemo(
+    () => combinedResults.filter((item) => item.catalog !== 'UMAPI_ANALOG'),
+    [combinedResults]
+  );
+  const analogItems = useMemo(
+    () => combinedResults.filter((item) => item.catalog === 'UMAPI_ANALOG'),
+    [combinedResults]
+  );
+
+  const isLoading = isLoadingProp ?? searchStore.isLoading;
+  const detectedType = detectedTypeProp ?? searchStore.detectedType ?? null;
+  const vehicle = vehicleProp ?? searchStore.vehicle ?? null;
+
+  const totalCount = typeof total === 'number' ? total : primaryItems.length;
   const currentPage = page ?? 0;
-  const currentPageSize = pageSize ?? (itemsToRender.length || 1);
+  const currentPageSize = pageSize ?? (primaryItems.length || 1);
 
   if (isLoading) {
     return (
       <div className="bg-white rounded-lg border shadow-sm p-8">
-        <div className="flex items-center justify-center">
-          <div className="flex items-center gap-3 text-gray-600">
-            <div className="w-6 h-6 border-2 border-gray-400 border-t-orange-500 rounded-full animate-spin" />
-            <span>Поиск автозапчастей...</span>
-          </div>
+        <div className="flex items-center justify-center gap-3 text-gray-600">
+          <div className="w-6 h-6 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
+          <span>Поиск автозапчастей...</span>
         </div>
       </div>
     );
   }
 
-  // Если найден автомобиль по VIN/Frame
   if (vehicle) {
-    return (
-      <div className="bg-white rounded-lg border shadow-sm">
-        <div className="p-6 border-b border-gray-100">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">Найден автомобиль</h3>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-4">
-              <Package className="w-6 h-6 text-blue-600 mt-1" />
-              <div>
-                <h4 className="font-semibold text-blue-900">{vehicle.brand} {vehicle.name}</h4>
-                <div className="text-sm text-blue-700 mt-2 space-y-1">
-                  <div><span className="font-medium">ID автомобиля:</span> {vehicle.vehicleId}</div>
-                  <div><span className="font-medium">SSD:</span> {vehicle.ssd}</div>
-                  <div><span className="font-medium">Каталог:</span> {vehicle.catalog}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <p className="text-gray-600 mt-4">
-            Для поиска запчастей для этого автомобиля перейдите в каталог или уточните запрос.
-          </p>
-        </div>
-      </div>
-    );
+    return <VehicleResultCard vehicle={vehicle} />;
   }
 
-  // Если результаты не найдены
-  if (!itemsToRender || itemsToRender.length === 0) {
+  if (primaryItems.length === 0 && analogItems.length === 0) {
     const message =
       emptyMessage ??
       'Попробуйте изменить поисковый запрос или проверить правильность написания артикула.';
-    return (
-      <div className="bg-white rounded-lg border shadow-sm p-8">
-        <div className="text-center text-gray-600">
-          <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Ничего не найдено</h3>
-          <p>{message}</p>
-        </div>
-      </div>
-    );
+    return <EmptyResult message={message} />;
   }
 
   return (
-    <div className={`bg-white rounded-lg border shadow-sm ${className}`}>
-      <div className="p-4 border-b border-gray-100">
-        <h3 className="text-lg font-semibold text-gray-900">
-          {totalCount > 0 ? `Найдено ${totalCount} автозапчастей` : 'Результаты поиска'}
-        </h3>
-        {(detectedType || (totalCount > itemsToRender.length && itemsToRender.length > 0)) && (
-          <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
-            {detectedType && <span>Тип поиска: {getSearchTypeLabel(detectedType)}</span>}
-            {totalCount > itemsToRender.length && itemsToRender.length > 0 && (
-              <span>
-                Показано {formatRange(currentPage, currentPageSize, itemsToRender.length, totalCount)}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-4 p-4 md:hidden">
-        {itemsToRender.map((item, index) => (
-          <MobileSearchResultCard key={`${item.oem}-${index}`} item={item} />
-        ))}
-      </div>
+    <div className={`bg-white rounded-lg border shadow-sm ${className ?? ''}`}>
+      <Header
+        detectedType={detectedType}
+        totalCount={totalCount}
+        displayed={primaryItems.length}
+        page={currentPage}
+        pageSize={currentPageSize}
+      />
 
       <div className="hidden md:block overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full border-t border-gray-100">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Запчасть
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Артикул / Бренд
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Наличие
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Цена
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Действия
-              </th>
+              <Th>Запчасть</Th>
+              <Th>Артикул / Бренд</Th>
+              <Th>Склады</Th>
+              <Th>Цена</Th>
+              <Th className="text-center">Количество</Th>
+              <Th className="text-center">Действия</Th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {itemsToRender.map((item, index) => (
-              <SearchResultRow key={`${item.oem}-${index}`} item={item} />
+          <tbody className="bg-white divide-y divide-gray-100">
+            {primaryItems.map((item) => (
+              <DesktopRow key={`${item.oem}-${item.brand ?? 'unknown'}`} item={item} />
             ))}
           </tbody>
         </table>
       </div>
-    </div>
-  );
-}
 
-interface SearchResultRowProps {
-  item: SearchItem;
-}
+  <div className="md:hidden divide-y divide-gray-100">
+        {primaryItems.map((item) => (
+          <MobileCard key={`${item.oem}-${item.brand ?? 'unknown'}-mobile`} item={item} />
+        ))}
+      </div>
 
-function SearchResultRow({ item }: SearchResultRowProps) {
-  const [showWarehouses, setShowWarehouses] = useState(false);
-  const [showAnalogs, setShowAnalogs] = useState(false);
-  const [analogs, setAnalogs] = useState<AnalogItem[]>([]);
-  const [loadingAnalogs, setLoadingAnalogs] = useState(false);
-  const { addByOem } = useCartStore();
-
-  const hasStock = item.quantity && item.quantity > 0;
-  
-  const handleToggleAnalogs = async () => {
-    if (!showAnalogs && analogs.length === 0 && item.umapiSuppliers && item.umapiSuppliers.length > 0) {
-      // Загружаем аналоги при первом открытии
-      setLoadingAnalogs(true);
-      try {
-        const exactMatch = item.umapiSuppliers.find(s => s.matchType === 'EXACT');
-        const brand = exactMatch?.name || item.umapiSuppliers[0]?.name;
-        
-        if (brand) {
-          const response = await searchApi.getAnalogs(item.oem, brand);
-          setAnalogs(response.analogs || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch analogs:', error);
-        toast.error('Не удалось загрузить аналоги');
-      } finally {
-        setLoadingAnalogs(false);
-      }
-    }
-    setShowAnalogs(!showAnalogs);
-  };
-  
-  return (
-    <>
-      <tr className="hover:bg-gray-50">
-        {/* Запчасть */}
-        <td className="px-6 py-4">
-          <div className="flex items-start gap-3">
-            <div className="w-16 h-12 bg-gray-100 rounded border flex-shrink-0 flex items-center justify-center">
-              {item.imageUrl ? (
-                <img 
-                  src={item.imageUrl} 
-                  alt={item.name}
-                  className="w-full h-full object-cover rounded"
-                />
-              ) : (
-                <Package className="w-6 h-6 text-gray-400" />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <h4 className="text-sm font-medium text-gray-900 line-clamp-2">
-                {item.name}
-              </h4>
-              {item.catalog && (
-                <p className="text-xs text-gray-500 mt-1">Каталог: {item.catalog}</p>
-              )}
-            </div>
+      {analogItems.length > 0 && (
+        <div className="border-t border-gray-200 bg-gray-50">
+          <div className="px-4 py-3 border-b border-gray-200">
+            <h4 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+              Аналоги и заменители ({analogItems.length})
+            </h4>
+            <p className="text-xs text-gray-600 mt-1">
+              Эти предложения найдены в UMAPI и обогащены локальными остатками 1С.
+            </p>
           </div>
-        </td>
 
-        {/* Артикул / Бренд */}
-        <td className="px-6 py-4">
-          <div className="space-y-2">
-            <div className="text-sm font-mono font-medium text-gray-900">
-              {item.oem}
-            </div>
-            <div className="text-sm text-gray-600">
-              {item.brand}
-            </div>
-            
-            {/* UMAPI бейджи */}
-            <div className="flex flex-wrap gap-1 mt-2">
-              {item.analogsCount && item.analogsCount > 0 && (
-                <button
-                  onClick={handleToggleAnalogs}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition cursor-pointer"
-                >
-                  {item.analogsCount} аналогов
-                  {showAnalogs ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                </button>
-              )}
-              {item.oeNumbers && item.oeNumbers.length > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded" title={`OE коды: ${item.oeNumbers.join(', ')}`}>
-                  ✓ {item.oeNumbers.length} OE кода
-                </span>
-              )}
-              {item.umapiSuppliers && item.umapiSuppliers.length > 1 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded" title={`Бренды: ${item.umapiSuppliers.map(s => s.name).join(', ')}`}>
-                  🏷️ {item.umapiSuppliers.length} брендов
-                </span>
-              )}
-            </div>
-          </div>
-        </td>
-
-        {/* Наличие */}
-        <td className="px-6 py-4">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${hasStock ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className="text-sm font-medium">
-                {hasStock ? `${item.quantity} шт.` : 'Нет в наличии'}
-              </span>
-            </div>
-            
-            {item.warehouses && item.warehouses.length > 0 && (
-              <button
-                onClick={() => setShowWarehouses(!showWarehouses)}
-                className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
-              >
-                <MapPin className="w-3 h-3" />
-                {item.warehouses.length} склада
-                <Info className="w-3 h-3" />
-              </button>
-            )}
-          </div>
-        </td>
-
-        {/* Цена */}
-        <td className="px-6 py-4">
-          {item.price ? (
-            <div>
-              <div className="text-lg font-bold text-gray-900">
-                {formatPrice(item.price)} {item.currency || 'тг'}
-              </div>
-            </div>
-          ) : (
-            <span className="text-sm text-gray-500">Цена по запросу</span>
-          )}
-        </td>
-
-        {/* Действия */}
-        <td className="px-6 py-4">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={async () => {
-                try {
-                  await addByOem(item.oem, item.name, item.brand || 'UNKNOWN', 1, item.price, item.imageUrl);
-                  toast.success('Товар добавлен в корзину');
-                } catch (error) {
-                  console.error('Не удалось добавить товар в корзину', error);
-                  toast.error('Не удалось добавить товар в корзину');
-                }
-              }}
-              disabled={!hasStock}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed"
-            >
-              <ShoppingCart className="w-3 h-3" />
-              В корзину
-            </button>
-          </div>
-        </td>
-      </tr>
-
-      {/* Склады */}
-      {showWarehouses && item.warehouses && (
-        <tr>
-          <td colSpan={5} className="px-6 py-2 bg-gray-50">
-            <div className="space-y-2">
-              <h5 className="text-xs font-medium text-gray-700 uppercase tracking-wider">
-                Наличие на складах:
-              </h5>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {item.warehouses.map((warehouse, idx) => (
-                  <WarehouseItem key={`${warehouse.code}-${idx}`} warehouse={warehouse} />
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-white">
+                <tr>
+                  <Th>Аналог</Th>
+                  <Th>Артикул / Бренд</Th>
+                  <Th>Склады</Th>
+                  <Th>Цена</Th>
+                  <Th className="text-center">Количество</Th>
+                  <Th className="text-center">Действия</Th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-100">
+                {analogItems.map((item) => (
+                  <DesktopRow key={`${item.oem}-${item.brand ?? 'analog'}-analog`} item={item} variant="analog" />
                 ))}
-              </div>
-            </div>
-          </td>
-        </tr>
-      )}
-      
-      {/* Таблица аналогов и заменителей */}
-      {showAnalogs && (
-        <tr>
-          <td colSpan={5} className="px-0 py-0">
-            <div className="bg-blue-50 border-t-2 border-blue-200">
-              <div className="px-6 py-3 bg-blue-100 border-b border-blue-200">
-                <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider">
-                  🔄Аналоги и заменители
-                </h4>
-              </div>
-              
-              {loadingAnalogs ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-                  <span className="ml-3 text-sm text-gray-600">Загрузка аналогов...</span>
-                </div>
-              ) : analogs.length === 0 ? (
-                <div className="px-6 py-8 text-center text-sm text-gray-600">
-                  Аналоги не найдены
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-blue-50">
-                      <tr>
-                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Производитель</th>
-                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Артикул</th>
-                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Наименование</th>
-                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Тип</th>
-                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Качество</th>
-                        <th className="px-6 py-2 text-left text-xs font-medium text-gray-600 uppercase">Действия</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {analogs.map((analog, idx) => (
-                        <tr key={`${analog.articleNumber}-${idx}`} className="hover:bg-gray-50">
-                          <td className="px-6 py-3 text-sm font-medium text-gray-900">
-                            {analog.supplierName}
-                          </td>
-                          <td className="px-6 py-3 text-sm font-mono text-gray-900">
-                            {analog.articleNumber}
-                          </td>
-                          <td className="px-6 py-3 text-sm text-gray-700">
-                            {analog.name || '-'}
-                          </td>
-                          <td className="px-6 py-3">
-                            {getAnalogMatchTypeBadge(analog.matchType)}
-                          </td>
-                          <td className="px-6 py-3">
-                            {getAnalogQualityBadge(analog.quality)}
-                          </td>
-                          <td className="px-6 py-3">
-                            <button
-                              onClick={async () => {
-                                try {
-                                  await addByOem(
-                                    analog.articleNumber,
-                                    analog.name || analog.articleNumber,
-                                    analog.supplierName,
-                                    1,
-                                    undefined,
-                                    undefined
-                                  );
-                                  toast.success('Аналог добавлен в корзину');
-                                } catch (error) {
-                                  console.error('Failed to add analog to cart:', error);
-                                  toast.error('Не удалось добавить в корзину');
-                                }
-                              }}
-                              className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600"
-                            >
-                              <ShoppingCart className="w-3 h-3" />
-                              В корзину
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          </td>
-        </tr>
-      )}
-    </>
-  );
-}
-
-// Вспомогательные функции для бейджей аналогов
-function getAnalogMatchTypeBadge(matchType: string) {
-  switch (matchType?.toUpperCase()) {
-    case 'OE':
-      return <span className="px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded">OE оригинал</span>;
-    case 'OEM':
-      return <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">OEM</span>;
-    case 'SIMILAR':
-      return <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 text-yellow-700 rounded">Аналог</span>;
-    default:
-      return <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded">{matchType || '-'}</span>;
-  }
-}
-
-function getAnalogQualityBadge(quality?: string) {
-  if (!quality) return <span className="text-xs text-gray-400">-</span>;
-  
-  switch (quality?.toUpperCase()) {
-    case 'OEM':
-      return <span className="px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded">OEM</span>;
-    case 'AFTERMARKET':
-      return <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded">Aftermarket</span>;
-    default:
-      return <span className="px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded">{quality}</span>;
-  }
-}
-
-interface MobileSearchResultCardProps {
-  item: SearchItem;
-}
-
-function MobileSearchResultCard({ item }: MobileSearchResultCardProps) {
-  const { addByOem } = useCartStore();
-  const [showWarehouses, setShowWarehouses] = useState(false);
-  const [showAnalogs, setShowAnalogs] = useState(false);
-  const [analogs, setAnalogs] = useState<AnalogItem[]>([]);
-  const [loadingAnalogs, setLoadingAnalogs] = useState(false);
-  const hasStock = item.quantity && item.quantity > 0;
-  
-  const handleToggleAnalogs = async () => {
-    if (!showAnalogs && analogs.length === 0 && item.umapiSuppliers && item.umapiSuppliers.length > 0) {
-      setLoadingAnalogs(true);
-      try {
-        const exactMatch = item.umapiSuppliers.find(s => s.matchType === 'EXACT');
-        const brand = exactMatch?.name || item.umapiSuppliers[0]?.name;
-        
-        if (brand) {
-          const response = await searchApi.getAnalogs(item.oem, brand);
-          setAnalogs(response.analogs || []);
-        }
-      } catch (error) {
-        console.error('Failed to fetch analogs:', error);
-        toast.error('Не удалось загрузить аналоги');
-      } finally {
-        setLoadingAnalogs(false);
-      }
-    }
-    setShowAnalogs(!showAnalogs);
-  };
-
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-3">
-      <div className="flex items-start gap-3">
-        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border bg-gray-100">
-          {item.imageUrl ? (
-            <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-xs text-gray-500">
-              Изображение
-            </div>
-          )}
-        </div>
-        <div className="flex-1 space-y-2">
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900">{item.name}</h4>
-            {item.catalog && <p className="text-xs text-gray-500 mt-1">Каталог: {item.catalog}</p>}
+              </tbody>
+            </table>
           </div>
-          <div className="text-xs text-gray-600 space-y-1">
-            <div className="font-mono text-sm text-gray-900">{item.oem}</div>
-            {item.brand && <div>Бренд: {item.brand}</div>}
-            
-            {/* UMAPI бейджи для мобильной версии */}
-            <div className="flex flex-wrap gap-1 mt-2">
-              {item.analogsCount && item.analogsCount > 0 && (
-                <button
-                  onClick={handleToggleAnalogs}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition cursor-pointer"
-                >
-                  🔄{item.analogsCount} аналогов
-                  {showAnalogs ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                </button>
-              )}
-              {item.oeNumbers && item.oeNumbers.length > 0 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700 rounded">
-                  ✓ {item.oeNumbers.length} OE
-                </span>
-              )}
-              {item.umapiSuppliers && item.umapiSuppliers.length > 1 && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-purple-100 text-purple-700 rounded">
-                  🏷️ {item.umapiSuppliers.length} брендов
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm">
-          <span className={`inline-flex h-2 w-2 rounded-full ${hasStock ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="font-medium">
-            {hasStock ? `${item.quantity} шт.` : 'Нет в наличии'}
-          </span>
-        </div>
-        <div className="text-right text-base font-semibold text-gray-900">
-          {item.price ? `${formatPrice(item.price)} ${item.currency || 'тг'}` : 'Цена по запросу'}
-        </div>
-      </div>
-
-      {item.warehouses && item.warehouses.length > 0 && (
-        <button
-          onClick={() => setShowWarehouses((prev) => !prev)}
-          className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800"
-        >
-          <MapPin className="h-4 w-4" />
-          {showWarehouses ? 'Скрыть склады' : `${item.warehouses.length} склада`}
-          <Info className="h-4 w-4" />
-        </button>
-      )}
-
-      <button
-        onClick={async () => {
-          try {
-            await addByOem(item.oem, item.name, item.brand || 'UNKNOWN', 1, item.price, item.imageUrl);
-            toast.success('Товар добавлен в корзину');
-          } catch (error) {
-            console.error('Не удалось добавить товар в корзину', error);
-            toast.error('Не удалось добавить товар в корзину');
-          }
-        }}
-        disabled={!hasStock}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-gray-300"
-      >
-        <ShoppingCart className="h-4 w-4" />
-        В корзину
-      </button>
-
-      {showWarehouses && item.warehouses && (
-        <div className="space-y-2 rounded-lg border bg-gray-50 p-3">
-          <h5 className="text-xs font-semibold uppercase text-gray-600">Наличие на складах</h5>
-          <div className="space-y-2">
-            {item.warehouses.map((warehouse, idx) => (
-              <WarehouseItem key={`${warehouse.code}-${idx}`} warehouse={warehouse} />
+          <div className="md:hidden divide-y divide-gray-100 bg-white">
+            {analogItems.map((item) => (
+              <MobileCard key={`${item.oem}-${item.brand ?? 'analog'}-analog-mobile`} item={item} variant="analog" />
             ))}
           </div>
         </div>
       )}
-      
-      {/* Мобильная таблица аналогов */}
-      {showAnalogs && (
-        <div className="rounded-lg border-2 border-blue-200 bg-blue-50 overflow-hidden">
-          <div className="px-4 py-2 bg-blue-100 border-b border-blue-200">
-            <h5 className="text-xs font-bold text-blue-900 uppercase tracking-wider">
-               Аналоги и заменители
-            </h5>
-          </div>
-          
-          {loadingAnalogs ? (
-            <div className="flex items-center justify-center py-6">
-              <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
-              <span className="ml-2 text-xs text-gray-600">Загрузка...</span>
-            </div>
-          ) : analogs.length === 0 ? (
-            <div className="px-4 py-6 text-center text-xs text-gray-600">
-              Аналоги не найдены
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-200">
-              {analogs.map((analog, idx) => (
-                <div key={`${analog.articleNumber}-${idx}`} className="p-3 bg-white">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm text-gray-900">{analog.supplierName}</div>
-                      <div className="font-mono text-xs text-gray-600 mt-0.5">{analog.articleNumber}</div>
-                      {analog.name && (
-                        <div className="text-xs text-gray-500 mt-1">{analog.name}</div>
-                      )}
-                    </div>
-                    <button
-                      onClick={async () => {
-                        try {
-                          await addByOem(
-                            analog.articleNumber,
-                            analog.name || analog.articleNumber,
-                            analog.supplierName,
-                            1,
-                            undefined,
-                            undefined
-                          );
-                          toast.success('Аналог добавлен в корзину');
-                        } catch (error) {
-                          console.error('Failed to add analog:', error);
-                          toast.error('Ошибка добавления');
-                        }
-                      }}
-                      className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600"
-                    >
-                      <ShoppingCart className="w-3 h-3" />
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {getAnalogMatchTypeBadge(analog.matchType)}
-                    {getAnalogQualityBadge(analog.quality)}
-                  </div>
-                </div>
-              ))}
-            </div>
+    </div>
+  );
+}
+
+function Header({
+  detectedType,
+  totalCount,
+  displayed,
+  page,
+  pageSize,
+}: {
+  detectedType: SearchType;
+  totalCount: number;
+  displayed: number;
+  page: number;
+  pageSize: number;
+}) {
+  return (
+    <div className="p-4 border-b border-gray-100">
+      <h3 className="text-lg font-semibold text-gray-900">
+        {totalCount > 0 ? `Найдено ${totalCount} автозапчастей` : 'Результаты поиска'}
+      </h3>
+      {(detectedType || totalCount > displayed) && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-600">
+          {detectedType && <span>Тип поиска: {getSearchTypeLabel(detectedType)}</span>}
+          {totalCount > displayed && (
+            <span>Показано {formatRange(page, pageSize, displayed, totalCount)}</span>
           )}
         </div>
       )}
@@ -641,23 +186,350 @@ function MobileSearchResultCard({ item }: MobileSearchResultCardProps) {
   );
 }
 
-interface WarehouseItemProps {
-  warehouse: SearchWarehouse;
+function DesktopRow({ item, variant = 'primary' }: { item: SearchItem; variant?: 'primary' | 'analog' }) {
+  const { addByOem } = useCartStore();
+  const [quantity, setQuantity] = useState(1);
+  const maxQuantity = useMemo(() => computeAvailableQuantity(item), [item]);
+  const hasStock = maxQuantity > 0;
+
+  useEffect(() => {
+    setQuantity(hasStock ? 1 : 0);
+  }, [hasStock]);
+
+  const handleAddToCart = async () => {
+    if (!hasStock) {
+      toast.error('Товар отсутствует на складах');
+      return;
+    }
+    try {
+      await addByOem(
+        item.oem,
+        item.name,
+        item.brand || 'UNKNOWN',
+        quantity,
+        item.price,
+        item.imageUrl
+      );
+      toast.success('Товар добавлен в корзину');
+    } catch (error: any) {
+      console.error('Не удалось добавить товар в корзину', error);
+      toast.error(error?.message || 'Не удалось добавить товар в корзину');
+    }
+  };
+
+  return (
+    <tr className="hover:bg-gray-50 transition">
+      <Td>
+        <div className="flex items-start gap-3">
+          <div className="w-16 h-14 bg-gray-100 border rounded flex items-center justify-center overflow-hidden">
+            {item.imageUrl ? (
+              <img src={ensureAbsoluteUrl(item.imageUrl)} alt={item.name} className="w-full h-full object-cover" />
+            ) : (
+              <Package className="w-6 h-6 text-gray-400" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-gray-900 line-clamp-2">{item.name}</div>
+            {item.catalog && (
+              <div className="text-xs text-gray-500 mt-1">{variant === 'analog' ? 'Источник: UMAPI' : `Каталог: ${item.catalog}`}</div>
+            )}
+          </div>
+        </div>
+      </Td>
+      <Td>
+        <div className="space-y-1">
+          <div className="text-sm font-mono font-medium text-gray-900">{item.oem}</div>
+          {item.brand && <div className="text-sm text-gray-600">{item.brand}</div>}
+          {variant === 'analog' && <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-700 rounded">Аналог</span>}
+        </div>
+      </Td>
+      <Td>
+        <WarehouseSummary warehouses={item.warehouses} total={maxQuantity} />
+      </Td>
+      <Td>
+        {typeof item.price === 'number' ? (
+          <div className="text-lg font-bold text-gray-900">
+            {formatPrice(item.price)} {item.currency || 'тг'}
+          </div>
+        ) : (
+          <span className="text-sm text-gray-500">Цена по запросу</span>
+        )}
+      </Td>
+      <Td className="text-center">
+        <QuantitySelector
+          quantity={quantity}
+          max={maxQuantity}
+          disabled={!hasStock}
+          onChange={setQuantity}
+        />
+      </Td>
+      <Td className="text-center">
+        <button
+          onClick={handleAddToCart}
+          disabled={!hasStock}
+          className="inline-flex items-center gap-1 px-3 py-2 text-xs font-semibold text-white bg-orange-500 rounded hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
+        >
+          <ShoppingCart className="w-3 h-3" />
+          В корзину
+        </button>
+      </Td>
+    </tr>
+  );
 }
 
-function WarehouseItem({ warehouse }: WarehouseItemProps) {
+function MobileCard({ item, variant = 'primary' }: { item: SearchItem; variant?: 'primary' | 'analog' }) {
+  const { addByOem } = useCartStore();
+  const [quantity, setQuantity] = useState(1);
+  const maxQuantity = useMemo(() => computeAvailableQuantity(item), [item]);
+  const hasStock = maxQuantity > 0;
+
+  useEffect(() => {
+    setQuantity(hasStock ? 1 : 0);
+  }, [hasStock]);
+
+  const handleAddToCart = async () => {
+    if (!hasStock) {
+      toast.error('Товар отсутствует на складах');
+      return;
+    }
+    try {
+      await addByOem(
+        item.oem,
+        item.name,
+        item.brand || 'UNKNOWN',
+        quantity,
+        item.price,
+        item.imageUrl
+      );
+      toast.success('Товар добавлен в корзину');
+    } catch (error: any) {
+      console.error('Не удалось добавить товар', error);
+      toast.error(error?.message || 'Не удалось добавить в корзину');
+    }
+  };
+
   return (
-    <div className="flex items-center justify-between p-2 bg-white border rounded text-xs">
-      <div>
-        <div className="font-medium text-gray-900">{warehouse.name}</div>
-        <div className="text-gray-500">{warehouse.address}</div>
+    <div className="p-4 space-y-3">
+      <div className="flex items-start gap-3">
+        <div className="w-20 h-20 bg-gray-100 border rounded-lg flex items-center justify-center overflow-hidden">
+          {item.imageUrl ? (
+            <img src={ensureAbsoluteUrl(item.imageUrl)} alt={item.name} className="w-full h-full object-cover" />
+          ) : (
+            <Package className="w-6 h-6 text-gray-400" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="text-sm font-semibold text-gray-900">{item.name}</div>
+          <div className="text-xs font-mono text-gray-700">{item.oem}</div>
+          {item.brand && <div className="text-xs text-gray-600">{item.brand}</div>}
+          {variant === 'analog' && (
+            <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-medium bg-blue-100 text-blue-700 rounded">
+              Аналог
+            </span>
+          )}
+        </div>
       </div>
-      <div className="text-right">
-        <div className="font-medium text-gray-900">{warehouse.qty} шт.</div>
-        <div className="text-gray-500">({warehouse.code})</div>
+
+      <WarehouseSummary warehouses={item.warehouses} total={maxQuantity} compact />
+
+      <div className="flex items-center justify-between">
+        {typeof item.price === 'number' ? (
+          <div className="text-lg font-bold text-gray-900">
+            {formatPrice(item.price)} {item.currency || 'тг'}
+          </div>
+        ) : (
+          <span className="text-sm text-gray-500">Цена по запросу</span>
+        )}
+        <QuantitySelector
+          quantity={quantity}
+          max={maxQuantity}
+          disabled={!hasStock}
+          onChange={setQuantity}
+          compact
+        />
+      </div>
+
+      <button
+        onClick={handleAddToCart}
+        disabled={!hasStock}
+        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-orange-500 rounded-lg hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition"
+      >
+        <ShoppingCart className="w-4 h-4" />
+        В корзину
+      </button>
+    </div>
+  );
+}
+
+function QuantitySelector({
+  quantity,
+  max,
+  disabled,
+  onChange,
+  compact,
+}: {
+  quantity: number;
+  max: number;
+  disabled?: boolean;
+  compact?: boolean;
+  onChange: (value: number) => void;
+}) {
+  const apply = (val: number) => {
+    if (Number.isNaN(val)) return;
+    if (max <= 0) {
+      onChange(0);
+      return;
+    }
+    const clamped = Math.min(Math.max(1, val), max);
+    onChange(clamped);
+  };
+
+  return (
+    <div
+      className={`inline-flex items-center border border-gray-300 rounded ${
+        compact ? 'h-8' : 'h-9'
+      } overflow-hidden`}
+    >
+      <button
+        type="button"
+        onClick={() => apply(quantity - 1)}
+        disabled={disabled || quantity <= 1}
+        className="w-8 h-full flex items-center justify-center text-gray-600 disabled:text-gray-300 disabled:cursor-not-allowed"
+      >
+        −
+      </button>
+      <input
+        type="number"
+        min={1}
+        max={max}
+        value={max > 0 ? quantity : 0}
+        disabled={disabled || max <= 0}
+        onChange={(e) => apply(parseInt(e.target.value, 10))}
+        className="w-12 h-full text-center text-sm text-gray-900 focus:outline-none disabled:bg-gray-100 disabled:text-gray-400"
+      />
+      <button
+        type="button"
+        onClick={() => apply(quantity + 1)}
+        disabled={disabled || quantity >= max}
+        className="w-8 h-full flex items-center justify-center text-gray-600 disabled:text-gray-300 disabled:cursor-not-allowed"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
+function WarehouseSummary({
+  warehouses,
+  total,
+  compact,
+}: {
+  warehouses?: SearchWarehouse[];
+  total: number;
+  compact?: boolean;
+}) {
+  if (!warehouses || warehouses.length === 0) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-gray-500">
+        <MapPin className="w-4 h-4 text-gray-400" />
+        Нет складских данных
+      </div>
+    );
+  }
+
+  const maxVisible = compact ? 2 : 3;
+  const visibleWarehouses = warehouses.slice(0, maxVisible);
+  const remaining = warehouses.length - visibleWarehouses.length;
+
+  return (
+    <div className="text-sm text-gray-700 space-y-1">
+      <div className="flex items-center gap-2 font-medium">
+        <MapPin className="w-4 h-4 text-green-600" />
+        <span>{total > 0 ? `Доступно: ${total} шт.` : 'Нет в наличии'}</span>
+      </div>
+      <div className="space-y-1 text-xs text-gray-600">
+        {visibleWarehouses.map((warehouse) => (
+          <div key={warehouse.code} className="flex justify-between gap-3">
+            <span className="truncate max-w-[150px]">{warehouse.name || warehouse.code}</span>
+            <span className="font-semibold text-gray-900">{warehouse.qty ?? 0} шт.</span>
+          </div>
+        ))}
+        {remaining > 0 && <div className="text-xs text-gray-500">и ещё {remaining} склад(ов)</div>}
       </div>
     </div>
   );
+}
+
+function VehicleResultCard({ vehicle }: { vehicle: SearchVehicle }) {
+  return (
+    <div className="bg-white rounded-lg border shadow-sm">
+      <div className="p-6 border-b border-gray-100">
+        <h3 className="text-xl font-semibold text-gray-900 mb-4">Найден автомобиль</h3>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-start gap-4">
+            <Package className="w-6 h-6 text-blue-600 mt-1" />
+            <div>
+              <h4 className="font-semibold text-blue-900">
+                {vehicle.brand} {vehicle.name}
+              </h4>
+              <div className="text-sm text-blue-700 mt-2 space-y-1">
+                <div>
+                  <span className="font-medium">ID автомобиля:</span> {vehicle.vehicleId}
+                </div>
+                <div>
+                  <span className="font-medium">SSD:</span> {vehicle.ssd}
+                </div>
+                <div>
+                  <span className="font-medium">Каталог:</span> {vehicle.catalog}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p className="text-gray-600 mt-4">
+          Для поиска запчастей для этого автомобиля перейдите в каталог или уточните запрос.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function EmptyResult({ message }: { message: string }) {
+  return (
+    <div className="bg-white rounded-lg border shadow-sm p-8">
+      <div className="text-center text-gray-600">
+        <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Ничего не найдено</h3>
+        <p>{message}</p>
+      </div>
+    </div>
+  );
+}
+
+function Th({ className, children }: PropsWithChildren<{ className?: string }>) {
+  return (
+    <th
+      className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+        className ?? ''
+      }`}
+    >
+      {children}
+    </th>
+  );
+}
+
+function Td({ className, children }: PropsWithChildren<{ className?: string }>) {
+  return <td className={`px-6 py-4 align-top ${className ?? ''}`}>{children}</td>;
+}
+
+function computeAvailableQuantity(item: SearchItem): number {
+  if (typeof item.quantity === 'number' && !Number.isNaN(item.quantity)) {
+    return Math.max(item.quantity, 0);
+  }
+  if (!item.warehouses || item.warehouses.length === 0) {
+    return 0;
+  }
+  return item.warehouses.reduce((sum, warehouse) => sum + (warehouse.qty ?? 0), 0);
 }
 
 function formatRange(page: number, pageSize: number, displayed: number, total: number): string {
@@ -670,7 +542,7 @@ function formatRange(page: number, pageSize: number, displayed: number, total: n
   return `${start}–${end} из ${total}`;
 }
 
-function getSearchTypeLabel(type: string): string {
+function getSearchTypeLabel(type: SearchType): string {
   switch (type) {
     case 'VIN':
       return 'Поиск по VIN-номеру';
@@ -683,7 +555,7 @@ function getSearchTypeLabel(type: string): string {
     case 'TEXT':
       return 'Текстовый поиск';
     default:
-      return type;
+      return '—';
   }
 }
 
@@ -692,4 +564,15 @@ function formatPrice(price: number): string {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(price);
+}
+
+function ensureAbsoluteUrl(url: string): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  if (url.startsWith('/')) {
+    return `https://api.umapi.ru${url}`;
+  }
+  return url;
 }
