@@ -85,17 +85,16 @@ function SearchPage() {
     });
   }, [analogResults, brands, photoOnly]);
 
+  const isOem = detectedType === 'OEM';
   const filteredResults = useMemo(
     () => [...filteredPrimaryResults, ...filteredAnalogResults],
     [filteredPrimaryResults, filteredAnalogResults]
   );
-
   const hasFilteredResults = filteredResults.length > 0;
   const shouldShowResultsTable =
     !isOem || (isOem && selectedCatalog && (hasFilteredResults || isLoading));
 
   // OEM flow helpers
-  const isOem = detectedType === 'OEM';
   const uniqueCatalogs: { brand: string; catalog: string }[] = isOem
     ? Array.from(new Map(primaryResults.map(r => [
         `${r.brand}|${r.catalog}`,
