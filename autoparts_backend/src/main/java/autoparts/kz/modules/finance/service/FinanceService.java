@@ -84,6 +84,28 @@ public class FinanceService {
         return available.signum() < 0 ? BigDecimal.ZERO : available;
     }
 
+    /**
+     * Проверяет достаточность средств (баланс + доступный кредит) для совершения покупки.
+     * Выбрасывает исключение если средств недостаточно.
+     */
+    public void validateSufficientFunds(Long clientId, BigDecimal requiredAmount) {
+        if (requiredAmount == null || requiredAmount.signum() <= 0) {
+            return;
+        }
+        ClientBalance balance = ensureBalance(clientId);
+        BigDecimal currentBalance = safe(balance.getBalance());
+        BigDecimal creditAvailable = availableCredit(balance);
+        BigDecimal totalAvailable = currentBalance.add(creditAvailable);
+        
+        if (totalAvailable.compareTo(requiredAmount) < 0) {
+            throw new IllegalStateException(
+                String.format("Недостаточно средств для оформления заказа. " +
+                    "Требуется: %.2f ₸, Доступно: %.2f ₸ (Баланс: %.2f ₸ + Кредит: %.2f ₸)",
+                    requiredAmount, totalAvailable, currentBalance, creditAvailable)
+            );
+        }
+    }
+
     private void applyPositiveAmount(ClientBalance balance, BigDecimal amount) {
         if (amount == null || amount.signum() <= 0) {
             return;

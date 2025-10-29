@@ -67,6 +67,13 @@ public class OrderService {
             throw new IllegalArgumentException("Cannot create order from empty cart");
         }
 
+        // ✅ НОВОЕ: Проверить достаточность средств (баланс + кредит) ДО создания заказа
+        BigDecimal orderTotal = cart.getItems().stream()
+                .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        financeService.validateSufficientFunds(userId, orderTotal);
+
         // Создать заказ
         Order order = createOrder(userId, req, cart);
         order = orderRepository.save(order);
