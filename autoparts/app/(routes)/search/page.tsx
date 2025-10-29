@@ -4,27 +4,18 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ChevronRight, SlidersHorizontal } from "lucide-react";
 import { useSearchStore } from "@/lib/stores/searchStore";
-import AutoPartsTable, { convertSearchItemToAutoPart } from "@/components/TableComponent";
 import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import FiltersSidebar from "@/components/FiltersSidebar";
 import PaginationButton from "@/components/PaginationWithPrimaryButton";
 import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { searchApi, type BrandRefinementItem, type SearchItem } from "@/lib/api/search";
-import AnalogsTable from "@/components/AnalogsTable";
-import { toast } from "sonner";
+import SearchResultsTable from "@/components/SearchResultsTable";
+import { type SearchItem } from "@/lib/api/search";
 
 function SearchPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [filtersVersion, setFiltersVersion] = useState(0);
-  const [brandItems, setBrandItems] = useState<BrandRefinementItem[]>([]);
-  const [loadingBrands, setLoadingBrands] = useState(false);
-  const [showAllBrands, setShowAllBrands] = useState(false);
-  const [showAllAnalogs, setShowAllAnalogs] = useState(false);
-  const [brandFilter, setBrandFilter] = useState<string>('');
-  const [analogFilter, setAnalogFilter] = useState<string>('');
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
   
   const searchParams = useSearchParams();
   const { 
@@ -49,38 +40,13 @@ function SearchPage() {
       // Only search if the query parameter has actually changed
       if (queryParam !== query) {
         search(queryParam);
-        // Сбрасываем UMAPI данные при новом поиске
-        setBrandItems([]);
-        // Аналоги будут вычисляться из результатов поиска
       }
     } else {
       // Clear results when there's no query parameter
       clearResults();
-      setBrandItems([]);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]); // Only depend on searchParams to avoid duplicate searches
-
-  // Загружаем данные из UMAPI, если detectedType === 'OEM'
-  useEffect(() => {
-    const loadUmapiData = async () => {
-      if (detectedType === 'OEM' && query && !loadingBrands) {
-        setLoadingBrands(true);
-        try {
-          const brandsResponse = await searchApi.searchByArticle(query);
-          setBrandItems(brandsResponse || []);
-          
-          // Автоматически загружаем аналоги для первого бренда
-        } catch (err) {
-          console.error('Failed to load brand items:', err);
-        } finally {
-          setLoadingBrands(false);
-        }
-      }
-    };
-
-    loadUmapiData();
-  }, [detectedType, query]);
 
   // Применяем клиентские фильтры и конвертируем в AutoPart
   const primaryResults = useMemo(
@@ -93,31 +59,40 @@ function SearchPage() {
     [results]
   );
 
-  const parts = primaryResults
-    .filter(r => {
-      // brand filter
-      if (filters.brands.length > 0 && !filters.brands.includes(r.brand)) {
-        return false;
+  const filteredPrimaryResults = useMemo(() => {
+    return primaryResults.filter((item: SearchItem) => {
+      if (brands.length > 0) {
+        if (!item.brand) return false;
+        if (!brands.includes(item.brand)) return false;
       }
-      // photo only
-      if (filters.photoOnly && !r.imageUrl) {
+      if (photoOnly && !item.imageUrl) {
         return false;
       }
       return true;
-    })
-    .map(convertSearchItemToAutoPart);
+    });
+  }, [primaryResults, brands, photoOnly]);
 
-  // Фильтрация и пагинация для BrandRefinement
-  const filteredBrandItems = brandItems.filter(item => 
-    !brandFilter || item.brand.toLowerCase().includes(brandFilter.toLowerCase())
+  const filteredAnalogResults = useMemo(() => {
+    return analogResults.filter((item: SearchItem) => {
+      if (brands.length > 0) {
+        if (!item.brand) return false;
+        if (!brands.includes(item.brand)) return false;
+      }
+      if (photoOnly && !item.imageUrl) {
+        return false;
+      }
+      return true;
+    });
+  }, [analogResults, brands, photoOnly]);
+
+  const filteredResults = useMemo(
+    () => [...filteredPrimaryResults, ...filteredAnalogResults],
+    [filteredPrimaryResults, filteredAnalogResults]
   );
-  const displayedBrandItems = showAllBrands ? filteredBrandItems : filteredBrandItems.slice(0, 5);
-  
-  // Фильтрация и пагинация для Analogs
-  const filteredAnalogs = analogResults.filter(analog => 
-    !analogFilter || analog.brand.toLowerCase().includes(analogFilter.toLowerCase())
-  );
-  const displayedAnalogs = showAllAnalogs ? filteredAnalogs : filteredAnalogs.slice(0, 5);
+
+  const hasFilteredResults = filteredResults.length > 0;
+  const shouldShowResultsTable =
+    !isOem || (isOem && selectedCatalog && (hasFilteredResults || isLoading));
 
   // OEM flow helpers
   const isOem = detectedType === 'OEM';
@@ -250,7 +225,7 @@ function SearchPage() {
             {/* Правая колонка – результаты поиска */}
             <section className="w-full lg:w-3/4">
               {/* OEM step 2: применимые автомобили */}
-              {isOem && selectedCatalog && applicableVehicles.length > 0 && parts.length === 0 && (
+              {isOem && selectedCatalog && applicableVehicles.length > 0 && filteredPrimaryResults.length === 0 && (
                 <div className="rounded-lg border overflow-hidden mb-4">
                   <div className="flex items-center justify-between px-4 py-3 bg-gray-100 text-gray-700 text-sm font-medium">
                     <div className="w-1/4">Бренд</div>
@@ -288,185 +263,19 @@ function SearchPage() {
                 </div>
               )}
 
-              {/* Таблица показываем по умолчанию и на финальном шаге OEM */}
-              {(!isOem || (isOem && selectedCatalog && parts.length > 0)) && (
-                <div className="rounded-lg border overflow-hidden">
-                  <AutoPartsTable
-                    parts={parts}
-                    isLoading={isLoading}
-                    emptyMessage={query ? `По запросу "${query}" ничего не найдено` : 'Введите поисковый запрос'}
-                  />
-                </div>
+              {/* Таблица результатов поиска */}
+              {shouldShowResultsTable && (
+                <SearchResultsTable
+                  className="overflow-hidden"
+                  items={filteredResults}
+                  isLoading={isLoading}
+                  detectedType={detectedType}
+                  emptyMessage={query ? `По запросу "${query}" ничего не найдено` : 'Введите поисковый запрос'}
+                />
               )}
 
-              {/* Таблица с найденными запчастями из UMAPI (BrandRefinement) */}
-              {brandItems && brandItems.length > 0 && (
-                <div className="rounded-lg border overflow-hidden mt-6">
-                  <div className="px-6 py-4 bg-gray-50 border-b">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Найденные запчасти ({filteredBrandItems.length})
-                      </h3>
-                      <input
-                        type="text"
-                        placeholder="Фильтр по бренду"
-                        value={brandFilter}
-                        onChange={(e) => setBrandFilter(e.target.value)}
-                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                      />
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Артикул: <span className="font-mono font-medium">{query}</span>
-                    </p>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 uppercase">Фото</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Бренд</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Артикул</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Наименование</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Остатки</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">Цена</th>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 uppercase">Кол-во</th>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 uppercase">Действия</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {displayedBrandItems.map((item, idx) => {
-                          const stock = Math.floor(Math.random() * 15); // Временно рандомные остатки
-                          const itemKey = `brand-${item.article}-${item.brand}-${idx}`;
-                          const quantity = quantities[itemKey] || 1;
-                          
-                          return (
-                            <tr key={itemKey} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 text-center">
-                                {item.img ? (
-                                  <img 
-                                    src={`https://api.umapi.ru${item.img}`}
-                                    alt={item.title}
-                                    className="w-12 h-12 object-cover rounded mx-auto"
-                                  />
-                                ) : (
-                                  <div className="w-12 h-12 bg-gray-100 rounded mx-auto flex items-center justify-center">
-                                    <span className="text-gray-400 text-xs">Нет фото</span>
-                                  </div>
-                                )}
-                              </td>
-                              <td className="px-4 py-2 text-sm font-medium text-gray-900">
-                                {item.brand}
-                              </td>
-                              <td className="px-4 py-2 text-sm font-mono text-gray-900">
-                                {item.article}
-                              </td>
-                              <td className="px-4 py-2 text-sm text-gray-700">
-                                {item.title}
-                              </td>
-                              <td className="px-4 py-2 text-sm">
-                                <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                                  stock > 5 ? 'bg-green-100 text-green-700' : 
-                                  stock > 0 ? 'bg-yellow-100 text-yellow-700' : 
-                                  'bg-red-100 text-red-700'
-                                }`}>
-                                  {stock > 0 ? `${stock} шт` : 'Нет в наличии'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2 text-sm text-gray-500">
-                                По запросу
-                              </td>
-                              <td className="px-4 py-2 text-center">
-                                <input 
-                                  type="number" 
-                                  min="1"
-                                  max={stock}
-                                  value={quantity}
-                                  onChange={(e) => {
-                                    const val = parseInt(e.target.value) || 1;
-                                    setQuantities(prev => ({
-                                      ...prev,
-                                      [itemKey]: Math.min(Math.max(1, val), stock)
-                                    }));
-                                  }}
-                                  disabled={stock === 0}
-                                  className="w-14 px-2 py-0.5 text-center text-sm border border-gray-300 rounded disabled:bg-gray-100 disabled:text-gray-400"
-                                />
-                              </td>
-                              <td className="px-4 py-2 text-center">
-                                <button
-                                  onClick={() => {
-                                    const token = localStorage.getItem('authToken');
-                                    if (!token) {
-                                      toast.error('Сначала войдите в аккаунт');
-                                      return;
-                                    }
-                                    if (quantity > stock) {
-                                      toast.error(`Доступно только ${stock} шт`);
-                                      return;
-                                    }
-                                    toast.success('Товар добавлен в корзину');
-                                  }}
-                                  disabled={stock === 0}
-                                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-white bg-orange-500 rounded hover:bg-orange-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                >
-                                  В корзину
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  {filteredBrandItems.length > 5 && (
-                    <div className="px-6 py-3 bg-gray-50 border-t flex justify-center">
-                      <button
-                        onClick={() => setShowAllBrands(!showAllBrands)}
-                        className="px-4 py-2 text-sm font-medium text-orange-600 hover:text-orange-700 hover:underline"
-                      >
-                        {showAllBrands ? 'Свернуть' : `Показать все (${filteredBrandItems.length})`}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Таблица с аналогами */}
-              {analogResults && analogResults.length > 0 && (
-                <div className="rounded-lg border overflow-hidden mt-6">
-                  <div className="px-6 py-4 bg-orange-50 border-b border-orange-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Аналоги и заменители ({filteredAnalogs.length})
-                      </h3>
-                      <input
-                        type="text"
-                        placeholder="Фильтр по бренду"
-                        value={analogFilter}
-                        onChange={(e) => setAnalogFilter(e.target.value)}
-                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                      />
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Альтернативные запчасти для артикула <span className="font-mono font-medium">{query}</span>
-                    </p>
-                  </div>
-                  <AnalogsTable analogs={displayedAnalogs} />
-                  {filteredAnalogs.length > 5 && (
-                    <div className="px-6 py-3 bg-orange-50 border-t flex justify-center">
-                      <button
-                        onClick={() => setShowAllAnalogs(!showAllAnalogs)}
-                        className="px-4 py-2 text-sm font-medium text-orange-600 hover:text-orange-700 hover:underline"
-                      >
-                        {showAllAnalogs ? 'Свернуть' : `Показать все (${filteredAnalogs.length})`}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-              
               {/* Пагинация показываем только если есть результаты */}
-              {results && results.length > 0 && (
+              {hasFilteredResults && (
                 <div className="flex justify-center mt-6 md:mt-8 p-4">
                   <PaginationButton />
                 </div>

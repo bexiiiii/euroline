@@ -64,8 +64,7 @@ const FiltersSidebar = ({
       <div className={cn('space-y-6', isMobile && 'px-1 pb-2')}> 
         <div className='space-y-1'>
           <p className='text-xs font-semibold uppercase tracking-wide text-slate-400'>Фильтрация</p>
-          <h3 className='text-lg font-semibold text-slate-900'>Уточните результаты поиска</h3>
-          <p className='text-sm text-slate-500'>Выберите популярные бренды или показывайте только товары с фотографиями.</p>
+  
         </div>
 
         <section className='space-y-4'>
