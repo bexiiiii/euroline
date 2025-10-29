@@ -61,6 +61,16 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> onIllegalState(IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                Map.of(
+                        "error", "business_rule_violation",
+                        "message", e.getMessage()
+                )
+        );
+    }
+
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> onRuntime(RuntimeException e) {
         // наши parser/soap ошибки считаем как bad upstream
@@ -70,4 +80,3 @@ public class GlobalExceptionHandler {
         );
     }
 }
-

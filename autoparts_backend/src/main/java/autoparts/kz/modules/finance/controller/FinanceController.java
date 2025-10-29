@@ -1,6 +1,7 @@
 package autoparts.kz.modules.finance.controller;
 
 
+import autoparts.kz.modules.common.storage.FileStorageService;
 import autoparts.kz.modules.finance.dto.FinanceDtos;
 import autoparts.kz.modules.finance.entity.FinanceTxn;
 import autoparts.kz.modules.finance.entity.RefundRequest;
@@ -23,6 +24,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class FinanceController {
     private final FinanceService svc;
+    private final FileStorageService fileStorageService;
 
     // top-ups
     @GetMapping("/top-ups") @PreAuthorize("hasRole('ADMIN')")
@@ -31,7 +33,7 @@ public class FinanceController {
                                                   @RequestParam(defaultValue="20") int size){
         return svc.listTopUps(status, PageRequest.of(page,size, Sort.by("createdAt").descending()));
     }
-    @PostMapping("/top-ups") public FinanceDtos.TopUpResponse createTopUp(@RequestBody FinanceDtos.TopUpCreate r){ return svc.createTopUp(r); }
+    @PostMapping("/top-ups") @PreAuthorize("hasRole('ADMIN')") public FinanceDtos.TopUpResponse createTopUp(@RequestBody FinanceDtos.TopUpCreate r){ return svc.createTopUp(r); }
     @GetMapping("/top-ups/{id}") @PreAuthorize("hasRole('ADMIN')") public FinanceDtos.TopUpResponse getTopUp(@PathVariable Long id){ return svc.getTopUp(id); }
     @PatchMapping("/top-ups/{id}") @PreAuthorize("hasRole('ADMIN')") public FinanceDtos.TopUpResponse patchTopUp(@PathVariable Long id, @RequestBody FinanceDtos.PatchStatus s){ return svc.patchTopUp(id, s); }
 
@@ -43,6 +45,17 @@ public class FinanceController {
     }
     @GetMapping("/balances/{id}") @PreAuthorize("hasRole('ADMIN')") public FinanceDtos.BalanceResponse balance(@PathVariable Long id){ return svc.getBalance(id); }
     @PostMapping("/balances/{id}/adjust") @PreAuthorize("hasRole('ADMIN')") public FinanceDtos.BalanceResponse adjust(@PathVariable Long id, @RequestBody FinanceDtos.BalanceAdjust r){ return svc.adjust(id, r); }
+    @PatchMapping("/balances/{id}/credit-profile") @PreAuthorize("hasRole('ADMIN')")
+    public FinanceDtos.ClientBalanceView updateCreditProfile(@PathVariable Long id,
+                                                             @RequestBody FinanceDtos.CreditProfileUpdate r){
+        return svc.updateCreditProfile(id, r);
+    }
+    @PostMapping("/balances/{id}/qr") @PreAuthorize("hasRole('ADMIN')")
+    public FinanceDtos.ClientBalanceView uploadQr(@PathVariable Long id,
+                                                  @RequestParam("file") MultipartFile file) throws java.io.IOException {
+        var stored = fileStorageService.store(file, "qr-codes/" + id);
+        return svc.storeQrCode(id, stored);
+    }
 
     // my balance
     @GetMapping("/my/balance")

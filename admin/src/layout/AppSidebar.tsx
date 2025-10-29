@@ -73,7 +73,13 @@ const navItems: NavItem[] = [
   {
     icon: <DollarLineIcon />,
     name: "Финансы и платежи",
-    subItems: [{ name: "Пополнение баланса", path: "/payment", pro: false }, { name: "Запросы на возврат", path: "/return-requests", pro: false }, { name: "История возвратов", path: "/return-history", pro: false },{ name: "Остатки на счетах", path: "/account-balances", pro: false }],
+    subItems: [
+      { name: "Пополнение баланса", path: "/payment", pro: false },
+      { name: "Запросы на возврат", path: "/return-requests", pro: false },
+      { name: "История возвратов", path: "/return-history", pro: false },
+      { name: "Остатки на счетах", path: "/account-balances", pro: false },
+      { name: "Кредитные лимиты", path: "/payment/credit-settings", pro: false },
+    ],
   },
   //  {
   //   icon: <PlugInIcon />,

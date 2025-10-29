@@ -19,9 +19,19 @@ public class FinanceDtos {
                                 String clientPhone) {}
     public record PatchStatus(String status, String adminComment, String paymentMethod) {}
     public record BalanceAdjust(BigDecimal delta, String reason) {}
-    public record BalanceResponse(Long clientId, BigDecimal balance, Instant updatedAt) {}
+    public record CreditProfileUpdate(BigDecimal creditLimit, Boolean clearQr) {}
+    public record BalanceResponse(Long clientId,
+                                  BigDecimal balance,
+                                  BigDecimal creditLimit,
+                                  BigDecimal creditUsed,
+                                  BigDecimal availableCredit,
+                                  String qrCodeUrl,
+                                  Instant updatedAt) {}
     public record ClientBalanceView(Long clientId,
                                     BigDecimal balance,
+                                    BigDecimal creditLimit,
+                                    BigDecimal creditUsed,
+                                    String qrCodeUrl,
                                     Instant updatedAt,
                                     String contactName,
                                     String establishmentName,

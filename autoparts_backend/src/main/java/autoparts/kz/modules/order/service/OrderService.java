@@ -222,13 +222,16 @@ public class OrderService {
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException(orderId));
         OrderStatus previousStatus = order.getStatus();
-        order.setStatus(OrderStatus.CONFIRMED);
-        orderRepository.save(order);
         try {
             financeService.chargeOrder(order.getUser().getId(), order.getTotalAmount(), order.getId());
+        } catch (IllegalStateException e) {
+            log.warn("Insufficient balance/credit for order confirmation: orderId={}, err={}", orderId, e.getMessage());
+            throw e;
         } catch (Exception e) {
             log.warn("Failed to charge order to balance: orderId={}, err={}", orderId, e.toString());
         }
+        order.setStatus(OrderStatus.CONFIRMED);
+        orderRepository.save(order);
         try {
             notifications.createAndBroadcast(order.getUser().getId(),
                     "Заказ подтверждён",

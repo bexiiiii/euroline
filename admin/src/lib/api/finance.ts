@@ -26,8 +26,11 @@ export interface TopUpCreate {
 export interface ClientBalance {
   clientId: number;
   balance: number;
+  creditLimit: number;
+  creditUsed: number;
+  qrCodeUrl?: string | null;
   updatedAt: string;
-  displayName?: string;
+  contactName?: string;
   establishmentName?: string;
   email?: string;
   phone?: string;
@@ -36,6 +39,10 @@ export interface ClientBalance {
 export interface BalanceResponse {
   clientId: number;
   balance: number;
+  creditLimit: number;
+  creditUsed: number;
+  availableCredit: number;
+  qrCodeUrl?: string | null;
   updatedAt: string;
 }
 
@@ -70,6 +77,11 @@ export interface TransactionDetail extends FinanceTransaction {
   orderPublicCode?: string;
   refundRequestId?: number;
   products?: TransactionProduct[];
+}
+
+export interface CreditProfileUpdate {
+  creditLimit?: number;
+  clearQr?: boolean;
 }
 
 export interface RefundRequest {
@@ -134,6 +146,20 @@ export const financeApi = {
     return apiFetch<BalanceResponse>(`/api/finance/balances/${id}/adjust`, {
       method: 'POST',
       body: JSON.stringify(adjustment),
+    });
+  },
+  updateCreditProfile: async (id: number, payload: CreditProfileUpdate): Promise<ClientBalance> => {
+    return apiFetch<ClientBalance>(`/api/finance/balances/${id}/credit-profile`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+  uploadCreditQr: async (id: number, file: File): Promise<ClientBalance> => {
+    const fd = new FormData();
+    fd.append('file', file);
+    return apiFetch<ClientBalance>(`/api/finance/balances/${id}/qr`, {
+      method: 'POST',
+      body: fd,
     });
   },
 

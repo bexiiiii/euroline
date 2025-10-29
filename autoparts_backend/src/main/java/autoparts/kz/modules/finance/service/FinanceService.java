@@ -3,8 +3,6 @@ package autoparts.kz.modules.finance.service;
 
 import autoparts.kz.modules.auth.entity.User;
 import autoparts.kz.modules.auth.repository.UserRepository;
-import autoparts.kz.modules.auth.entity.User;
-import autoparts.kz.modules.auth.repository.UserRepository;
 import autoparts.kz.modules.finance.dto.FinanceDtos;
 import autoparts.kz.modules.finance.entity.ClientBalance;
 import autoparts.kz.modules.finance.entity.FinanceTxn;
@@ -14,6 +12,7 @@ import autoparts.kz.modules.finance.repository.ClientBalanceRepository;
 import autoparts.kz.modules.finance.repository.FinanceTxnRepository;
 import autoparts.kz.modules.finance.repository.RefundRequestRepository;
 import autoparts.kz.modules.finance.repository.TopUpRepository;
+import autoparts.kz.modules.common.storage.FileStorageService;
 import autoparts.kz.modules.notifications.entity.Notification;
 import autoparts.kz.modules.notifications.service.NotificationService;
 import jakarta.persistence.EntityNotFoundException;
@@ -43,6 +42,80 @@ public class FinanceService {
     private final UserRepository users;
     private final autoparts.kz.modules.telegram.service.TelegramNotificationService telegramNotificationService;
     private final autoparts.kz.modules.cml.service.ReturnIntegrationService returnIntegrationService;
+    private final FileStorageService fileStorageService;
+
+    private static final BigDecimal ZERO = BigDecimal.ZERO;
+
+    private BigDecimal safe(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private ClientBalance ensureBalance(Long clientId) {
+        ClientBalance balance = balances.findById(clientId).orElse(null);
+        if (balance == null) {
+            balance = new ClientBalance();
+            balance.setClientId(clientId);
+            balance.setBalance(BigDecimal.ZERO);
+            balance.setCreditLimit(BigDecimal.ZERO);
+            balance.setCreditUsed(BigDecimal.ZERO);
+            balance.setQrCodeUrl(null);
+            return balances.save(balance);
+        }
+        boolean dirty = false;
+        if (balance.getBalance() == null) {
+            balance.setBalance(BigDecimal.ZERO);
+            dirty = true;
+        }
+        if (balance.getCreditLimit() == null) {
+            balance.setCreditLimit(BigDecimal.ZERO);
+            dirty = true;
+        }
+        if (balance.getCreditUsed() == null) {
+            balance.setCreditUsed(BigDecimal.ZERO);
+            dirty = true;
+        }
+        return dirty ? balances.save(balance) : balance;
+    }
+
+    private BigDecimal availableCredit(ClientBalance balance) {
+        BigDecimal limit = safe(balance.getCreditLimit());
+        BigDecimal used = safe(balance.getCreditUsed());
+        BigDecimal available = limit.subtract(used);
+        return available.signum() < 0 ? BigDecimal.ZERO : available;
+    }
+
+    private void applyPositiveAmount(ClientBalance balance, BigDecimal amount) {
+        if (amount == null || amount.signum() <= 0) {
+            return;
+        }
+        BigDecimal debt = safe(balance.getCreditUsed());
+        BigDecimal toDebt = amount.min(debt);
+        if (toDebt.signum() > 0) {
+            balance.setCreditUsed(debt.subtract(toDebt));
+        }
+        BigDecimal remainder = amount.subtract(toDebt);
+        if (remainder.signum() > 0) {
+            balance.setBalance(safe(balance.getBalance()).add(remainder));
+        }
+    }
+
+    private void applyChargeAmount(ClientBalance balance, BigDecimal amount, boolean enforceLimit) {
+        if (amount == null || amount.signum() <= 0) {
+            return;
+        }
+        BigDecimal balancePortion = amount.min(safe(balance.getBalance()));
+        if (balancePortion.signum() > 0) {
+            balance.setBalance(safe(balance.getBalance()).subtract(balancePortion));
+        }
+        BigDecimal remaining = amount.subtract(balancePortion);
+        if (remaining.signum() > 0) {
+            BigDecimal creditAvailable = availableCredit(balance);
+            if (enforceLimit && creditAvailable.compareTo(remaining) < 0) {
+                throw new IllegalStateException("Недостаточно кредитного лимита для списания");
+            }
+            balance.setCreditUsed(safe(balance.getCreditUsed()).add(remaining));
+        }
+    }
 
     // Top-ups
     public Page<FinanceDtos.TopUpResponse> listTopUps(String status, Pageable p){
@@ -182,13 +255,8 @@ public class FinanceService {
             } catch (Exception ex) {
                 // Логируем, но не прерываем процесс
             }
-            
             if (t.getStatus()== TopUp.Status.APPROVED) {
-                String desc = "TopUp "+t.getId();
-                if (!txns.existsByClientIdAndTypeAndDescription(t.getClientId(), "TOPUP", desc)){
-                    adjustBalance(t.getClientId(), t.getAmount(), "TOPUP APPROVED");
-                    addTxn(t.getClientId(),"TOPUP", t.getAmount(), desc);
-                }
+                applyApprovedTopUp(t);
                 String title = "Пополнение одобрено";
                 String body = "Заявка #"+t.getId()+" на сумму " + t.getAmount() + " ₸ подтверждена. Баланс пополнен.";
                 notifications.createAndBroadcast(t.getClientId(), title, body, Notification.Type.FINANCE, Notification.Severity.SUCCESS);
@@ -206,14 +274,37 @@ public class FinanceService {
         return toTopUpResponse(t);
     }
 
+    private void applyApprovedTopUp(TopUp topUp) {
+        BigDecimal amount = safe(topUp.getAmount());
+        if (amount.signum() <= 0) {
+            return;
+        }
+        String desc = "TopUp " + topUp.getId();
+        if (txns.existsByClientIdAndTypeAndDescription(topUp.getClientId(), "TOPUP", desc)) {
+            // ничего не делаем, уже применено ранее
+            return;
+        }
+        ClientBalance balance = ensureBalance(topUp.getClientId());
+        applyPositiveAmount(balance, amount);
+        balances.save(balance);
+        addTxn(topUp.getClientId(), "TOPUP", amount, desc);
+    }
+
     // Balance
     public FinanceDtos.BalanceResponse getBalance(Long clientId){
-        ClientBalance b = balances.findById(clientId).orElseGet(()->{ ClientBalance nb=new ClientBalance(); nb.setClientId(clientId); nb.setBalance(BigDecimal.ZERO); return balances.save(nb); });
-        // reconcile: ensure all APPROVED top-ups are reflected in txns and balance
+        ClientBalance current = ensureBalance(clientId);
         reconcileBalance(clientId);
-        // reload
-        ClientBalance cur = balances.findById(clientId).orElse(b);
-        return new FinanceDtos.BalanceResponse(cur.getClientId(), cur.getBalance(), cur.getUpdatedAt());
+        current = ensureBalance(clientId);
+        BigDecimal availableCredit = availableCredit(current);
+        return new FinanceDtos.BalanceResponse(
+                current.getClientId(),
+                safe(current.getBalance()),
+                safe(current.getCreditLimit()),
+                safe(current.getCreditUsed()),
+                availableCredit,
+                current.getQrCodeUrl(),
+                current.getUpdatedAt()
+        );
     }
     public FinanceDtos.BalanceResponse adjust(Long clientId, FinanceDtos.BalanceAdjust r){
         adjustBalance(clientId, r.delta(), r.reason());
@@ -222,6 +313,51 @@ public class FinanceService {
     }
     public Page<FinanceDtos.ClientBalanceView> listBalances(Pageable p){
         return balances.findAll(p).map(this::toClientBalanceView);
+    }
+
+    public FinanceDtos.ClientBalanceView updateCreditProfile(Long clientId, FinanceDtos.CreditProfileUpdate request) {
+        ClientBalance balance = ensureBalance(clientId);
+        boolean changed = false;
+        if (request.creditLimit() != null) {
+            BigDecimal newLimit = request.creditLimit().max(BigDecimal.ZERO);
+            if (safe(balance.getCreditUsed()).compareTo(newLimit) > 0) {
+                throw new IllegalArgumentException("Нельзя установить лимит меньше текущего долга клиента");
+            }
+            balance.setCreditLimit(newLimit);
+            changed = true;
+        }
+        if (Boolean.TRUE.equals(request.clearQr()) && balance.getQrCodeKey() != null) {
+            try {
+                fileStorageService.delete(balance.getQrCodeKey());
+            } catch (Exception ex) {
+                // логируем, но не блокируем очищение ссылки
+                org.slf4j.LoggerFactory.getLogger(FinanceService.class)
+                        .warn("Failed to delete QR code {} from storage: {}", balance.getQrCodeKey(), ex.getMessage());
+            }
+            balance.setQrCodeKey(null);
+            balance.setQrCodeUrl(null);
+            changed = true;
+        }
+        if (changed) {
+            balances.save(balance);
+        }
+        return toClientBalanceView(balance);
+    }
+
+    public FinanceDtos.ClientBalanceView storeQrCode(Long clientId, FileStorageService.StoredObject storedObject) {
+        ClientBalance balance = ensureBalance(clientId);
+        if (balance.getQrCodeKey() != null && !Objects.equals(balance.getQrCodeKey(), storedObject.key())) {
+            try {
+                fileStorageService.delete(balance.getQrCodeKey());
+            } catch (Exception ex) {
+                org.slf4j.LoggerFactory.getLogger(FinanceService.class)
+                        .warn("Failed to delete previous QR code {}: {}", balance.getQrCodeKey(), ex.getMessage());
+            }
+        }
+        balance.setQrCodeKey(storedObject.key());
+        balance.setQrCodeUrl(storedObject.url());
+        balances.save(balance);
+        return toClientBalanceView(balance);
     }
 
     private FinanceDtos.ClientBalanceView toClientBalanceView(ClientBalance balance) {
@@ -242,7 +378,10 @@ public class FinanceService {
 
         return new FinanceDtos.ClientBalanceView(
                 balance.getClientId(),
-                balance.getBalance(),
+                safe(balance.getBalance()),
+                safe(balance.getCreditLimit()),
+                safe(balance.getCreditUsed()),
+                balance.getQrCodeUrl(),
                 balance.getUpdatedAt(),
                 contactName,
                 establishmentName,
@@ -351,6 +490,11 @@ public class FinanceService {
         long totalTopUps = topups.count();
         long totalRefunds = refunds.count();
 
+        BigDecimal totalCreditLimit = balances.sumAllCreditLimits();
+        if (totalCreditLimit == null) totalCreditLimit = BigDecimal.ZERO;
+        BigDecimal totalCreditUsed = balances.sumAllCreditUsed();
+        if (totalCreditUsed == null) totalCreditUsed = BigDecimal.ZERO;
+
         Map<String,Object> response = new HashMap<>();
         response.put("totalBalance", totalBalance);
         response.put("monthlyTopUps", monthlyTopUps);
@@ -359,6 +503,9 @@ public class FinanceService {
         response.put("revenue", revenue);
         response.put("topUps", totalTopUps);
         response.put("refunds", totalRefunds);
+        response.put("totalCreditLimit", totalCreditLimit);
+        response.put("totalCreditUsed", totalCreditUsed);
+        response.put("totalCreditAvailable", totalCreditLimit.subtract(totalCreditUsed));
         return response;
     }
 
@@ -368,16 +515,27 @@ public class FinanceService {
         }
 
         String desc = "RefundReq " + rr.getId();
-        if (!txns.existsByClientIdAndTypeAndDescription(rr.getClientId(), "REFUND", desc)) {
-            adjustBalance(rr.getClientId(), rr.getAmount(), "REFUND APPROVED " + rr.getId());
-            addTxn(rr.getClientId(), "REFUND", rr.getAmount(), desc);
+        if (txns.existsByClientIdAndTypeAndDescription(rr.getClientId(), "REFUND", desc)) {
+            return;
         }
+        ClientBalance balance = ensureBalance(rr.getClientId());
+        applyPositiveAmount(balance, rr.getAmount());
+        balances.save(balance);
+        addTxn(rr.getClientId(), "REFUND", rr.getAmount(), desc);
     }
 
     // helpers
     private void adjustBalance(Long clientId, BigDecimal delta, String reason){
-        ClientBalance b = balances.findById(clientId).orElseGet(()->{ClientBalance nb=new ClientBalance(); nb.setClientId(clientId); nb.setBalance(BigDecimal.ZERO); return nb;});
-        b.setBalance(b.getBalance().add(delta)); balances.save(b);
+        if (delta == null || delta.signum() == 0) {
+            return;
+        }
+        ClientBalance balance = ensureBalance(clientId);
+        if (delta.signum() > 0) {
+            applyPositiveAmount(balance, delta);
+        } else {
+            applyChargeAmount(balance, delta.negate(), false);
+        }
+        balances.save(balance);
     }
     private void addTxn(Long clientId, String type, BigDecimal amount, String desc){
         FinanceTxn t = new FinanceTxn(); t.setClientId(clientId); t.setType(type); t.setAmount(amount); t.setDescription(desc); txns.save(t);
@@ -400,13 +558,15 @@ public class FinanceService {
 
     // Charge client balance for an order (idempotent)
     public void chargeOrder(Long clientId, BigDecimal amount, Long orderId){
-        if (amount == null) return;
+        if (amount == null || amount.signum() <= 0) return;
         String desc = "Order "+orderId;
-        if (!txns.existsByClientIdAndTypeAndDescription(clientId, "CHARGE", desc)){
-            // CHARGE txns are stored as positive amount; balance is decreased by delta
-            adjustBalance(clientId, amount.negate(), "ORDER CHARGE "+orderId);
-            addTxn(clientId, "CHARGE", amount, desc);
+        if (txns.existsByClientIdAndTypeAndDescription(clientId, "CHARGE", desc)){
+            return;
         }
+        ClientBalance balance = ensureBalance(clientId);
+        applyChargeAmount(balance, amount, true);
+        balances.save(balance);
+        addTxn(clientId, "CHARGE", amount, desc);
     }
 
     public boolean hasChargeForOrder(Long clientId, Long orderId){
@@ -414,13 +574,16 @@ public class FinanceService {
     }
 
     public void refundOrderIfCharged(Long clientId, BigDecimal amount, Long orderId){
-        if (amount == null) return;
+        if (amount == null || amount.signum() <= 0) return;
         if (!hasChargeForOrder(clientId, orderId)) return;
         String desc = "Refund Order "+orderId;
-        if (!txns.existsByClientIdAndTypeAndDescription(clientId, "REFUND", desc)){
-            adjustBalance(clientId, amount, "ORDER REFUND "+orderId);
-            addTxn(clientId, "REFUND", amount, desc);
+        if (txns.existsByClientIdAndTypeAndDescription(clientId, "REFUND", desc)){
+            return;
         }
+        ClientBalance balance = ensureBalance(clientId);
+        applyPositiveAmount(balance, amount);
+        balances.save(balance);
+        addTxn(clientId, "REFUND", amount, desc);
     }
 
     // Ensure balance aligns with approved top-ups and ledger
@@ -429,19 +592,13 @@ public class FinanceService {
         // 1) For each APPROVED top-up ensure a TOPUP txn exists
         var approved = topups.findByClientIdAndStatus(clientId, TopUp.Status.APPROVED);
         for (var t : approved){
-            String desc = "TopUp "+t.getId();
-            if (!txns.existsByClientIdAndTypeAndDescription(clientId, "TOPUP", desc)){
-                addTxn(clientId, "TOPUP", t.getAmount(), desc);
-                adjustBalance(clientId, t.getAmount(), desc);
-            }
+            applyApprovedTopUp(t);
         }
-
-        // 2) Optionally recompute authoritative balance from ledger
-        BigDecimal ledger = txns.sumAmountByClientId(clientId);
-        ClientBalance b = balances.findById(clientId).orElseGet(()->{ ClientBalance nb=new ClientBalance(); nb.setClientId(clientId); nb.setBalance(BigDecimal.ZERO); return nb; });
-        if (b.getBalance() == null || b.getBalance().compareTo(ledger) != 0){
-            b.setBalance(ledger);
-            balances.save(b);
+        ClientBalance balance = ensureBalance(clientId);
+        if (balance.getCreditLimit() != null && balance.getCreditUsed() != null
+                && balance.getCreditLimit().compareTo(balance.getCreditUsed()) < 0) {
+            balance.setCreditUsed(balance.getCreditLimit());
+            balances.save(balance);
         }
     }
 }

@@ -1,13 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { productApi, Product } from "@/lib/api/products";
-
-interface ProductsStatsProps {
-  refreshKey: number;
-}
-
-"use client";
-import React, { useState, useEffect } from "react";
 import { productApi } from "@/lib/api/products";
 
 interface ProductsStatsProps {
