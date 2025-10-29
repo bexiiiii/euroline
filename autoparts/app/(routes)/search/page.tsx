@@ -24,6 +24,7 @@ function SearchPage() {
   const [showAllAnalogs, setShowAllAnalogs] = useState(false);
   const [brandFilter, setBrandFilter] = useState<string>('');
   const [analogFilter, setAnalogFilter] = useState<string>('');
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
   
   const searchParams = useSearchParams();
   const { 
