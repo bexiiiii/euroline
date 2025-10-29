@@ -209,11 +209,12 @@ public class OrderService {
     }
     
     private void clearCart(Cart cart) {
+        // Используем явное удаление через репозиторий
+        // Это безопаснее, чем cart.getItems().clear() + save, 
+        // т.к. избегает проблем с detached entities в текущей транзакции
         if (cart.getId() != null) {
             cartItemRepository.deleteByCartId(cart.getId());
         }
-        cart.getItems().clear();
-        cartRepository.save(cart);
     }
 
     private void enqueueOrderCreated(Order order) {

@@ -13,7 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 public interface CartItemRepository extends JpaRepository<CartItem, Long> {
 
     @Transactional
-    @Modifying(clearAutomatically = true)
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("delete from CartItem ci where ci.cart.id = :cartId")
     void deleteByCartId(@Param("cartId") Long cartId);
 }
