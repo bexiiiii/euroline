@@ -49,15 +49,20 @@ public class RateLimitingFilter extends OncePerRequestFilter {
 
     public RateLimitingFilter(
             @Value("${spring.data.redis.host:localhost}") String redisHost,
-            @Value("${spring.data.redis.port:6379}") int redisPort
+            @Value("${spring.data.redis.port:6379}") int redisPort,
+            @Value("${spring.data.redis.password:}") String redisPassword
     ) {
         // Подключаемся к Redis для распределенного rate limiting
-        RedisClient redisClient = RedisClient.create(
-                RedisURI.builder()
-                        .withHost(redisHost)
-                        .withPort(redisPort)
-                        .build()
-        );
+        RedisURI.Builder uriBuilder = RedisURI.builder()
+                .withHost(redisHost)
+                .withPort(redisPort);
+        
+        // Добавляем пароль, если он указан
+        if (redisPassword != null && !redisPassword.isEmpty()) {
+            uriBuilder.withPassword(redisPassword.toCharArray());
+        }
+        
+        RedisClient redisClient = RedisClient.create(uriBuilder.build());
         
         StatefulRedisConnection<String, byte[]> connection = redisClient.connect(
                 RedisCodec.of(StringCodec.UTF8, ByteArrayCodec.INSTANCE)
