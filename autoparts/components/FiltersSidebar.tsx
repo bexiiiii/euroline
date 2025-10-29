@@ -52,7 +52,9 @@ const FiltersSidebar = ({
     onReset?.()
   }
 
-  const hasBrands = visibleBrands.length > 0
+  const hasBrandOptions = allBrands.length > 0
+  const hasVisibleBrands = visibleBrands.length > 0
+  const isBrandListScrollable = visibleBrands.length > 8
 
   return (
     <aside
@@ -69,55 +71,99 @@ const FiltersSidebar = ({
         </div>
 
         <section className='space-y-4'>
-          <div className='rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4'>
-            <div className='flex items-center justify-between gap-2'>
-              <div>
-                <p className='text-sm font-medium text-slate-800'>Производитель</p>
-                <p className='text-xs text-slate-500'>Отметьте бренды, которые хотите видеть в списке</p>
-              </div>
-              <Building2 className='h-5 w-5 text-slate-400' />
-            </div>
-            <div className='mt-4 space-y-3'>
-              <div className='relative'>
-                <SearchIcon className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400' />
-                <Input
-                  placeholder='Поиск бренда'
-                  value={brandQuery}
-                  onChange={(event) => setBrandQuery(event.target.value)}
-                  className='h-11 rounded-xl border-slate-200 bg-white pl-9 text-sm shadow-sm focus-visible:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/40'
-                />
-              </div>
-              <ScrollArea className='max-h-56 pr-1'>
-                <div className='grid gap-2 sm:grid-cols-2'>
-                  {hasBrands ? (
-                    visibleBrands.map((brand) => {
-                      const selected = filters.brands.includes(brand)
-                      return (
-                        <button
-                          key={brand}
-                          type='button'
-                          onClick={() => handleBrandToggle(brand)}
-                          className={cn(
-                            'flex items-center justify-between rounded-xl border px-3 py-2 text-sm transition-colors',
-                            selected
-                              ? 'border-orange-500 bg-orange-50 text-orange-600'
-                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                          )}
-                        >
-                          <span className='truncate'>{brand}</span>
-                          {selected && <Check className='h-4 w-4' />}
-                        </button>
-                      )
-                    })
-                  ) : (
-                    <p className='rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-500'>
-                      Бренды не найдены по запросу
-                    </p>
-                  )}
+          {hasBrandOptions ? (
+            <div className='rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4'>
+              <div className='flex items-center justify-between gap-2'>
+                <div>
+                  <p className='text-sm font-medium text-slate-800'>Производитель</p>
+                  <p className='text-xs text-slate-500'>Отметьте бренды, которые хотите видеть в списке</p>
                 </div>
-              </ScrollArea>
+                <Building2 className='h-5 w-5 text-slate-400' />
+              </div>
+              <div className='mt-4 space-y-3'>
+                <div className='relative'>
+                  <SearchIcon className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400' />
+                  <Input
+                    placeholder='Поиск бренда'
+                    value={brandQuery}
+                    onChange={(event) => setBrandQuery(event.target.value)}
+                    className='h-11 rounded-xl border-slate-200 bg-white pl-9 text-sm shadow-sm focus-visible:border-orange-500 focus-visible:ring-2 focus-visible:ring-orange-500/40'
+                  />
+                </div>
+                {isBrandListScrollable ? (
+                  <ScrollArea className='max-h-56 pr-1'>
+                    <div className='grid gap-2 sm:grid-cols-2'>
+                      {hasVisibleBrands ? (
+                        visibleBrands.map((brand) => {
+                          const selected = filters.brands.includes(brand)
+                          return (
+                            <button
+                              key={brand}
+                              type='button'
+                              onClick={() => handleBrandToggle(brand)}
+                              className={cn(
+                                'flex items-center justify-between rounded-xl border px-3 py-2 text-sm transition-colors',
+                                selected
+                                  ? 'border-orange-500 bg-orange-50 text-orange-600'
+                                  : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                              )}
+                            >
+                              <span className='min-w-0 flex-1 truncate pr-2 text-left'>{brand}</span>
+                              {selected && <Check className='h-4 w-4 shrink-0' />}
+                            </button>
+                          )
+                        })
+                      ) : (
+                        <p className='rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-500'>
+                          Бренды не найдены по запросу
+                        </p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className='grid gap-2 sm:grid-cols-2'>
+                    {hasVisibleBrands ? (
+                      visibleBrands.map((brand) => {
+                        const selected = filters.brands.includes(brand)
+                        return (
+                          <button
+                            key={brand}
+                            type='button'
+                            onClick={() => handleBrandToggle(brand)}
+                            className={cn(
+                              'flex items-center justify-between rounded-xl border px-3 py-2 text-sm transition-colors',
+                              selected
+                                ? 'border-orange-500 bg-orange-50 text-orange-600'
+                                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                            )}
+                          >
+                            <span className='min-w-0 flex-1 truncate pr-2 text-left'>{brand}</span>
+                            {selected && <Check className='h-4 w-4 shrink-0' />}
+                          </button>
+                        )
+                      })
+                    ) : (
+                      <p className='rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-6 text-center text-xs text-slate-500'>
+                        Бренды не найдены по запросу
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className='rounded-2xl border border-dashed border-slate-200/80 bg-slate-50/70 p-4'>
+              <div className='flex items-start gap-3'>
+                <Building2 className='mt-1 h-5 w-5 text-slate-400' />
+                <div className='space-y-1'>
+                  <p className='text-sm font-medium text-slate-800'>Бренды появятся после поиска</p>
+                  <p className='text-xs text-slate-500'>
+                    Выполните запрос, и мы покажем производители, доступные для фильтрации.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className='flex items-center justify-between gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4'>
             <div>
