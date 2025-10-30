@@ -17,6 +17,8 @@ import java.util.List;
 public class OrdersCmlBuilder {
 
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final DateTimeFormatter TIME_FORMAT = DateTimeFormatter.ofPattern("HH:mm:ss");
 
     public byte[] build(List<CmlOrder> orders) throws XMLStreamException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -49,8 +51,8 @@ public class OrdersCmlBuilder {
         element(writer, "Курс", "1");
         
         if (order.getCreatedAt() != null) {
-            element(writer, "Дата", order.getCreatedAt().toLocalDate().toString());
-            element(writer, "Время", order.getCreatedAt().toLocalTime().toString());
+            element(writer, "Дата", DATE_FORMAT.format(order.getCreatedAt()));
+            element(writer, "Время", TIME_FORMAT.format(order.getCreatedAt()));
         }
         
         // Контрагент

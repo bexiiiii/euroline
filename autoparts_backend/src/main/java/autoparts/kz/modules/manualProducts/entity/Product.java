@@ -43,6 +43,11 @@ public class Product {
 
     private Integer price;
     private Integer stock;
+    
+    // Зарезервированное количество (в корзинах и неподтвержденных заказах)
+    @Column(name = "reserved_stock")
+    private Integer reservedStock = 0;
+    
     private String sku;
 
     // Флаг участия в витрине "Товар недели"
