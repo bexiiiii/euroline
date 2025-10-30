@@ -110,8 +110,13 @@ function SearchPage() {
   const primaryResultByArticle = useMemo(() => {
     const map = new Map<string, SearchItem>();
     primaryResults.forEach((item) => {
-      const key = normalizeArticle(item.oem);
-      if (key.length > 0) {
+      const article = normalizeArticle(item.oem);
+      const brandKey = (item.brand ?? '').trim().toUpperCase();
+      if (article.length === 0) {
+        return;
+      }
+      const key = `${article}|${brandKey}`;
+      if (!map.has(key)) {
         map.set(key, item);
       }
     });
@@ -313,7 +318,8 @@ function SearchPage() {
                         {displayedBrandItems.length > 0 ? (
                           displayedBrandItems.map((item, idx) => {
                             const normalizedArticle = normalizeArticle(item.oem);
-                            const searchMatch = primaryResultByArticle.get(normalizedArticle) ?? item;
+                            const mapKey = `${normalizedArticle}|${(item.brand ?? '').trim().toUpperCase()}`;
+                            const searchMatch = primaryResultByArticle.get(mapKey) ?? item;
                             const stock = computeAvailableQuantity(searchMatch);
                             const priceValue = typeof searchMatch?.price === "number" ? searchMatch.price : null;
                             let warehouseName = "Нет данных";
