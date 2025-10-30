@@ -98,3 +98,6 @@ databaseChangeLog:
   - include:
       file: db/changelog/changes/24-add-credit-fields-to-client-balances.sql
       relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/26-extend-cml-orders-customer-details.sql
+      relativeToChangelogFile: false

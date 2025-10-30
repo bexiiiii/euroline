@@ -97,6 +97,9 @@ public class OrdersCmlBuilder {
             if (order.getCustomerCountry() != null && !order.getCustomerCountry().isEmpty()) {
                 element(writer, "Страна", order.getCustomerCountry());
             }
+            if (order.getCustomerState() != null && !order.getCustomerState().isEmpty()) {
+                element(writer, "Регион", order.getCustomerState());
+            }
             if (order.getCustomerCity() != null && !order.getCustomerCity().isEmpty()) {
                 element(writer, "Город", order.getCustomerCity());
             }
@@ -106,6 +109,8 @@ public class OrdersCmlBuilder {
             
             writer.writeEndElement(); // АдресРегистрации
         }
+
+        writeCustomerRequisites(writer, order);
         
         writer.writeEndElement(); // Контрагент
         writer.writeEndElement(); // Контрагенты
@@ -218,28 +223,80 @@ public class OrdersCmlBuilder {
     }
     
     private boolean hasAddress(CmlOrder order) {
-        return (order.getCustomerCountry() != null && !order.getCustomerCountry().isEmpty()) ||
-               (order.getCustomerCity() != null && !order.getCustomerCity().isEmpty()) ||
-               (order.getCustomerAddress() != null && !order.getCustomerAddress().isEmpty());
+        return isNotBlank(order.getCustomerCountry()) ||
+               isNotBlank(order.getCustomerState()) ||
+               isNotBlank(order.getCustomerCity()) ||
+               isNotBlank(order.getCustomerAddress());
     }
     
     private String buildAddressString(CmlOrder order) {
         StringBuilder address = new StringBuilder();
         
-        if (order.getCustomerCountry() != null && !order.getCustomerCountry().isEmpty()) {
+        if (isNotBlank(order.getCustomerCountry())) {
             address.append(order.getCustomerCountry());
         }
         
-        if (order.getCustomerCity() != null && !order.getCustomerCity().isEmpty()) {
+        if (isNotBlank(order.getCustomerState())) {
+            if (address.length() > 0) address.append(", ");
+            address.append(order.getCustomerState());
+        }
+        
+        if (isNotBlank(order.getCustomerCity())) {
             if (address.length() > 0) address.append(", ");
             address.append(order.getCustomerCity());
         }
         
-        if (order.getCustomerAddress() != null && !order.getCustomerAddress().isEmpty()) {
+        if (isNotBlank(order.getCustomerAddress())) {
             if (address.length() > 0) address.append(", ");
             address.append(order.getCustomerAddress());
         }
+
+        if (isNotBlank(order.getCustomerOfficeAddress()) &&
+                !order.getCustomerOfficeAddress().equals(order.getCustomerAddress())) {
+            if (address.length() > 0) address.append(", ");
+            address.append(order.getCustomerOfficeAddress());
+        }
         
         return address.length() > 0 ? address.toString() : "Не указан";
+    }
+
+    private void writeCustomerRequisites(XMLStreamWriter writer, CmlOrder order) throws XMLStreamException {
+        boolean hasData = isNotBlank(order.getCustomerLastName()) ||
+                isNotBlank(order.getCustomerFirstName()) ||
+                isNotBlank(order.getCustomerMiddleName()) ||
+                isNotBlank(order.getCustomerType()) ||
+                isNotBlank(order.getCustomerOfficeAddress()) ||
+                order.getCustomerUserId() != null;
+
+        if (!hasData) {
+            return;
+        }
+
+        writer.writeStartElement("ЗначенияРеквизитов");
+
+        writeRequisite(writer, "Фамилия", order.getCustomerLastName());
+        writeRequisite(writer, "Имя", order.getCustomerFirstName());
+        writeRequisite(writer, "Отчество", order.getCustomerMiddleName());
+        writeRequisite(writer, "ТипКонтрагента", order.getCustomerType());
+        writeRequisite(writer, "Адрес офиса", order.getCustomerOfficeAddress());
+        if (order.getCustomerUserId() != null) {
+            writeRequisite(writer, "ID клиента на сайте", order.getCustomerUserId().toString());
+        }
+
+        writer.writeEndElement(); // ЗначенияРеквизитов
+    }
+
+    private void writeRequisite(XMLStreamWriter writer, String name, String value) throws XMLStreamException {
+        if (!isNotBlank(value)) {
+            return;
+        }
+        writer.writeStartElement("ЗначениеРеквизита");
+        element(writer, "Наименование", name);
+        element(writer, "Значение", value);
+        writer.writeEndElement();
+    }
+
+    private boolean isNotBlank(String value) {
+        return value != null && !value.isBlank();
     }
 }

@@ -53,6 +53,21 @@ public class CmlOrder {
     @Column(name = "customer_client_name")
     private String customerClientName;
 
+    @Column(name = "customer_first_name")
+    private String customerFirstName;
+
+    @Column(name = "customer_last_name")
+    private String customerLastName;
+
+    @Column(name = "customer_middle_name")
+    private String customerMiddleName;
+
+    @Column(name = "customer_type")
+    private String customerType;
+
+    @Column(name = "customer_state")
+    private String customerState;
+
     @Column(name = "customer_email")
     private String customerEmail;
 
@@ -67,6 +82,12 @@ public class CmlOrder {
 
     @Column(name = "customer_address")
     private String customerAddress;
+
+    @Column(name = "customer_office_address")
+    private String customerOfficeAddress;
+
+    @Column(name = "customer_user_id")
+    private Long customerUserId;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<CmlOrderItem> items = new ArrayList<>();
@@ -181,6 +202,62 @@ public class CmlOrder {
 
     public void setCustomerAddress(String customerAddress) {
         this.customerAddress = customerAddress;
+    }
+
+    public String getCustomerFirstName() {
+        return customerFirstName;
+    }
+
+    public void setCustomerFirstName(String customerFirstName) {
+        this.customerFirstName = customerFirstName;
+    }
+
+    public String getCustomerLastName() {
+        return customerLastName;
+    }
+
+    public void setCustomerLastName(String customerLastName) {
+        this.customerLastName = customerLastName;
+    }
+
+    public String getCustomerMiddleName() {
+        return customerMiddleName;
+    }
+
+    public void setCustomerMiddleName(String customerMiddleName) {
+        this.customerMiddleName = customerMiddleName;
+    }
+
+    public String getCustomerType() {
+        return customerType;
+    }
+
+    public void setCustomerType(String customerType) {
+        this.customerType = customerType;
+    }
+
+    public String getCustomerState() {
+        return customerState;
+    }
+
+    public void setCustomerState(String customerState) {
+        this.customerState = customerState;
+    }
+
+    public String getCustomerOfficeAddress() {
+        return customerOfficeAddress;
+    }
+
+    public void setCustomerOfficeAddress(String customerOfficeAddress) {
+        this.customerOfficeAddress = customerOfficeAddress;
+    }
+
+    public Long getCustomerUserId() {
+        return customerUserId;
+    }
+
+    public void setCustomerUserId(Long customerUserId) {
+        this.customerUserId = customerUserId;
     }
 
     public List<CmlOrderItem> getItems() {

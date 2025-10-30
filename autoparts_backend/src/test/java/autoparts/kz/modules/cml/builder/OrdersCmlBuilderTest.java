@@ -26,10 +26,17 @@ class OrdersCmlBuilderTest {
         order.setCustomerGuid("customer-guid-456");
         order.setCustomerName("Иванов Иван Иванович");
         order.setCustomerClientName("ТОО \"АвтоСервис Алматы\"");
+        order.setCustomerFirstName("Иван");
+        order.setCustomerLastName("Иванов");
+        order.setCustomerMiddleName("Иванович");
+        order.setCustomerType("Юридическое лицо");
         order.setCustomerEmail("ivanov@example.com");
         order.setCustomerPhone("+77001234567");
         order.setCustomerCountry("Казахстан");
         order.setCustomerCity("Алматы");
+        order.setCustomerState("Алматинская область");
+        order.setCustomerOfficeAddress("БЦ «Nomad», офис 501");
+        order.setCustomerUserId(42L);
         order.setCustomerAddress("ул. Абая, д. 10, офис 5");
         order.setStatus(CmlOrderStatus.NEW);
         order.setTotal(new BigDecimal("15000.00"));
@@ -102,10 +109,23 @@ class OrdersCmlBuilderTest {
         
         // Проверка адреса
         assertThat(xmlString).contains("<АдресРегистрации>");
-        assertThat(xmlString).contains("<Представление>Казахстан, Алматы, ул. Абая, д. 10, офис 5</Представление>");
+        assertThat(xmlString).contains("<Представление>Казахстан, Алматинская область, Алматы, ул. Абая, д. 10, офис 5, БЦ «Nomad», офис 501</Представление>");
         assertThat(xmlString).contains("<Страна>Казахстан</Страна>");
+        assertThat(xmlString).contains("<Регион>Алматинская область</Регион>");
         assertThat(xmlString).contains("<Город>Алматы</Город>");
         assertThat(xmlString).contains("<АдресВСвободнойФорме>ул. Абая, д. 10, офис 5</АдресВСвободнойФорме>");
+        
+        // Проверка дополнительных реквизитов клиента
+        assertThat(xmlString).contains("<Наименование>Фамилия</Наименование>");
+        assertThat(xmlString).contains("<Значение>Иванов</Значение>");
+        assertThat(xmlString).contains("<Наименование>Имя</Наименование>");
+        assertThat(xmlString).contains("<Значение>Иван</Значение>");
+        assertThat(xmlString).contains("Отчество");
+        assertThat(xmlString).contains("Иванович");
+        assertThat(xmlString).contains("ТипКонтрагента");
+        assertThat(xmlString).contains("Юридическое лицо");
+        assertThat(xmlString).contains("ID клиента на сайте");
+        assertThat(xmlString).contains("42");
         
         // Проверка товаров
         assertThat(xmlString).contains("<Товары>");

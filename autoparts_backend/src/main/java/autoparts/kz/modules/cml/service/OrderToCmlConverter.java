@@ -99,6 +99,10 @@ public class OrderToCmlConverter {
         
         // Название компании (для юр. лиц)
         cmlOrder.setCustomerClientName(user.getClientName());
+        cmlOrder.setCustomerFirstName(user.getName());
+        cmlOrder.setCustomerLastName(user.getSurname());
+        cmlOrder.setCustomerMiddleName(user.getFathername());
+        cmlOrder.setCustomerType(user.getType());
         
         // Контактная информация
         cmlOrder.setCustomerEmail(user.getEmail());
@@ -107,6 +111,9 @@ public class OrderToCmlConverter {
         // Адрес клиента
         cmlOrder.setCustomerCountry(user.getCountry());
         cmlOrder.setCustomerCity(user.getCity());
+        cmlOrder.setCustomerState(user.getState());
+        cmlOrder.setCustomerOfficeAddress(user.getOfficeAddress());
+        cmlOrder.setCustomerUserId(user.getId());
         
         // Полный адрес доставки (комбинированный)
         String deliveryAddress = buildDeliveryAddress(order, user);
