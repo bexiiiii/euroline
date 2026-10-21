@@ -3,6 +3,11 @@ export interface SearchResponse {
   detectedType: 'VIN' | 'FRAME' | 'PLATE' | 'OEM' | 'TEXT';
   vehicle?: SearchVehicle;
   results?: SearchItem[];
+  selectionRequired?: boolean;
+  selectedArticle?: string;
+  selectedBrand?: string;
+  warnings?: string[];
+  analogsLoading?: boolean;
 }
 
 export interface SearchVehicle {
@@ -18,6 +23,10 @@ export interface SearchItem {
   name: string;
   brand: string;
   catalog: string;
+  productId?: number;
+  onecRefKey?: string;
+  analogSource?: string;
+  compatibilityStatus?: 'UNVERIFIED' | 'VERIFIED';
   imageUrl?: string;
   price?: number;
   currency?: string;
@@ -53,6 +62,7 @@ export interface TechnicalCriteria {
 }
 
 export interface SearchWarehouse {
+  refKey?: string;
   code: string;
   name: string;
   address: string;
@@ -120,11 +130,13 @@ async function apiRequest<T>(
 
 export const searchApi = {
   // Основной поиск
-  async search(query: string, catalog?: string): Promise<SearchResponse> {
+  async search(query: string, catalog?: string, brand?: string, refresh = false): Promise<SearchResponse> {
     const params = new URLSearchParams({ q: query });
     if (catalog) {
       params.append('catalog', catalog);
     }
+    if (brand) params.set('brand', brand);
+    if (refresh) params.set('refresh', 'true');
 
     return apiRequest<SearchResponse>(`/search?${params.toString()}`);
   },

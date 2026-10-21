@@ -1,8 +1,9 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
 import { analyticsApi } from "@/lib/api/analytics";
+import WidgetError from "./WidgetError";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -15,20 +16,25 @@ interface CategoryData {
 export default function CategoryDistribution() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<CategoryData[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await analyticsApi.getCategoryDistribution();
+      setCategories(result ?? []);
+    } catch (err) {
+      console.error("Failed to fetch category distribution:", err);
+      setError("Не удалось загрузить категории");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const result = await analyticsApi.getCategoryDistribution();
-        setCategories(result);
-      } catch (error) {
-        console.error("Failed to fetch category distribution:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const options: ApexOptions = {
     chart: {
@@ -38,8 +44,7 @@ export default function CategoryDistribution() {
     labels: categories.map((c) => c.category),
     colors: ["#465FFF", "#9C27B0", "#00BCD4", "#4CAF50", "#FF9800", "#F44336"],
     legend: {
-      show: true,
-      position: "bottom",
+      show: false,
     },
     plotOptions: {
       pie: {
@@ -69,30 +74,31 @@ export default function CategoryDistribution() {
   const series = categories.map((c) => c.count);
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="mb-6">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Распределение по категориям
-        </h3>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          Товары по категориям
-        </p>
-      </div>
+    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+      <h3 className="mb-3 text-base font-semibold text-gray-800 dark:text-white/90">
+        Товары по категориям
+      </h3>
 
       {loading ? (
-        <div className="flex items-center justify-center h-[350px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="flex items-center justify-center h-[280px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+        </div>
+      ) : error ? (
+        <WidgetError message="Не удалось загрузить данные" onRetry={fetchData} className="h-[280px] py-0" />
+      ) : categories.length === 0 ? (
+        <div className="flex items-center justify-center h-[280px] text-sm text-gray-500 dark:text-gray-400">
+          Данных пока нет
         </div>
       ) : (
         <>
-          <ReactApexChart options={options} series={series} type="donut" height={280} />
-          
-          <div className="mt-6 space-y-3">
+          <ReactApexChart options={options} series={series} type="donut" height={240} />
+
+          <div className="mt-3 space-y-2">
             {categories.map((category, index) => (
               <div key={index} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
-                    className="w-3 h-3 rounded-full"
+                    className="size-2.5 shrink-0 rounded-full"
                     style={{
                       backgroundColor: options.colors?.[index],
                     }}
@@ -102,10 +108,10 @@ export default function CategoryDistribution() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-gray-800 dark:text-white/90">
+                  <span className="text-sm font-medium tabular-nums text-gray-800 dark:text-white/90">
                     {category.count}
                   </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-500">
+                  <span className="w-10 text-right text-xs tabular-nums text-gray-500 dark:text-gray-400">
                     {category.percentage}%
                   </span>
                 </div>

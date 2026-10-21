@@ -1,10 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Modal } from "../ui/modal";
 import Label from "../form/Label";
+import Button from "../ui/button/Button";
 import { NewsItem, NewsRequest } from "@/lib/api/news";
 import { uploadFile } from "@/lib/api/files";
 import NewsPreviewCard from "@/components/news/NewsPreviewCard";
 import { API_URL } from "@/lib/api";
+import { controlClass } from "@/components/finance/tableUi";
 
 interface NewsModalProps {
   isOpen: boolean;
@@ -132,7 +134,7 @@ const NewsModal: React.FC<NewsModalProps> = ({ isOpen, onClose, onSave, news, is
       setErrors((prev) => ({ ...prev, coverImageUrl: undefined }));
     } catch (error) {
       console.error("Upload error:", error);
-      setUploadError("Не удалось загрузить изображение. Попробуйте снова.");
+      setUploadError("Не удалось загрузить изображение");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -143,126 +145,115 @@ const NewsModal: React.FC<NewsModalProps> = ({ isOpen, onClose, onSave, news, is
 
   const triggerFileUpload = () => fileInputRef.current?.click();
 
-  return (
-    <Modal isOpen={isOpen} onClose={handleClose} className="max-w-4xl p-6">
-      <div>
-        <h4 className="mb-6 text-lg font-semibold text-gray-800 dark:text-white/90">
-          {news ? "Редактировать новость" : "Создать новость"}
-        </h4>
+  const errorText = (text?: string | null) =>
+    text ? <p className="mt-1 text-xs text-error-600 dark:text-error-500">{text}</p> : null;
 
-        <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
-          <div className="space-y-6">
+  return (
+    <Modal isOpen={isOpen} onClose={handleClose} size="xl" className="p-0">
+      <div className="p-5">
+        <h2 className="mb-4 pr-12 text-base font-semibold text-gray-800 dark:text-white/90">
+          {news ? "Редактирование новости" : "Новая новость"}
+        </h2>
+
+        <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+          <div className="space-y-4">
             <div>
-              <Label htmlFor="title">Заголовок *</Label>
+              <Label htmlFor="title">Заголовок</Label>
               <input
                 type="text"
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-900 text-sm focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                className={`${controlClass} w-full`}
               />
-              {errors.title && <p className="mt-2 text-sm text-red-500">{errors.title}</p>}
+              {errorText(errors.title)}
             </div>
 
             <div>
               <div className="flex items-center justify-between">
                 <Label htmlFor="description">Краткое описание</Label>
-                <span className="text-xs text-gray-400">{description.length}/{DESCRIPTION_LIMIT}</span>
+                <span className="text-xs tabular-nums text-gray-400">{description.length}/{DESCRIPTION_LIMIT}</span>
               </div>
               <textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value.slice(0, DESCRIPTION_LIMIT))}
-                rows={3}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-900 text-sm focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                rows={2}
+                className={`${controlClass} h-auto w-full py-2`}
               />
-              {errors.description && <p className="mt-2 text-sm text-red-500">{errors.description}</p>}
-            </div>
-
-            <div className="space-y-3">
-              <Label>Обложка</Label>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-                <div className="flex-1">
-                  <input
-                    type="text"
-                    value={coverImageUrl}
-                    onChange={(e) => setCoverImageUrl(e.target.value)}
-                    placeholder="URL изображения"
-                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-900 text-sm focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
-                  />
-                  <p className="mt-2 text-sm text-gray-500">Или загрузите изображение с компьютера</p>
-                </div>
-                <div className="sm:mt-2">
-                  <button
-                    type="button"
-                    onClick={triggerFileUpload}
-                    disabled={isUploading || isSaving}
-                    className="px-3 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
-                  >
-                    {isUploading ? "Загрузка..." : "Загрузить"}
-                  </button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    accept="image/*"
-                    className="hidden"
-                  />
-                </div>
-              </div>
-              {uploadError && <p className="text-sm text-red-500">{uploadError}</p>}
-              {errors.coverImageUrl && <p className="text-sm text-red-500">{errors.coverImageUrl}</p>}
+              {errorText(errors.description)}
             </div>
 
             <div>
-              <Label htmlFor="content">Содержание *</Label>
+              <Label htmlFor="cover-url">Обложка</Label>
+              <div className="flex gap-2">
+                <input
+                  id="cover-url"
+                  type="text"
+                  value={coverImageUrl}
+                  onChange={(e) => setCoverImageUrl(e.target.value)}
+                  placeholder="Ссылка на изображение"
+                  className={`${controlClass} min-w-0 flex-1`}
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={triggerFileUpload}
+                  disabled={isUploading || isSaving}
+                >
+                  {isUploading ? "Загрузка…" : "Загрузить"}
+                </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+              </div>
+              {errorText(uploadError)}
+              {errorText(errors.coverImageUrl)}
+            </div>
+
+            <div>
+              <Label htmlFor="content">Текст</Label>
               <textarea
                 id="content"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 rows={8}
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-900 text-sm focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+                className={`${controlClass} h-auto w-full py-2`}
               />
-              {errors.content && <p className="mt-2 text-sm text-red-500">{errors.content}</p>}
+              {errorText(errors.content)}
             </div>
 
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="published"
-                checked={published}
-                onChange={(e) => setPublished(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-              />
-              <label htmlFor="published" className="ml-2 text-sm font-medium text-gray-900 dark:text-gray-300">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label htmlFor="published" className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  id="published"
+                  checked={published}
+                  onChange={(e) => setPublished(e.target.checked)}
+                  className="size-4 rounded border-gray-300 accent-brand-500 dark:border-gray-600"
+                />
                 Опубликовать
               </label>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700"
-                disabled={isSaving}
-              >
-                Отмена
-              </button>
-              <button
-                type="submit"
-                disabled={isSaving || isUploading}
-                className="px-4 py-3 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-60"
-              >
-                {isSaving ? "Сохранение..." : news ? "Сохранить" : "Создать"}
-              </button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleClose} disabled={isSaving}>
+                  Отмена
+                </Button>
+                <Button type="submit" size="sm" disabled={isSaving || isUploading}>
+                  {isSaving ? "Сохранение…" : news ? "Сохранить" : "Создать"}
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-4 lg:pl-6">
-            <h5 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Превью</h5>
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Превью</p>
             <NewsPreviewCard
-              title={title || "Заголовок новости"}
-              description={description || "Краткое описание будет отображаться на карточке новости."}
+              title={title || "Заголовок"}
+              description={description || "Краткое описание"}
               coverImageUrl={toPreviewUrl(coverImageUrl)}
               published={published}
             />

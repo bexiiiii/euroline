@@ -2,7 +2,9 @@
 import React, { useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import FinanceStats from "@/components/finance/FinanceStats";
-import FinanceToolbar from "@/components/finance/FinanceToolbar";
+import Button from "@/components/ui/button/Button";
+import { RefreshIcon } from "@/components/finance/tableUi";
+import { useToast } from "@/context/ToastContext";
 import AccountBalancesTable from "@/components/finance/AccountBalancesTable";
 import ViewBalanceModal from "@/components/finance/ViewBalanceModal";
 import AdjustBalanceModal from "@/components/finance/AdjustBalanceModal";
@@ -13,6 +15,9 @@ const AccountBalancesPage: React.FC = () => {
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<ClientBalance | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const toast = useToast();
+
+  const handleRefresh = () => setRefreshKey((key) => key + 1);
 
   const handleViewBalance = (data: ClientBalance) => {
     setSelectedAccount(data);
@@ -49,25 +54,32 @@ const AccountBalancesPage: React.FC = () => {
 
       setRefreshKey((key) => key + 1);
       setIsAdjustModalOpen(false);
+      toast.success("Баланс скорректирован");
     } catch (error) {
       console.error("Ошибка при корректировке баланса:", error);
+      toast.error("Не удалось скорректировать баланс");
+      // Пробрасываем ошибку, чтобы модальное окно осталось открытым
+      throw error;
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Statistics */}
-      <FinanceStats />
+    <div className="space-y-4">
+      <FinanceStats refreshKey={refreshKey} />
 
-      {/* Toolbar */}
-      <FinanceToolbar
-        title="Остатки на счетах"
-        description="Управление балансами клиентов и корректировка остатков"
-        showAddButton={false}
-      />
-
-      {/* Main Content */}
-      <ComponentCard title="Остатки на счетах клиентов">
+      <ComponentCard
+        title="Балансы клиентов"
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            startIcon={<RefreshIcon />}
+          >
+            Обновить
+          </Button>
+        }
+      >
         <AccountBalancesTable
           onViewBalance={handleViewBalance}
           onAdjustBalance={handleAdjustBalance}
@@ -75,7 +87,6 @@ const AccountBalancesPage: React.FC = () => {
         />
       </ComponentCard>
 
-      {/* Modals */}
       <ViewBalanceModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PublicProductController {
 
     private final ProductService productService;
+    private final autoparts.kz.modules.manualProducts.repository.ProductRepository productRepository;
     private final autoparts.kz.modules.admin.categories.service.AdminCategoryService categoryService;
 
     @GetMapping
@@ -44,6 +45,43 @@ public class PublicProductController {
         );
         
         return productService.list(query, pageable);
+    }
+
+    /**
+     * Остатки и цены из 1С (таблица products) по списку OEM из каталога.
+     * Ответ: нормализованный OEM -> {productId, stock, price}. OEM без товара в ответ не попадают.
+     */
+    @GetMapping("/stock-by-oem")
+    public java.util.Map<String, java.util.Map<String, Object>> stockByOem(@RequestParam java.util.List<String> oems) {
+        java.util.List<String> keys = oems.stream()
+                .map(PublicProductController::normalizeArticle)
+                .filter(k -> !k.isEmpty())
+                .distinct()
+                .limit(200)
+                .toList();
+        java.util.Map<String, java.util.Map<String, Object>> out = new java.util.LinkedHashMap<>();
+        if (keys.isEmpty()) return out;
+        for (var p : productRepository.findAllByNormalizedArticleIn(keys)) {
+            for (String article : new String[]{p.getCode(), p.getSku()}) {
+                String key = normalizeArticle(article);
+                if (!keys.contains(key)) continue;
+                var prev = out.get(key);
+                int stock = p.getStock() == null ? 0 : p.getStock();
+                // если один OEM у нескольких товаров — берём тот, где больше остаток
+                if (prev == null || (int) prev.get("stock") < stock) {
+                    java.util.Map<String, Object> row = new java.util.HashMap<>();
+                    row.put("productId", p.getId());
+                    row.put("stock", stock);
+                    row.put("price", p.getPrice());
+                    out.put(key, row);
+                }
+            }
+        }
+        return out;
+    }
+
+    static String normalizeArticle(String s) {
+        return s == null ? "" : s.toLowerCase().replaceAll("[^a-z0-9]", "");
     }
 
     @GetMapping("/weekly")

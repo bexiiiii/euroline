@@ -66,6 +66,20 @@ public class CatController {
         return cat.wizardNext(catalog, ssd, selections);
     }
 
+    // Шаг мастера по ssd (key выбранного значения или removeKey параметра)
+    @GetMapping("/{catalog}/wizard/step")
+    public WizardStepDto wizardStep(@PathVariable String catalog,
+                                    @RequestParam(required = false) String ssd){
+        return cat.wizardStep(catalog, ssd);
+    }
+
+    // Список автомобилей по текущему ssd мастера (FindVehicleByWizard2)
+    @GetMapping("/{catalog}/wizard/vehicles")
+    public List<VehicleDto> wizardVehicles(@PathVariable String catalog,
+                                           @RequestParam String ssd){
+        return cat.wizardVehicles(catalog, ssd);
+    }
+
     @PostMapping("/{catalog}/wizard/finish")
     public VehicleDto wizardFinish(@PathVariable String catalog,
                                    @RequestParam String ssd,

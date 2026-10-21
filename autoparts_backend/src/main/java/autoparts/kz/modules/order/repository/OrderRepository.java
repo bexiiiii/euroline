@@ -39,6 +39,14 @@ public interface OrderRepository extends JpaRepository<Order, Long>, JpaSpecific
     Optional<Order> findByExternalId(String externalId);
     Optional<Order> findByIdempotencyKey(String idempotencyKey);
     Optional<Order> findByPublicCode(String publicCode);
+
+    @EntityGraph(attributePaths = {"items", "items.product"})
+    @Query("""
+           select o from Order o
+           where o.publicCode = :siteOrderId or o.externalId = :siteOrderId
+           """)
+    Optional<Order> findSiteOrderWithItems(@Param("siteOrderId") String siteOrderId);
+
     boolean existsByPublicCode(String publicCode);
 
     @EntityGraph(attributePaths = {"user", "items", "items.product"})

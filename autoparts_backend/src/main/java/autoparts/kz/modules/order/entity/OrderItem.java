@@ -36,6 +36,13 @@ public class OrderItem {
     @Column(nullable = false)
     private int quantity;
 
+    /** Склад, выбранный в корзине (snapshot) */
+    @Column(name = "warehouse_name", length = 255)
+    private String warehouseName;
+
+    @Column(name = "warehouse_ref_key", length = 64)
+    private String warehouseRefKey;
+
     /** Цена на момент оформления (snapshot) */
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;

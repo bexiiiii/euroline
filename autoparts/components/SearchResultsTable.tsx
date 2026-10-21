@@ -40,11 +40,17 @@ export default function SearchResultsTable(props: SearchResultsTableProps) {
   const resultsFromStore = searchStore.results ?? [];
   const combinedResults = items ?? resultsFromStore;
   const primaryItems = useMemo(
-    () => combinedResults.filter((item) => item.catalog !== 'UMAPI_ANALOG'),
+    () =>
+      combinedResults
+        .filter((item) => item.catalog !== 'UMAPI_ANALOG')
+        .sort(compareByAvailability),
     [combinedResults]
   );
   const analogItems = useMemo(
-    () => combinedResults.filter((item) => item.catalog === 'UMAPI_ANALOG'),
+    () =>
+      combinedResults
+        .filter((item) => item.catalog === 'UMAPI_ANALOG')
+        .sort(compareByAvailability),
     [combinedResults]
   );
 
@@ -208,7 +214,9 @@ function DesktopRow({ item, variant = 'primary' }: { item: SearchItem; variant?:
         item.brand || 'UNKNOWN',
         quantity,
         item.price,
-        item.imageUrl
+        item.imageUrl ? ensureAbsoluteUrl(item.imageUrl) : undefined,
+        bestWarehouse(item)?.name || bestWarehouse(item)?.code,
+        bestWarehouse(item)?.code
       );
       toast.success('Товар добавлен в корзину');
     } catch (error: any) {
@@ -299,7 +307,9 @@ function MobileCard({ item, variant = 'primary' }: { item: SearchItem; variant?:
         item.brand || 'UNKNOWN',
         quantity,
         item.price,
-        item.imageUrl
+        item.imageUrl ? ensureAbsoluteUrl(item.imageUrl) : undefined,
+        bestWarehouse(item)?.name || bestWarehouse(item)?.code,
+        bestWarehouse(item)?.code
       );
       toast.success('Товар добавлен в корзину');
     } catch (error: any) {
@@ -532,6 +542,19 @@ function computeAvailableQuantity(item: SearchItem): number {
   return item.warehouses.reduce((sum, warehouse) => sum + (warehouse.qty ?? 0), 0);
 }
 
+/** Put offers with real stock first, with the largest available quantity on top. */
+function compareByAvailability(left: SearchItem, right: SearchItem): number {
+  const quantityDifference = computeAvailableQuantity(right) - computeAvailableQuantity(left);
+  if (quantityDifference !== 0) {
+    return quantityDifference;
+  }
+
+  return `${left.brand ?? ''} ${left.name ?? ''}`.localeCompare(
+    `${right.brand ?? ''} ${right.name ?? ''}`,
+    'ru'
+  );
+}
+
 function formatRange(page: number, pageSize: number, displayed: number, total: number): string {
   if (total <= 0 || displayed <= 0) {
     return '0 из 0';
@@ -566,13 +589,20 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
+// Склад с наибольшим остатком — его и показываем в корзине
+function bestWarehouse(item: SearchItem): SearchWarehouse | undefined {
+  return (item.warehouses ?? [])
+    .filter((warehouse) => (warehouse.qty ?? 0) > 0)
+    .sort((left, right) => (right.qty ?? 0) - (left.qty ?? 0))[0];
+}
+
 function ensureAbsoluteUrl(url: string): string {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url;
   }
   if (url.startsWith('/')) {
-    return `https://api.umapi.ru${url}`;
+    return url.startsWith("/IMAGE/") ? `https://image.umapi.ru${url}` : `https://image.umapi.ru/IMAGE${url}`;
   }
   return url;
 }

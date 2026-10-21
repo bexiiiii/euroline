@@ -92,36 +92,7 @@ function ActionSearchBar() {
     }, [searchHistory]);
 
     // Professional debounced search - triggers only after user stops typing
-    useEffect(() => {
-        // Clear any existing timeout
-        if (searchTimeoutRef.current) {
-            clearTimeout(searchTimeoutRef.current);
-        }
-
-        const trimmed = query.trim();
-        
-        // Don't search if empty
-        if (trimmed.length === 0) {
-            return;
-        }
-
-        // Don't search if too short (minimum 3 characters for auto-search)
-        if (trimmed.length < 3) {
-            return;
-        }
-
-        // Set timeout for debounced search (600ms is professional standard)
-        searchTimeoutRef.current = setTimeout(() => {
-            void performSearch(trimmed);
-        }, 600);
-
-        // Cleanup on unmount or when query changes
-        return () => {
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-            }
-        };
-    }, [query]); // Only depend on query
+    // Поиск только по Enter/выбору: авто-поиск при наборе тратил лимит запросов Laximo
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;

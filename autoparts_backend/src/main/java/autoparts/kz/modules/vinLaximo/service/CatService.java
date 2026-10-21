@@ -75,93 +75,76 @@ public class CatService {
         return CatXmlParser.parseFindVehicleByPlateNumber(soap.execCommands(List.of(cmd)));
     }
 
-    // ---- Wizard (GetWizard2 / Next / Finish) ----
+    // ---- Wizard (GetWizard2 / FindVehicleByWizard2) ----
+    // По документации Laximo: стартовый шаг = GetWizard2 с пустым ssd,
+    // каждый следующий = GetWizard2 с ssd из key выбранного значения,
+    // список авто = FindVehicleByWizard2 с текущим ssd.
+    // Запросы к Laximo лимитированы, поэтому шаги кешируются (ssd детерминирует результат).
+
+    private String getWizard2(String catalog, String ssd, String useLocale) {
+        StringBuilder sb = new StringBuilder("GetWizard2:Locale=").append(useLocale)
+                .append("|Catalog=").append(catalog);
+        if (ssd != null && !ssd.isBlank()) sb.append("|ssd=").append(ssd);
+        sb.append("|Localized=true");
+        return soap.execCommands(List.of(sb.toString()));
+    }
+
+    private WizardStepDto parseStep(String xml, String ssd) {
+        WizardStepDto step = CatXmlParser.parseWizardStep(xml, "GetWizard2");
+        if (step.getSsd() == null || step.getSsd().isBlank()) step.setSsd(ssd);
+        return step;
+    }
+
     @Cacheable(cacheNames = CacheConfig.WIZARD_START_CACHE, key = "#catalog")
     public WizardStepDto wizardStart(String catalog){
-        try {
-            String cmd = "GetWizard2:Locale=" + locale + "|Catalog=" + catalog + "|Localized=true";
-            return CatXmlParser.parseWizardStep(soap.execCommands(List.of(cmd)), "GetWizard2");
-        } catch (Exception e) {
-            // Если не удалось получить мастер, возвращаем пустой шаг
-            WizardStepDto fallback = new WizardStepDto();
-            fallback.setSsd("");
-            fallback.setParams(Collections.emptyList());
-            fallback.setFinalStep(true);
-            return fallback;
-        }
+        return parseStep(getWizard2(catalog, null, locale), null);
     }
 
     // Overload supporting VIN and custom locale (if provided)
     @Cacheable(cacheNames = CacheConfig.WIZARD_START_CACHE, key = "#catalog + '::' + (#vin == null ? 'NO_VIN' : #vin) + '::' + (#overrideLocale == null ? 'DEFAULT' : #overrideLocale)")
     public WizardStepDto wizardStart(String catalog, String vin, String overrideLocale){
         String useLocale = (overrideLocale != null && !overrideLocale.isBlank()) ? overrideLocale : this.locale;
-        try {
-            StringBuilder sb = new StringBuilder("GetWizard2:Locale=").append(useLocale)
-                    .append("|Catalog=").append(catalog).append("|Localized=true");
-            if (vin != null && !vin.isBlank()) sb.append("|VIN=").append(vin);
-            return CatXmlParser.parseWizardStep(soap.execCommands(List.of(sb.toString())), "GetWizard2");
-        } catch (Exception e) {
-            WizardStepDto fallback = new WizardStepDto();
-            fallback.setSsd("");
-            fallback.setParams(Collections.emptyList());
-            fallback.setFinalStep(true);
-            return fallback;
-        }
+        StringBuilder sb = new StringBuilder("GetWizard2:Locale=").append(useLocale)
+                .append("|Catalog=").append(catalog).append("|Localized=true");
+        if (vin != null && !vin.isBlank()) sb.append("|VIN=").append(vin);
+        return parseStep(soap.execCommands(List.of(sb.toString())), null);
     }
 
-    public WizardStepDto wizardNext(String catalog, String ssd, Map<String,String> selections){
-        try {
-            StringBuilder sb = new StringBuilder("GetWizardNextStep2:Locale=").append(locale)
-                    .append("|Catalog=").append(catalog).append("|Localized=true");
-            if (ssd != null && !ssd.isBlank()) {
-                sb.append("|ssd=").append(ssd);
-            }
-            selections.forEach((k,v)-> sb.append("|").append(k).append("=").append(v));
-            return CatXmlParser.parseWizardStep(soap.execCommands(List.of(sb.toString())), "GetWizardNextStep2");
-        } catch (Exception e) {
-            // Если не удалось получить следующий шаг, возвращаем финальный шаг
-            WizardStepDto fallback = new WizardStepDto();
-            fallback.setSsd(ssd);
-            fallback.setParams(Collections.emptyList());
-            fallback.setFinalStep(true);
-            return fallback;
+    // Шаг мастера по ssd (key выбранного значения или removeKey для сброса параметра)
+    @Cacheable(cacheNames = CacheConfig.WIZARD_STEP_CACHE, key = "#catalog + '::' + #ssd")
+    public WizardStepDto wizardStep(String catalog, String ssd){
+        if (ssd == null || ssd.isBlank()) {
+            return parseStep(getWizard2(catalog, null, locale), null);
         }
+        return parseStep(getWizard2(catalog, ssd, locale), ssd);
+    }
+
+    // Legacy: значение выбранной опции — это и есть новый ssd
+    public WizardStepDto wizardNext(String catalog, String ssd, Map<String,String> selections){
+        String next = (selections == null ? Collections.<String>emptyList() : selections.values()).stream()
+                .filter(v -> v != null && !v.isBlank()).findFirst().orElse(ssd);
+        return parseStep(getWizard2(catalog, next, locale), next);
     }
 
     // Overload accepting explicit single selection key/value and custom locale
     public WizardStepDto wizardNext(String catalog, String ssd, String selKey, String selValue, String overrideLocale){
         String useLocale = (overrideLocale != null && !overrideLocale.isBlank()) ? overrideLocale : this.locale;
-        try {
-            if (selKey == null || selKey.isBlank()) {
-                throw new IllegalArgumentException("Selection key is required");
-            }
-            StringBuilder sb = new StringBuilder("GetWizardNextStep2:Locale=").append(useLocale)
-                    .append("|Catalog=").append(catalog).append("|Localized=true");
-            if (ssd != null && !ssd.isBlank()) sb.append("|ssd=").append(ssd);
-            sb.append("|").append(selKey).append("=").append(selValue == null ? "" : selValue);
-            return CatXmlParser.parseWizardStep(soap.execCommands(List.of(sb.toString())), "GetWizardNextStep2");
-        } catch (Exception e) {
-            WizardStepDto fallback = new WizardStepDto();
-            fallback.setSsd(ssd);
-            fallback.setParams(Collections.emptyList());
-            fallback.setFinalStep(true);
-            return fallback;
+        String next = (selValue != null && !selValue.isBlank()) ? selValue : ssd;
+        return parseStep(getWizard2(catalog, next, useLocale), next);
+    }
+
+    // Все автомобили, подходящие под выбранные параметры
+    @Cacheable(cacheNames = CacheConfig.WIZARD_VEHICLES_CACHE, key = "#catalog + '::' + #ssd")
+    public List<VehicleDto> wizardVehicles(String catalog, String ssd){
+        if (ssd == null || ssd.isBlank()) {
+            throw new IllegalArgumentException("Parameter 'ssd' is required for wizard vehicles");
         }
+        String cmd = "FindVehicleByWizard2:Locale=" + locale + "|Catalog=" + catalog + "|ssd=" + ssd + "|Localized=true";
+        return CatXmlParser.parseFindVehicleByWizard2List(soap.execCommands(List.of(cmd)));
     }
 
     public VehicleDto wizardFinish(String catalog, String ssd, Map<String,String> selections){
-        try {
-            if (ssd == null || ssd.isBlank()) {
-                throw new IllegalArgumentException("Parameter 'ssd' is required for wizard finish");
-            }
-            StringBuilder sb = new StringBuilder("FindVehicleByWizard2:Locale=").append(locale)
-                    .append("|Catalog=").append(catalog).append("|ssd=").append(ssd).append("|Localized=true");
-            selections.forEach((k,v)-> sb.append("|").append(k).append("=").append(v));
-            return CatXmlParser.parseFindVehicleByWizard2(soap.execCommands(List.of(sb.toString())));
-        } catch (Exception e) {
-            // Если завершение мастера не удалось, выбрасываем исключение
-            throw new RuntimeException("Не удалось завершить подбор автомобиля через мастер: " + e.getMessage(), e);
-        }
+        return wizardFinish(catalog, ssd, (String) null);
     }
 
     // Overload without selections and with optional locale override
@@ -170,9 +153,8 @@ public class CatService {
             throw new IllegalArgumentException("Parameter 'ssd' is required for wizard finish");
         }
         String useLocale = (overrideLocale != null && !overrideLocale.isBlank()) ? overrideLocale : this.locale;
-        StringBuilder sb = new StringBuilder("FindVehicleByWizard2:Locale=").append(useLocale)
-                .append("|Catalog=").append(catalog).append("|ssd=").append(ssd).append("|Localized=true");
-        return CatXmlParser.parseFindVehicleByWizard2(soap.execCommands(List.of(sb.toString())));
+        String cmd = "FindVehicleByWizard2:Locale=" + useLocale + "|Catalog=" + catalog + "|ssd=" + ssd + "|Localized=true";
+        return CatXmlParser.parseFindVehicleByWizard2(soap.execCommands(List.of(cmd)));
     }
 
     // Валидация SSD параметра для Laximo
@@ -671,27 +653,20 @@ public class CatService {
     
     // Получить сырой XML от GetWizard2 (wizard start)
     public String wizardStartRaw(String catalog) {
-        String cmd = "GetWizard2:Locale=" + locale + "|Catalog=" + catalog + "|Localized=true";
-        return soap.execCommands(List.of(cmd));
+        return getWizard2(catalog, null, locale);
     }
     
-    // Получить сырой XML от GetWizardNextStep2 
+    // Получить сырой XML от GetWizard2 для выбранного значения
     public String wizardNextRaw(String catalog, String ssd, Map<String,String> selections) {
-        StringBuilder sb = new StringBuilder("GetWizardNextStep2:Locale=").append(locale)
-                .append("|Catalog=").append(catalog).append("|Localized=true");
-        if (ssd != null && !ssd.isBlank()) {
-            sb.append("|ssd=").append(ssd);
-        }
-        selections.forEach((k,v)-> sb.append("|").append(k).append("=").append(v));
-        return soap.execCommands(List.of(sb.toString()));
+        String next = (selections == null ? Collections.<String>emptyList() : selections.values()).stream()
+                .filter(v -> v != null && !v.isBlank()).findFirst().orElse(ssd);
+        return getWizard2(catalog, next, locale);
     }
     
     // Получить сырой XML от FindVehicleByWizard2 (wizard finish)
     public String wizardFinishRaw(String catalog, String ssd, Map<String,String> selections) {
-        StringBuilder sb = new StringBuilder("FindVehicleByWizard2:Locale=").append(locale)
-                .append("|Catalog=").append(catalog).append("|ssd=").append(ssd).append("|Localized=true");
-        selections.forEach((k,v)-> sb.append("|").append(k).append("=").append(v));
-        return soap.execCommands(List.of(sb.toString()));
+        String cmd = "FindVehicleByWizard2:Locale=" + locale + "|Catalog=" + catalog + "|ssd=" + ssd + "|Localized=true";
+        return soap.execCommands(List.of(cmd));
     }
     @Cacheable(cacheNames = CacheConfig.CATEGORY_TREE_CACHE, key = "#catalog + '::' + #vehicleId + '::' + #ssd")
     public List<CategoryNodeDto> tree(String catalog, String vehicleId, String ssd) {

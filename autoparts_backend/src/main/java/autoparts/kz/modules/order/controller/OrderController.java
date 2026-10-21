@@ -49,4 +49,14 @@ public class OrderController {
         var p = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return orderRepository.findByUser_Id(principal.id(), p).map(OrderMapper::toResponse);
     }
+
+    /** Один заказ текущего пользователя (для накладной). Чужой заказ — 404. */
+    @GetMapping("/my/{id}")
+    @Transactional(readOnly = true)
+    public OrderResponse myOrder(@AuthenticationPrincipal SimplePrincipal principal, @PathVariable Long id) {
+        return orderRepository.findById(id)
+                .filter(order -> order.getUser() != null && principal.id().equals(order.getUser().getId()))
+                .map(OrderMapper::toResponse)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Заказ не найден"));
+    }
 }

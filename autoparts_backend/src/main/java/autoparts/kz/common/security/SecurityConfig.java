@@ -110,8 +110,12 @@ public class SecurityConfig {
     public SecurityFilterChain appSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> {})
+                .cors(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // Raw SOAP diagnostics can disclose the provider response; never expose them publicly.
+                        .requestMatchers("/api/v1/cat/debug/**", "/api/v1/cat/_debug/**").hasRole("ADMIN")
+                        // Queue contents and broker state are operational data, not customer-facing API data.
+                        .requestMatchers("/api/diagnostic/**").hasRole("ADMIN")
                         // --- публичные эндпоинты CAT (read-only) ---
                         .requestMatchers(HttpMethod.GET, "/api/v1/cat/catalogs/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/cat/**").permitAll()
@@ -134,8 +138,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/wizard/start").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/wizard/next").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/wizard/finish").permitAll()
-                        // --- debug raw endpoints for wizard (dev only) ---
-                        .requestMatchers(HttpMethod.POST, "/api/v1/cat/debug/**").permitAll()
+                        // Входящие события новой интеграции 1С используют отдельный Bearer-токен.
+                        .requestMatchers(HttpMethod.POST, "/api/integrations/1c/events").permitAll()
                         // SSE stream for notifications (auth via token query param)
                         .requestMatchers(HttpMethod.GET, "/api/notifications/stream").permitAll()
                         // --- публичные шаги мастера подбора (используем AntPath, чтобы обойти ограничения PathPattern) ---
@@ -160,6 +164,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/finance/my/top-ups/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/api/finance/my/balance").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/api/finance/my/transactions").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers("/api/finance/my/kaspi/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/api/admin/categories").hasRole("ADMIN")
                         // News admin endpoints - require ADMIN role
                         .requestMatchers(HttpMethod.GET, "/api/news").hasRole("ADMIN")

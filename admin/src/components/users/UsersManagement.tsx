@@ -1,23 +1,34 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import ComponentCard from "../common/ComponentCard";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
 import { Modal } from "../ui/modal";
-import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table";
 import Label from "../form/Label";
-import Input from "../form/input/InputField";
-import Select from "../form/Select";
 import { userApi, User as ApiUser } from "@/lib/api/users";
 import { userActivityApi, UserActivity as ApiUserActivity } from "@/lib/api/userActivity";
 import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
 import { exportAdminData } from "@/lib/api/importExport";
 import { useToast } from "@/context/ToastContext";
+import { formatDateTime } from "@/lib/format";
+import StatCard, { StatGrid } from "@/components/common/StatCard";
+import {
+  EditIcon,
+  PlusIcon,
+  RowAction,
+  controlClass,
+  rowClass,
+  tableWrapClass,
+  tbodyClass,
+  tdClass,
+  thClass,
+  theadClass,
+} from "@/components/finance/tableUi";
 
 // Локальный тип для UI с дополнительными полями
 interface User extends ApiUser {
   status: "active" | "inactive" | "blocked";
-  lastLogin: string;
+  /** Время последнего входа; API пока не отдаёт это поле. */
+  lastLogin?: string;
   displayName: string;
   // Дополнительные поля для регистрации
   country?: string;
@@ -42,17 +53,40 @@ interface UserActivity {
 
 type UserRole = ApiUser["role"];
 
+const ACTIVITY_STATUS_META: Record<UserActivity["status"], { label: string; color: "success" | "error" | "warning" }> = {
+  success: { label: "Успешно", color: "success" },
+  failed: { label: "Ошибка", color: "error" },
+  warning: { label: "Предупреждение", color: "warning" },
+};
+
+const EMPTY_CREATE_FORM = {
+  clientName: "",
+  surname: "",
+  name: "",
+  email: "",
+  phone: "",
+  password: "",
+  confirmPassword: "",
+};
+
+type CreateUserForm = typeof EMPTY_CREATE_FORM;
+
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
+
 const UsersManagement = () => {
   const [activeTab, setActiveTab] = useState("users");
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalType, setModalType] = useState<"user" | "role">("user");
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [userActivities, setUserActivities] = useState<UserActivity[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [userForm, setUserForm] = useState<{ role: UserRole }>({ role: "USER" });
+  const [activitiesError, setActivitiesError] = useState<string | null>(null);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [userForm, setUserForm] = useState<{ role: UserRole; banned: boolean }>({ role: "USER", banned: false });
+  const [createForm, setCreateForm] = useState<CreateUserForm>(EMPTY_CREATE_FORM);
+  const [formError, setFormError] = useState<string | null>(null);
   const [savingUser, setSavingUser] = useState(false);
   const { success: showSuccess, error: showError } = useToast();
 
@@ -67,12 +101,15 @@ const UsersManagement = () => {
   };
 
   useEffect(() => {
-    if (isModalOpen && modalType === "user") {
+    if (isModalOpen) {
       setUserForm({
         role: normalizeRole(selectedUser?.role),
+        banned: selectedUser?.status === "blocked",
       });
+      setCreateForm(EMPTY_CREATE_FORM);
+      setFormError(null);
     }
-  }, [isModalOpen, modalType, selectedUser]);
+  }, [isModalOpen, selectedUser]);
 
   const loadUsers = async () => {
     try {
@@ -84,13 +121,14 @@ const UsersManagement = () => {
       const mappedUsers: User[] = data.content.map((u: ApiUser) => ({
         ...u,
         status: u.banned ? "blocked" : "active",
-        lastLogin: new Date().toISOString(), // заглушка, пока нет данных о последнем входе
         displayName: `${u.name || ""} ${u.surname || ""}`.trim() || u.clientName || u.email,
       }));
       
       setUsers(mappedUsers);
-    } catch (e: any) {
-      setError(e.message || "Не удалось загрузить пользователей");
+      setTotalUsers(data.totalElements ?? mappedUsers.length);
+    } catch (e) {
+      console.error("Не удалось загрузить пользователей:", e);
+      setError("Не удалось загрузить данные");
     } finally {
       setLoading(false);
     }
@@ -99,6 +137,7 @@ const UsersManagement = () => {
   const loadUserActivities = async () => {
     try {
       setActivitiesLoading(true);
+      setActivitiesError(null);
       const data = await userActivityApi.getActivities(undefined, 0, 50);
       
       // Маппим данные API в локальный тип
@@ -115,10 +154,10 @@ const UsersManagement = () => {
       }));
       
       setUserActivities(mappedActivities);
-    } catch (e: any) {
-      console.error("Не удалось загрузить активность пользователей:", e.message);
-      // Не показываем ошибку пользователю, так как это не критично
-      setUserActivities([]); // оставляем пустой список
+    } catch (e) {
+      console.error("Не удалось загрузить активность пользователей:", e);
+      setUserActivities([]);
+      setActivitiesError("Не удалось загрузить данные");
     } finally {
       setActivitiesLoading(false);
     }
@@ -146,66 +185,133 @@ const UsersManagement = () => {
     }
   };
 
-  const formatDateTime = (dateString: string) => new Date(dateString).toLocaleString("ru-RU");
+  const newUsersLastMonth = (() => {
+    const withDates = users.filter((u) => u.createdAt && !Number.isNaN(new Date(u.createdAt).getTime()));
+    if (withDates.length === 0) return null;
+    const threshold = Date.now() - MONTH_MS;
+    return withDates.filter((u) => new Date(u.createdAt as string).getTime() >= threshold).length;
+  })();
 
   const getRoleBadge = (role: string) => {
     const normalizedRole = role?.toLowerCase().replace(/^role_/, "");
     switch (normalizedRole) {
       case "admin":
-        return <Badge color="error">Администратор</Badge>;
+        return <Badge size="sm" color="primary">Администратор</Badge>;
       case "user":
-        return <Badge color="primary">Пользователь</Badge>;
+        return <Badge size="sm" color="light">Пользователь</Badge>;
       default:
-        return <Badge color="light">{role}</Badge>;
+        return <Badge size="sm" color="light">{role}</Badge>;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge color="success">Активен</Badge>;
+        return <Badge size="sm" color="success">Активен</Badge>;
       case "inactive":
-        return <Badge color="warning">Неактивен</Badge>;
+        return <Badge size="sm" color="warning">Неактивен</Badge>;
       case "blocked":
-        return <Badge color="error">Заблокирован</Badge>;
+        return <Badge size="sm" color="error">Заблокирован</Badge>;
       default:
-        return <Badge color="light">{status}</Badge>;
+        return <Badge size="sm" color="light">{status}</Badge>;
     }
   };
 
-  const openModal = (type: "user" | "role", user?: User) => {
-    setModalType(type);
+  const openModal = (user?: User) => {
     setSelectedUser(user || null);
     setIsModalOpen(true);
   };
 
   const toggleBan = async (u: User) => {
+    const isBlocked = u.status === "blocked";
+    const confirmed = window.confirm(
+      isBlocked
+        ? `Разблокировать пользователя «${u.displayName}»?`
+        : `Заблокировать пользователя «${u.displayName}»?`
+    );
+    if (!confirmed) return;
     try {
-      const newBannedStatus = u.status === "blocked";
-      await userApi.toggleUserBan(u.id, !newBannedStatus);
-      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, status: u.status === "blocked" ? "active" : "blocked" } : x)));
+      await userApi.toggleUserBan(u.id, !isBlocked);
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, banned: !isBlocked, status: isBlocked ? "active" : "blocked" } : x)));
+      showSuccess(isBlocked ? "Пользователь разблокирован" : "Пользователь заблокирован");
     } catch (e) {
-      setError("Не удалось изменить статус пользователя");
+      console.error("Не удалось изменить статус пользователя", e);
+      showError("Не удалось изменить статус пользователя");
+    }
+  };
+
+  const updateCreateField = (field: keyof CreateUserForm) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setCreateForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateUser = async () => {
+    const form = {
+      clientName: createForm.clientName.trim(),
+      surname: createForm.surname.trim(),
+      name: createForm.name.trim(),
+      email: createForm.email.trim(),
+      phone: createForm.phone.trim(),
+    };
+    if (!form.clientName || !form.surname || !form.name || !form.email || !form.phone) {
+      setFormError("Заполните все обязательные поля");
+      return;
+    }
+    if (!createForm.password) {
+      setFormError("Введите пароль");
+      return;
+    }
+    if (createForm.password !== createForm.confirmPassword) {
+      setFormError("Пароли не совпадают");
+      return;
+    }
+    setFormError(null);
+    try {
+      setSavingUser(true);
+      await userApi.createUser({
+        ...form,
+        password: createForm.password,
+        role: userForm.role,
+      });
+      showSuccess("Пользователь создан");
+      setIsModalOpen(false);
+      await loadUsers();
+    } catch (err) {
+      console.error("Не удалось создать пользователя", err);
+      showError("Не удалось создать пользователя");
+    } finally {
+      setSavingUser(false);
     }
   };
 
   const handleUserSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedUser) {
-      setIsModalOpen(false);
+      await handleCreateUser();
       return;
     }
 
     try {
       setSavingUser(true);
-      const updated = await userApi.updateUserRole(selectedUser.id, userForm.role);
+      let role = selectedUser.role;
+      if (normalizeRole(selectedUser.role) !== userForm.role) {
+        const updated = await userApi.updateUserRole(selectedUser.id, userForm.role);
+        role = updated.role;
+      }
+      const wasBlocked = selectedUser.status === "blocked";
+      if (wasBlocked !== userForm.banned) {
+        await userApi.toggleUserBan(selectedUser.id, userForm.banned);
+      }
+      const patch: Partial<User> = {
+        role,
+        banned: userForm.banned,
+        status: userForm.banned ? "blocked" : "active",
+      };
       setUsers((prev) =>
-        prev.map((user) =>
-          user.id === selectedUser.id ? { ...user, role: updated.role } : user,
-        ),
+        prev.map((user) => (user.id === selectedUser.id ? { ...user, ...patch } : user)),
       );
-      setSelectedUser((prev) => (prev ? { ...prev, role: updated.role } : prev));
-      showSuccess("Роль пользователя обновлена");
+      setSelectedUser((prev) => (prev ? { ...prev, ...patch } : prev));
+      showSuccess("Изменения сохранены");
       setIsModalOpen(false);
     } catch (err) {
       console.error("Не удалось сохранить изменения пользователя", err);
@@ -215,376 +321,327 @@ const UsersManagement = () => {
     }
   };
 
+  const tabClass = (tab: string) =>
+    `whitespace-nowrap border-b-2 px-1 py-3 text-sm font-medium ${
+      activeTab === tab
+        ? "border-brand-500 text-brand-600 dark:text-brand-400"
+        : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+    }`;
+
+  const errorBox = (onRetry: () => void) => (
+    <div
+      role="alert"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400"
+    >
+      <span>Не удалось загрузить данные</span>
+      <Button size="xs" variant="outline" onClick={onRetry}>
+        Повторить
+      </Button>
+    </div>
+  );
+
+  const stateRow = (text: string, colSpan: number) => (
+    <tr>
+      <td colSpan={colSpan} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+        {text}
+      </td>
+    </tr>
+  );
+
+  const readOnlyItem = (label: string, value?: string, wide = false) => (
+    <div className={wide ? "col-span-2" : undefined}>
+      <dt className="text-gray-500 dark:text-gray-400">{label}</dt>
+      <dd className="break-words text-gray-800 dark:text-white/90">{value?.trim() ? value : "—"}</dd>
+    </div>
+  );
+
+  const createInput = (
+    id: keyof CreateUserForm,
+    label: string,
+    type: string = "text",
+    autoComplete?: string,
+  ) => (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <input
+        id={id}
+        type={type}
+        autoComplete={autoComplete}
+        value={createForm[id]}
+        onChange={updateCreateField(id)}
+        className={`${controlClass} w-full`}
+      />
+    </div>
+  );
+
+  const svgProps = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.75,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+
+  const statValue = (value: number) => (loading || error ? "—" : value);
+
   return (
-    <div className="space-y-6">
-      {error && <div className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded">{error}</div>}
+    <div className="space-y-4">
+      <StatGrid>
+        <StatCard
+          label="Всего пользователей"
+          value={statValue(totalUsers)}
+          icon={
+            <svg {...svgProps}>
+              <circle cx="9" cy="8" r="3.5" />
+              <path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6" />
+            </svg>
+          }
+        />
+        <StatCard
+          label="Активные"
+          value={statValue(users.filter((u) => u.status === "active").length)}
+          icon={
+            <svg {...svgProps}>
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21a8 8 0 0 1 11-7.4M16 19l2 2 4-4" />
+            </svg>
+          }
+        />
+        {newUsersLastMonth !== null && (
+          <StatCard
+            label="Новые за 30 дней"
+            value={loading ? "—" : newUsersLastMonth}
+            icon={
+              <svg {...svgProps}>
+                <circle cx="10" cy="8" r="4" />
+                <path d="M3 21a7 7 0 0 1 12-4.9M19 15v6M16 18h6" />
+              </svg>
+            }
+          />
+        )}
+        <StatCard
+          label="Заблокированные"
+          value={statValue(users.filter((u) => u.status === "blocked").length)}
+          icon={
+            <svg {...svgProps}>
+              <circle cx="12" cy="12" r="9" />
+              <path d="m5.6 5.6 12.8 12.8" />
+            </svg>
+          }
+        />
+      </StatGrid>
 
-      {/* Статистика */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 lg:p-6">
-          <h3 className="text-base lg:text-lg font-medium text-gray-900 dark:text-white">Всего пользователей</h3>
-          <div className="mt-2 flex items-baseline">
-            <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{users.length}</p>
-          </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">в системе</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 lg:p-6">
-          <h3 className="text-base lg:text-lg font-medium text-gray-900 dark:text-white">Активных пользователей</h3>
-          <div className="mt-2 flex items-baseline">
-            <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{users.filter(u=>u.status==='active').length}</p>
-          </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">онлайн сейчас</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 lg:p-6">
-          <h3 className="text-base lg:text-lg font-medium text-gray-900 dark:text-white">Новые за месяц</h3>
-          <div className="mt-2 flex items-baseline">
-            <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">—</p>
-          </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">пользователей</p>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 lg:p-6">
-          <h3 className="text-base lg:text-lg font-medium text-gray-900 dark:text-white">Заблокированных</h3>
-          <div className="mt-2 flex items-baseline">
-            <p className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">{users.filter(u=>u.status==='blocked').length}</p>
-          </div>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">пользователей</p>
-        </div>
-      </div>
-
-      {/* Основной контент с табами */}
-      <ComponentCard
-        title="Пользователи системы"
-        description="Управление пользователями, ролями и мониторинг активности"
-      >
-        {/* Табы */}
-        <div className="border-b border-gray-200 dark:border-gray-700 -mx-6 px-6">
-          <nav className="flex space-x-8 overflow-x-auto" aria-label="Tabs">
-            <button onClick={() => setActiveTab("users")} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === "users" ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"}`}>Список пользователей</button>
-            <button onClick={() => setActiveTab("activity")} className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === "activity" ? "border-blue-500 text-blue-600 dark:text-blue-400" : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"}`}>Активность пользователей</button>
+      <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 px-4 dark:border-gray-800">
+          <nav className="-mb-px flex gap-6 overflow-x-auto" aria-label="Разделы">
+            <button type="button" onClick={() => setActiveTab("users")} className={tabClass("users")}>Пользователи</button>
+            <button type="button" onClick={() => setActiveTab("activity")} className={tabClass("activity")}>Активность</button>
           </nav>
+          <div className="py-2">
+            {activeTab === "users" ? (
+              <Button size="sm" startIcon={<PlusIcon />} onClick={() => openModal()}>
+                Добавить пользователя
+              </Button>
+            ) : (
+              <ExportWithDateRange
+                triggerLabel="Экспорт CSV"
+                size="sm"
+                variant="outline"
+                title="Экспорт активности"
+                description="Период для выгрузки в CSV."
+                onConfirm={handleExportUserActivity}
+              />
+            )}
+          </div>
         </div>
 
-        {/* Контент табов */}
-        <div className="mt-6">
+        <div className="space-y-4 p-4">
           {activeTab === "users" && (
-            <div>
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Пользователи системы</h3>
-                <Button onClick={() => openModal("user")} className="w-full sm:w-auto">Добавить пользователя</Button>
+            <>
+              {error && errorBox(loadUsers)}
+              <div className={tableWrapClass}>
+                <table className="w-full min-w-[720px]">
+                  <thead className={theadClass}>
+                    <tr>
+                      <th className={thClass}>Пользователь</th>
+                      <th className={thClass}>Роль</th>
+                      <th className={thClass}>Статус</th>
+                      <th className={thClass}>Регистрация</th>
+                      <th className={`${thClass} text-right`}>Действия</th>
+                    </tr>
+                  </thead>
+                  <tbody className={tbodyClass}>
+                    {loading
+                      ? stateRow("Загрузка…", 5)
+                      : error
+                        ? stateRow("Данные недоступны", 5)
+                        : users.length === 0
+                          ? stateRow("Пользователей пока нет", 5)
+                          : users.map((user) => {
+                              const blocked = user.status === "blocked";
+                              return (
+                                <tr key={user.id} className={rowClass}>
+                                  <td className={tdClass}>
+                                    <div className="font-medium text-gray-800 dark:text-white/90">{user.displayName}</div>
+                                    <div className="truncate text-xs text-gray-500 dark:text-gray-400">
+                                      {[user.email, user.phone].filter(Boolean).join(", ")}
+                                    </div>
+                                  </td>
+                                  <td className={tdClass}>{getRoleBadge(user.role)}</td>
+                                  <td className={tdClass}>{getStatusBadge(user.status)}</td>
+                                  <td className={`${tdClass} whitespace-nowrap tabular-nums`}>{formatDateTime(user.createdAt)}</td>
+                                  <td className={tdClass}>
+                                    <div className="flex items-center justify-end gap-1">
+                                      <RowAction label={`Редактировать пользователя ${user.displayName}`} onClick={() => openModal(user)}>
+                                        <EditIcon />
+                                      </RowAction>
+                                      <RowAction
+                                        label={`${blocked ? "Разблокировать" : "Заблокировать"} пользователя ${user.displayName}`}
+                                        onClick={() => { void toggleBan(user); }}
+                                        destructive={!blocked}
+                                      >
+                                        {blocked ? (
+                                          <svg {...svgProps} aria-hidden="true">
+                                            <rect x="5" y="11" width="14" height="9" rx="2" />
+                                            <path d="M8 11V7a4 4 0 0 1 7.5-2" />
+                                          </svg>
+                                        ) : (
+                                          <svg {...svgProps} aria-hidden="true">
+                                            <circle cx="12" cy="12" r="9" />
+                                            <path d="m5.6 5.6 12.8 12.8" />
+                                          </svg>
+                                        )}
+                                      </RowAction>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                  </tbody>
+                </table>
               </div>
-              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-                <div className="max-w-full overflow-x-auto">
-                  <div className="min-w-[800px]">
-                    <Table>
-                      <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                        <TableRow>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Пользователь</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Роль</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Статус</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Последний вход</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Действия</TableCell>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                        {loading ? (
-                          <TableRow><TableCell className="px-5 py-4" colSpan={5}>Загрузка...</TableCell></TableRow>
-                        ) : (
-                          users.map((user) => (
-                            <TableRow key={user.id}>
-                              <TableCell className="px-5 py-4 sm:px-6 text-start">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium text-sm">
-                                    {user.displayName.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2)}
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">{user.displayName}</div>
-                                    <div className="text-gray-500 text-theme-xs dark:text-gray-400 truncate">{user.email}</div>
-                                    <div className="text-gray-500 text-theme-xs dark:text-gray-400">{user.phone}</div>
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="px-4 py-3 text-start text-theme-sm">{getRoleBadge(user.role)}</TableCell>
-                              <TableCell className="px-4 py-3 text-start text-theme-sm">{getStatusBadge(user.status)}</TableCell>
-                              <TableCell className="px-4 py-3 text-gray-700 text-start text-theme-sm dark:text-gray-300">{formatDateTime(user.lastLogin)}</TableCell>
-                              <TableCell className="px-4 py-3 text-start">
-                                <div className="flex items-center gap-2">
-                                  <button onClick={() => openModal("user", user)} className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors dark:hover:bg-blue-900/20 dark:hover:text-blue-400" title="Редактировать">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke="currentColor" strokeWidth="2"/></svg>
-                                  </button>
-                                  <button onClick={() => toggleBan(user)} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors dark:hover:bg-red-900/20 dark:hover:text-red-400" title={user.status === 'blocked' ? 'Разблокировать' : 'Заблокировать'}>
-                                    {user.status === 'blocked' ? (
-                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 4a4 4 0 00-4 4v2H6a2 2 0 00-2 2v6a2 2 0 002 2h12a2 2 0 002-2v-6a2 2 0 00-2-2h-2V8a4 4 0 00-4-4zm-2 6V8a2 2 0 114 0v2h-4z" stroke="currentColor" strokeWidth="2"/></svg>
-                                    ) : (
-                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v12a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" strokeWidth="2"/></svg>
-                                    )}
-                                  </button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </div>
-            </div>
+            </>
           )}
 
           {activeTab === "activity" && (
-            <div>
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-4">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white">Активность пользователей</h3>
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Button size="sm" variant="outline" className="w-full sm:w-auto">Фильтры</Button>
-                  <ExportWithDateRange
-                    triggerLabel="Экспорт CSV"
-                    size="sm"
-                    variant="outline"
-                    className="w-full sm:w-auto"
-                    title="Экспорт активности"
-                    description="Укажите период для выгрузки событий активности пользователей."
-                    onConfirm={handleExportUserActivity}
-                  />
-                </div>
+            <>
+              {activitiesError && errorBox(loadUserActivities)}
+              <div className={tableWrapClass}>
+                <table className="w-full min-w-[760px]">
+                  <thead className={theadClass}>
+                    <tr>
+                      <th className={thClass}>Пользователь</th>
+                      <th className={thClass}>Действие</th>
+                      <th className={thClass}>Модуль</th>
+                      <th className={thClass}>Время</th>
+                      <th className={thClass}>IP-адрес</th>
+                      <th className={thClass}>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody className={tbodyClass}>
+                    {activitiesLoading
+                      ? stateRow("Загрузка…", 6)
+                      : activitiesError
+                        ? stateRow("Данные недоступны", 6)
+                        : userActivities.length === 0
+                          ? stateRow("Активности пока нет", 6)
+                          : userActivities.map((activity) => {
+                              const statusMeta = ACTIVITY_STATUS_META[activity.status] ?? { label: activity.status || "—", color: "warning" as const };
+                              return (
+                                <tr key={activity.id} className={rowClass}>
+                                  <td className={`${tdClass} font-medium text-gray-800 dark:text-white/90`}>{activity.userName}</td>
+                                  <td className={tdClass}>{activity.action}</td>
+                                  <td className={tdClass}>{activity.module || "—"}</td>
+                                  <td className={`${tdClass} whitespace-nowrap tabular-nums`}>{formatDateTime(activity.timestamp)}</td>
+                                  <td className={`${tdClass} tabular-nums`}>{activity.ipAddress || "—"}</td>
+                                  <td className={tdClass}>
+                                    <Badge size="sm" color={statusMeta.color}>{statusMeta.label}</Badge>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                  </tbody>
+                </table>
               </div>
-              <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-                <div className="max-w-full overflow-x-auto">
-                  <div className="min-w-[900px]">
-                    <Table>
-                      <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                        <TableRow>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Пользователь</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Действие</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Модуль</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Время</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">IP адрес</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Статус</TableCell>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                        {activitiesLoading ? (
-                          <TableRow><TableCell className="px-5 py-4" colSpan={6}>Загрузка активности...</TableCell></TableRow>
-                        ) : userActivities.length === 0 ? (
-                          <TableRow><TableCell className="px-5 py-4" colSpan={6}>Нет данных об активности</TableCell></TableRow>
-                        ) : (
-                          userActivities.map((activity) => (
-                            <TableRow key={activity.id}>
-                              <TableCell className="px-5 py-4 sm:px-6 text-start"><div className="font-medium text-gray-800 text-theme-sm dark:text-white/90">{activity.userName}</div></TableCell>
-                              <TableCell className="px-4 py-3 text-gray-700 text-start text-theme-sm dark:text-gray-300">{activity.action}</TableCell>
-                              <TableCell className="px-4 py-3 text-start text-theme-sm"><Badge color="light">{activity.module}</Badge></TableCell>
-                              <TableCell className="px-4 py-3 text-gray-700 text-start text-theme-sm dark:text-gray-300">{formatDateTime(activity.timestamp)}</TableCell>
-                              <TableCell className="px-4 py-3 text-gray-500 text-start text-theme-sm dark:text-gray-400">{activity.ipAddress}</TableCell>
-                              <TableCell className="px-4 py-3 text-start text-theme-sm"><Badge color={activity.status==='success'?'success':activity.status==='failed'?'error':'warning'}>{activity.status}</Badge></TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </div>
-            </div>
+            </>
           )}
         </div>
-      </ComponentCard>
+      </div>
 
-      {/* Модальное окно пользователя */}
-      <Modal isOpen={isModalOpen && modalType === "user"} onClose={() => setIsModalOpen(false)} size="lg">
-        <div className="p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">{selectedUser ? "Редактирование пользователя" : "Регистрация нового пользователя"}</h3>
-          
-          {!selectedUser && (
-            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-              <p className="text-sm text-blue-800 dark:text-blue-300">
-                Электронная торговая площадка (ЭТП) предназначена для работы с ОПТОВЫМИ клиентами. 
-                Если Вы хотите приобретать товары в розницу, то обратитесь за информацией в контакт-центр.
-              </p>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} size="lg" className="p-0">
+        <form onSubmit={handleUserSubmit} className="space-y-4 p-5">
+          <h2 className="pr-12 text-base font-semibold text-gray-800 dark:text-white/90">
+            {selectedUser ? "Редактирование пользователя" : "Новый пользователь"}
+          </h2>
+
+          {formError && (
+            <div role="alert" className="rounded-lg border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
+              {formError}
             </div>
           )}
-          
-          <form onSubmit={handleUserSubmit}>
-            <div className="space-y-6">
-              {/* Основная информация */}
-              <div>
-                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Основная информация</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <Label htmlFor="clientName">Наименование клиента *</Label>
-                    <Input id="clientName" placeholder="Введите наименование организации" defaultValue={selectedUser?.clientName || ""} />
-                  </div>
-                  <div>
-                    <Label htmlFor="country">Страна *</Label>
-                    <Select 
-                      options={[{value: 'KZ', label: 'Kazakhstan'}]} 
-                      onChange={() => {}} 
-                      placeholder="Выберите страну" 
-                      defaultValue="KZ" 
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="state">Территориальная единица</Label>
-                    <Input id="state" placeholder="Область, регион" defaultValue={selectedUser?.state || ""} />
-                  </div>
-                  <div>
-                    <Label htmlFor="city">Местоположение офиса</Label>
-                    <Input id="city" placeholder="Город" defaultValue={selectedUser?.city || ""} />
-                  </div>
-                  <div>
-                    <Label htmlFor="officeAddress">Адрес офиса</Label>
-                    <Input id="officeAddress" placeholder="Улица, дом, офис" defaultValue={selectedUser?.officeAddress || ""} />
-                  </div>
-                  <div className="md:col-span-2">
-                    <Label htmlFor="type">Вид деятельности</Label>
-                    <Select 
-                      options={[
-                        {value: 'retail', label: 'Розничная торговля'},
-                        {value: 'wholesale', label: 'Оптовая торговля'},
-                        {value: 'service', label: 'Услуги'},
-                        {value: 'manufacturing', label: 'Производство'}
-                      ]} 
-                      onChange={() => {}} 
-                      placeholder="Выберите вид деятельности" 
-                      defaultValue={selectedUser?.type || ''}
-                    />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Контактное лицо */}
-              <div>
-                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Контактное лицо</h4>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="surname">Фамилия *</Label>
-                    <Input id="surname" placeholder="Введите фамилию" defaultValue={selectedUser?.surname || ""} />
-                  </div>
-                  <div>
-                    <Label htmlFor="name">Имя *</Label>
-                    <Input id="name" placeholder="Введите имя" defaultValue={selectedUser?.name || ""} />
-                  </div>
-                  <div>
-                    <Label htmlFor="fathername">Отчество</Label>
-                    <Input id="fathername" placeholder="Введите отчество" defaultValue={selectedUser?.fathername || ""} />
-                  </div>
-                </div>
-              </div>
-              
-              {/* Контактные данные */}
-              <div>
-                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Контактные данные</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="email">E-mail *</Label>
-                    <Input id="email" type="email" placeholder="email@example.com" defaultValue={selectedUser?.email || ""} />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Номер телефона *</Label>
-                    <div className="flex">
-                      <span className="inline-flex items-center px-3 text-sm text-gray-900 bg-gray-200 border border-r-0 border-gray-300 rounded-l-md dark:bg-gray-600 dark:text-gray-400 dark:border-gray-600">
-                        +7
-                      </span>
-                      <Input id="phone" placeholder="(999) 123-45-67" defaultValue={selectedUser?.phone || ""} className="rounded-l-none" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Системные настройки */}
-              <div>
-                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Системные настройки</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="role">Роль *</Label>
-                    <Select
-                      options={[
-                        { value: "USER", label: "Пользователь" },
-                        { value: "ADMIN", label: "Администратор" },
-                      ]}
-                      onChange={(value) =>
-                        setUserForm((prev) => ({
-                          ...prev,
-                          role: normalizeRole(value),
-                        }))
-                      }
-                      placeholder="Выберите роль"
-                      value={userForm.role}
-                    />
-                  </div>
-                  <div className="flex items-center space-x-4 pt-6">
-                    <label className="flex items-center">
-                      <input 
-                        type="checkbox" 
-                        defaultChecked={selectedUser?.banned || false}
-                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600" 
-                      />
-                      <span className="ml-2 text-sm text-gray-900 dark:text-gray-300">Заблокировать пользователя</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Пароль */}
-              <div>
-                <h4 className="text-md font-medium text-gray-900 dark:text-white mb-4">Безопасность</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="password">Пароль {selectedUser ? '' : '*'}</Label>
-                    <Input 
-                      id="password" 
-                      type="password" 
-                      placeholder={selectedUser ? "Оставьте пустым для сохранения текущего" : "Введите пароль"} 
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="confirmPassword">Подтверждение пароля {selectedUser ? '' : '*'}</Label>
-                    <Input 
-                      id="confirmPassword" 
-                      type="password" 
-                      placeholder={selectedUser ? "Оставьте пустым" : "Подтвердите пароль"} 
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 mt-6 border-t border-gray-200 dark:border-gray-700">
-              <Button
-                variant="outline"
-                onClick={() => setIsModalOpen(false)}
-                className="w-full sm:w-auto"
-                type="button"
-              >
-                Отменить
-              </Button>
-              <Button
-                className="w-full sm:w-auto"
-                type="submit"
-                disabled={savingUser}
-              >
-                {savingUser ? "Сохранение..." : selectedUser ? "Сохранить изменения" : "Создать пользователя"}
-              </Button>
-            </div>
-          </form>
-        </div>
-      </Modal>
 
-      {/* Модальное окно роли */}
-      <Modal isOpen={isModalOpen && modalType === "role"} onClose={() => setIsModalOpen(false)} size="md">
-        <div className="p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">Настройка ролей и прав</h3>
-          <div className="space-y-4">
-            <div><Label>Название роли</Label><Input placeholder="Введите название роли" /></div>
-            <div>
-              <Label>Описание</Label>
-              <textarea rows={3} placeholder="Опишите права и обязанности роли" className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white" />
+          {selectedUser ? (
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              {readOnlyItem("Клиент", selectedUser.clientName, true)}
+              {readOnlyItem("Контактное лицо", [selectedUser.surname, selectedUser.name, selectedUser.fathername].filter(Boolean).join(" "))}
+              {readOnlyItem("Email", selectedUser.email)}
+              {readOnlyItem("Телефон", selectedUser.phone)}
+              {readOnlyItem("Город", [selectedUser.state, selectedUser.city].filter(Boolean).join(", "))}
+              {readOnlyItem("Адрес офиса", selectedUser.officeAddress, true)}
+            </dl>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">{createInput("clientName", "Наименование клиента", "text", "organization")}</div>
+              {createInput("surname", "Фамилия", "text", "family-name")}
+              {createInput("name", "Имя", "text", "given-name")}
+              {createInput("email", "Email", "email", "email")}
+              {createInput("phone", "Телефон", "tel", "tel")}
+              {createInput("password", "Пароль", "password", "new-password")}
+              {createInput("confirmPassword", "Повтор пароля", "password", "new-password")}
             </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-4 border-t border-gray-200 pt-4 sm:grid-cols-2 dark:border-gray-800">
+            <div>
+              <Label htmlFor="role">Роль</Label>
+              <select
+                id="role"
+                value={userForm.role}
+                onChange={(e) =>
+                  setUserForm((prev) => ({
+                    ...prev,
+                    role: normalizeRole(e.target.value),
+                  }))
+                }
+                className={`${controlClass} w-full`}
+              >
+                <option value="USER">Пользователь</option>
+                <option value="ADMIN">Администратор</option>
+              </select>
+            </div>
+            {selectedUser && (
+              <label className="flex items-center gap-2 text-sm text-gray-700 sm:pt-7 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={userForm.banned}
+                  onChange={(e) => setUserForm((prev) => ({ ...prev, banned: e.target.checked }))}
+                  className="size-4 rounded border-gray-300 accent-brand-500 dark:border-gray-600"
+                />
+                Заблокирован
+              </label>
+            )}
           </div>
-          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto">Отменить</Button>
-            <Button onClick={() => setIsModalOpen(false)} className="w-full sm:w-auto">Сохранить роль</Button>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" type="button" onClick={() => setIsModalOpen(false)}>
+              Отмена
+            </Button>
+            <Button size="sm" type="submit" disabled={savingUser}>
+              {savingUser ? "Сохранение…" : selectedUser ? "Сохранить" : "Создать"}
+            </Button>
           </div>
-        </div>
+        </form>
       </Modal>
     </div>
   );

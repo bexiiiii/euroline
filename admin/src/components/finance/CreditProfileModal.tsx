@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import { ClientBalance } from "@/lib/api/finance";
+import { formatKzt } from "@/lib/format";
+import { controlClass, fieldLabelClass } from "./tableUi";
 
 interface CreditProfileModalProps {
   isOpen: boolean;
@@ -15,12 +17,6 @@ interface CreditProfileModalProps {
   loading?: boolean;
 }
 
-const fmtKzt = (value: number) =>
-  new Intl.NumberFormat("kk-KZ", {
-    style: "currency",
-    currency: "KZT",
-    maximumFractionDigits: 0,
-  }).format(value || 0);
 
 const CreditProfileModal: React.FC<CreditProfileModalProps> = ({
   isOpen,
@@ -62,11 +58,11 @@ const CreditProfileModal: React.FC<CreditProfileModalProps> = ({
     const normalized = limitInput.replace(/\s+/g, "");
     const numericValue = Number(normalized);
     if (!Number.isFinite(numericValue) || numericValue < 0) {
-      setError("Введите корректный лимит (неотрицательное число)");
+      setError("Введите неотрицательное число");
       return;
     }
     if ((client.creditUsed ?? 0) > numericValue) {
-      setError("Текущий долг превышает новый лимит. Сначала погасите задолженность.");
+      setError("Текущий долг больше нового лимита");
       return;
     }
     setError(null);
@@ -112,109 +108,94 @@ const CreditProfileModal: React.FC<CreditProfileModalProps> = ({
     return null;
   }
 
+  const uploadLabelClass =
+    "inline-flex h-10 cursor-pointer items-center justify-center rounded-lg px-4 text-sm font-medium text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-700 dark:hover:bg-white/[0.03]";
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg" className="p-0">
-      <div className="flex flex-col gap-6 p-8">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Настройка лимита и QR-кода
-          </h2>
+    <Modal isOpen={isOpen} onClose={onClose} size="md" className="p-0">
+      <div className="flex flex-col gap-4 p-5">
+        <div className="pr-12">
+          <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">Кредитный лимит и QR</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Клиент #{client.clientId}
-            {client.establishmentName ? ` · ${client.establishmentName}` : ""}
+            {client.establishmentName || `Клиент #${client.clientId}`}
           </p>
         </div>
 
-        <form onSubmit={handleSaveLimit} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+        <dl className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <dt className="text-gray-500 dark:text-gray-400">Долг</dt>
+            <dd className="font-medium tabular-nums text-gray-800 dark:text-white/90">{formatKzt(debtInfo?.used ?? 0)}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500 dark:text-gray-400">Доступно</dt>
+            <dd className="font-medium tabular-nums text-gray-800 dark:text-white/90">{formatKzt(debtInfo?.available ?? 0)}</dd>
+          </div>
+        </dl>
+
+        <form onSubmit={handleSaveLimit} className="space-y-3">
+          <div>
+            <label htmlFor="credit-limit" className={fieldLabelClass}>
               Кредитный лимит, ₸
             </label>
             <input
+              id="credit-limit"
               type="number"
               min={0}
               step={1000}
               value={limitInput}
               onChange={(event) => setLimitInput(event.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+              className={`${controlClass} w-full`}
             />
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Текущий долг:{" "}
-              <span className="font-semibold text-orange-600">
-                {fmtKzt(debtInfo?.used ?? 0)}
-              </span>
-              . Доступно без пополнения:{" "}
-              <span className="font-semibold text-emerald-600">
-                {fmtKzt(debtInfo?.available ?? 0)}
-              </span>
-              .
-            </p>
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex items-center justify-end gap-3">
-            <Button type="button" variant="outline" onClick={onClose}>
+          {error && <p className="text-sm text-error-600 dark:text-error-500">{error}</p>}
+          <div className="flex items-center justify-end gap-2">
+            <Button type="button" size="sm" variant="outline" onClick={onClose}>
               Отмена
             </Button>
-            <Button type="submit" disabled={loading}>
-              Сохранить лимит
+            <Button type="submit" size="sm" disabled={loading}>
+              Сохранить
             </Button>
           </div>
         </form>
 
-        <div className="space-y-3 rounded-2xl border border-gray-200 bg-gray-50 p-4 dark:border-white/[0.05] dark:bg-white/[0.02]">
-          <h3 className="text-sm font-semibold text-gray-800 dark:text-white">
-            Персональный QR-код
-          </h3>
+        <div className="space-y-3 border-t border-gray-200 pt-4 dark:border-gray-800">
+          <h3 className="text-sm font-medium text-gray-800 dark:text-white/90">QR-код для оплаты</h3>
           {client.qrCodeUrl ? (
-            <div className="space-y-3">
-              <img
-                src={client.qrCodeUrl}
-                alt="QR код клиента"
-                className="h-48 w-48 rounded-lg border border-gray-200 object-contain dark:border-white/[0.05]"
-              />
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-red-200 text-red-600 hover:bg-red-50"
-                  disabled={uploading || loading}
-                  onClick={handleRemoveQr}
-                >
-                  Удалить QR
-                </Button>
-                <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:border-blue-400 hover:text-blue-600 dark:border-gray-600 dark:text-gray-300 dark:hover:border-blue-400 dark:hover:text-blue-300">
-                  Заменить QR
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,application/pdf"
-                    className="hidden"
-                    onChange={handleUpload}
-                    disabled={uploading || loading}
-                  />
-                </label>
-              </div>
-            </div>
+            <img
+              src={client.qrCodeUrl}
+              alt="QR-код клиента"
+              className="size-40 rounded-lg border border-gray-200 object-contain dark:border-gray-800"
+            />
           ) : (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Для клиента ещё не загружен персональный QR-код. Загрузите файл, чтобы выдавать индивидуальные реквизиты для оплаты.
-              </p>
-              <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:border-blue-400 hover:text-blue-600 dark:border-gray-600 dark:text-gray-300 dark:hover:border-blue-400 dark:hover:text-blue-300">
-                Загрузить QR
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,application/pdf"
-                  className="hidden"
-                  onChange={handleUpload}
-                  disabled={uploading || loading}
-                />
-              </label>
-            </div>
+            <p className="text-sm text-gray-500 dark:text-gray-400">QR-код не загружен</p>
           )}
-          {(uploadError || uploading) && (
-            <p className="text-sm text-red-600">
-              {uploading ? "Загрузка файла…" : uploadError}
-            </p>
+          <div className="flex flex-wrap gap-2">
+            <label className={uploadLabelClass}>
+              {client.qrCodeUrl ? "Заменить" : "Загрузить"}
+              <input
+                type="file"
+                accept="image/png,image/jpeg,image/webp,application/pdf"
+                className="hidden"
+                onChange={handleUpload}
+                disabled={uploading || loading}
+              />
+            </label>
+            {client.qrCodeUrl && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="hover:text-error-600"
+                disabled={uploading || loading}
+                onClick={handleRemoveQr}
+              >
+                Удалить
+              </Button>
+            )}
+          </div>
+          {uploading && <p className="text-sm text-gray-500 dark:text-gray-400">Загрузка файла…</p>}
+          {!uploading && uploadError && (
+            <p className="text-sm text-error-600 dark:text-error-500">{uploadError}</p>
           )}
         </div>
       </div>

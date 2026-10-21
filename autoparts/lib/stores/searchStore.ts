@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import { searchApi, SearchResponse, SearchItem, SearchVehicle, SearchApiError, OemApplicableVehicle, OemApplicabilityResponse } from '@/lib/api/search';
 import { toast } from 'sonner';
 
+let inflightSearch: { key: string; promise: Promise<SearchResponse | null> } | null = null;
+let searchRevision = 0;
+export const searchKey = (query: string, catalog?: string, brand?: string) =>
+  JSON.stringify([query.trim().toUpperCase(), catalog ?? '', (brand ?? '').trim().toUpperCase()]);
+
 interface SearchState {
   query: string;
   detectedType: 'VIN' | 'FRAME' | 'OEM' | 'TEXT' | 'PLATE' | null;
@@ -9,6 +14,13 @@ interface SearchState {
   results: SearchItem[];
   isLoading: boolean;
   error: string | null;
+  lastSearchKey: string | null;
+  selectionRequired: boolean;
+  selectedArticle: string | null;
+  selectedBrand: string | null;
+  warnings: string[];
+  analogsLoading: boolean;
+  refreshAnalogs: (query: string, brand?: string) => Promise<boolean>;
   // client-side filters (UI)
   filters: {
     brands: string[];
@@ -17,7 +29,7 @@ interface SearchState {
   page: number;
   pageSize: number;
   
-  search: (query: string, catalog?: string) => Promise<SearchResponse | null>;
+  search: (query: string, catalog?: string, brand?: string) => Promise<SearchResponse | null>;
   setQuery: (query: string) => void;
   clearResults: () => void;
   clearError: () => void;
@@ -43,6 +55,12 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
   query: '',
   isLoading: false,
   error: null,
+  lastSearchKey: null,
+  selectionRequired: false,
+  selectedArticle: null,
+  selectedBrand: null,
+  warnings: [],
+  analogsLoading: false,
   detectedType: null,
   vehicle: null,
   results: [],
@@ -53,78 +71,125 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
   selectedCatalog: null,
   applicableVehicles: [],
 
-  search: async (query: string, catalog?: string): Promise<SearchResponse | null> => {
-    if (!query.trim()) {
-      toast.error('Введите запрос для поиска');
-      return null;
+  search: async (query: string, catalog?: string, brand?: string): Promise<SearchResponse | null> => {
+    // Один и тот же запрос, уже летящий на бэкенд, повторно не отправляем (лимит Laximo)
+    const inflightKey = searchKey(query, catalog, brand);
+    if (inflightSearch && inflightSearch.key === inflightKey) {
+      return inflightSearch.promise;
     }
 
-    // Minimum 3 characters for search
-    if (query.trim().length < 3) {
-      toast.error('Введите не менее 3 символов для поиска');
-      return null;
-    }
-
-    set({ 
-      isLoading: true, 
-      error: null, 
-      query: query.trim(),
-      vehicle: null,
-      results: [],
-      // reset OEM flow on new search
-      oemStep: null,
-      selectedCatalog: null,
-      applicableVehicles: [],
-      // keep filters but clear brands that no longer relevant later if needed
-      page: 0,
-    });
-
-    try {
-      const response = await searchApi.search(query.trim(), catalog);
-      
-      const newResults = response.results || []
-      // cleanup selected brands that are not present in new results
-      const presentBrands = new Set(newResults.map(r => r.brand).filter(Boolean))
-      const currentFilters = get().filters
-      const cleanedBrands = currentFilters.brands.filter(b => presentBrands.has(b))
-
-      set({
-        detectedType: response.detectedType || null,
-        vehicle: response.vehicle || null,
-        results: newResults,
-        isLoading: false,
-        error: null,
-        filters: { ...currentFilters, brands: cleanedBrands },
-      });
-
-      // Показываем информацию о типе поиска
-      if (response.detectedType === 'VIN' && response.vehicle) {
-        toast.success(`Найден автомобиль: ${response.vehicle.brand} ${response.vehicle.name}`);
-      } else if (response.detectedType === 'FRAME' && response.vehicle) {
-        toast.success(`Найден автомобиль по номеру кузова: ${response.vehicle.brand} ${response.vehicle.name}`);
-      } else if (response.detectedType === 'PLATE' && response.vehicle) {
-        toast.success(`Найден автомобиль по номеру гос. знака: ${response.vehicle.brand} ${response.vehicle.name}`);
-      } else if (response.results && response.results.length > 0) {
-        toast.success(`Найдено ${response.results.length} запчастей`);
-      } else {
-        toast.info('По вашему запросу ничего не найдено');
+    const revision = ++searchRevision;
+    const promise = (async (): Promise<SearchResponse | null> => {
+      if (!query.trim()) {
+        set({ isLoading: false, lastSearchKey: inflightKey, results: [], error: 'Введите запрос для поиска' });
+        toast.error('Введите запрос для поиска');
+        return null;
       }
 
-      return response;
+      // Minimum 3 characters for search
+      if (query.trim().length < 3) {
+        set({ isLoading: false, lastSearchKey: inflightKey, results: [], error: 'Введите не менее 3 символов для поиска' });
+        toast.error('Введите не менее 3 символов для поиска');
+        return null;
+      }
 
-    } catch (error) {
-      console.error('Search failed:', error);
-      const errorMessage = error instanceof SearchApiError ? error.message : 'Ошибка поиска';
-      
-      set({ 
-        error: errorMessage, 
-        isLoading: false,
+      set({
+        isLoading: true,
+        error: null,
+        query: query.trim(),
+        vehicle: null,
         results: [],
-        vehicle: null
+        lastSearchKey: inflightKey,
+        selectionRequired: false,
+        selectedArticle: null,
+        selectedBrand: null,
+        warnings: [],
+        analogsLoading: false,
+        // reset OEM flow on new search
+        oemStep: null,
+        selectedCatalog: null,
+        applicableVehicles: [],
+        // keep filters but clear brands that no longer relevant later if needed
+        page: 0,
       });
+
+      try {
+        const response = await searchApi.search(query.trim(), catalog, brand);
+        if (revision !== searchRevision) return null;
+
+        const newResults = response.results || []
+        // cleanup selected brands that are not present in new results
+        const presentBrands = new Set(newResults.map(r => r.brand).filter(Boolean))
+        const currentFilters = get().filters
+        const cleanedBrands = currentFilters.brands.filter(b => presentBrands.has(b))
+
+        set({
+          detectedType: response.detectedType || null,
+          vehicle: response.vehicle || null,
+          results: newResults,
+          selectionRequired: response.selectionRequired ?? false,
+          selectedArticle: response.selectedArticle ?? null,
+          selectedBrand: response.selectedBrand ?? null,
+          warnings: response.warnings ?? [],
+          analogsLoading: response.analogsLoading ?? false,
+          isLoading: false,
+          error: null,
+          filters: { ...currentFilters, brands: cleanedBrands },
+        });
+
+        // Показываем информацию о типе поиска
+        if (response.detectedType === 'VIN' && response.vehicle) {
+          toast.success(`Найден автомобиль: ${response.vehicle.brand} ${response.vehicle.name}`);
+        } else if (response.detectedType === 'FRAME' && response.vehicle) {
+          toast.success(`Найден автомобиль по номеру кузова: ${response.vehicle.brand} ${response.vehicle.name}`);
+        } else if (response.detectedType === 'PLATE' && response.vehicle) {
+          toast.success(`Найден автомобиль по номеру гос. знака: ${response.vehicle.brand} ${response.vehicle.name}`);
+        } else if (response.results && response.results.length > 0) {
+          toast.success(`Найдено ${response.results.length} запчастей`);
+        } else {
+          toast.info('По вашему запросу ничего не найдено');
+        }
+
+        return response;
+
+      } catch (error) {
+        if (revision !== searchRevision) return null;
+        console.error('Search failed:', error);
+        const errorMessage = error instanceof SearchApiError ? error.message : 'Ошибка поиска';
       
-      toast.error(errorMessage);
-      return null;
+        set({
+          error: errorMessage,
+          isLoading: false,
+          results: [],
+          vehicle: null
+        });
+      
+        toast.error(errorMessage);
+        return null;
+      }
+    })();
+
+    inflightSearch = { key: inflightKey, promise };
+    try {
+      return await promise;
+    } finally {
+      if (inflightSearch?.promise === promise) inflightSearch = null;
+    }
+  },
+
+  refreshAnalogs: async (query, brand) => {
+    const revision = searchRevision;
+    const key = searchKey(query, undefined, brand);
+    if (get().lastSearchKey !== key) return false;
+    try {
+      const response = await searchApi.search(query, undefined, brand, true);
+      if (revision !== searchRevision || get().lastSearchKey !== key) return false;
+      set({ results: response.results ?? [], warnings: response.warnings ?? [], analogsLoading: response.analogsLoading ?? false });
+      return response.analogsLoading ?? false;
+    } catch {
+      if (revision === searchRevision) set({ analogsLoading: false,
+        warnings: [...get().warnings, 'Не удалось догрузить замены по OE. Повторите поиск позже.'] });
+      return false;
     }
   },
 
@@ -133,12 +198,21 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
   },
 
   clearResults: () => {
+    ++searchRevision;
+    inflightSearch = null;
     set({ 
       results: [], 
       vehicle: null, 
       detectedType: null, 
       error: null,
       page: 0,
+      isLoading: false,
+      lastSearchKey: null,
+      selectionRequired: false,
+      selectedArticle: null,
+      selectedBrand: null,
+      warnings: [],
+      analogsLoading: false,
     });
   },
 

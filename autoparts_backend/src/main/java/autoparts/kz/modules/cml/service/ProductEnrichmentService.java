@@ -10,12 +10,15 @@ import autoparts.kz.modules.manualProducts.entity.Product;
 import autoparts.kz.modules.manualProducts.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -27,7 +30,8 @@ import java.util.stream.Collectors;
  *
  * Источники:
  *  - таблица products (локальная копия каталогов)
- *  - cml_prices / cml_stocks (последние выгрузки CommerceML)
+ *  - onec_prices / onec_stocks (JSON-вебхук 1С, ключ products.onec_ref_key) — приоритетный источник
+ *  - cml_prices / cml_stocks (последние выгрузки CommerceML, ключ products.external_code) — fallback
  */
 @Service
 @RequiredArgsConstructor
@@ -37,6 +41,7 @@ public class ProductEnrichmentService {
     private final ProductRepository productRepository;
     private final CmlStockRepository cmlStockRepository;
     private final CmlPriceRepository cmlPriceRepository;
+    private final NamedParameterJdbcTemplate namedJdbcTemplate;
 
     /**
      * Обогатить данные о товаре по OEM.
@@ -87,6 +92,21 @@ public class ProductEnrichmentService {
                 ? Map.of()
                 : loadPricesByGuid(externalCodes);
 
+        List<String> oneCRefKeys = products.stream()
+                .map(Product::getOneCRefKey)
+                .filter(key -> key != null && !key.trim().isEmpty())
+                .map(String::trim)
+                .distinct()
+                .toList();
+
+        Map<String, List<WarehouseStockDTO>> oneCStocksByRef = oneCRefKeys.isEmpty()
+                ? Map.of()
+                : loadOneCStocksByRef(oneCRefKeys);
+
+        Map<String, BigDecimal> oneCPricesByRef = oneCRefKeys.isEmpty()
+                ? Map.of()
+                : loadOneCPricesByRef(oneCRefKeys);
+
         Map<Long, EnrichmentData> result = new HashMap<>(products.size());
 
         for (Product product : products) {
@@ -101,17 +121,30 @@ public class ProductEnrichmentService {
             Integer price = product.getPrice();
             Integer stock = product.getStock();
 
-            List<WarehouseStockDTO> warehouses = stocksByGuid.getOrDefault(
-                    product.getExternalCode(),
-                    List.of()
-            );
+            String refKey = product.getOneCRefKey() == null ? null : product.getOneCRefKey().trim();
+            List<WarehouseStockDTO> oneCWarehouses = refKey == null
+                    ? List.of()
+                    : oneCStocksByRef.getOrDefault(refKey, List.of());
+            BigDecimal oneCPrice = refKey == null ? null : oneCPricesByRef.get(refKey);
 
-            if (price == null) {
-                price = toInteger(pricesByGuid.get(product.getExternalCode()));
+            List<WarehouseStockDTO> warehouses;
+            if (!oneCWarehouses.isEmpty()) {
+                // Остатки из JSON-вебхука 1С — актуальнее products.stock и CommerceML.
+                warehouses = oneCWarehouses;
+                stock = sumQuantities(oneCWarehouses);
+                data.setFromOneCEvents(true);
+            } else {
+                warehouses = stocksByGuid.getOrDefault(product.getExternalCode(), List.of());
+                if ((stock == null || stock == 0) && !warehouses.isEmpty()) {
+                    stock = sumQuantities(warehouses);
+                }
             }
 
-            if ((stock == null || stock == 0) && !warehouses.isEmpty()) {
-                stock = sumQuantities(warehouses);
+            if (oneCPrice != null) {
+                price = toInteger(oneCPrice);
+                data.setFromOneCEvents(true);
+            } else if (price == null) {
+                price = toInteger(pricesByGuid.get(product.getExternalCode()));
             }
 
             data.setPrice(price);
@@ -211,6 +244,52 @@ public class ProductEnrichmentService {
         return grouped;
     }
 
+    /**
+     * Остатки из onec_stocks (stock.updated / product.updated вебхука 1С), сгруппированные по product_ref_key.
+     */
+    private Map<String, List<WarehouseStockDTO>> loadOneCStocksByRef(List<String> refKeys) {
+        Map<String, List<WarehouseStockDTO>> grouped = new LinkedHashMap<>();
+        try {
+            namedJdbcTemplate.query(
+                    "SELECT product_ref_key, warehouse_ref_key, warehouse_name, quantity FROM onec_stocks " +
+                            "WHERE product_ref_key IN (:refKeys) ORDER BY product_ref_key, warehouse_name, warehouse_ref_key",
+                    new MapSqlParameterSource("refKeys", refKeys),
+                    rs -> {
+                        WarehouseStockDTO dto = new WarehouseStockDTO(rs.getString("warehouse_ref_key"), rs.getBigDecimal("quantity"));
+                        dto.setWarehouseName(rs.getString("warehouse_name"));
+                        grouped.computeIfAbsent(rs.getString("product_ref_key"), key -> new java.util.ArrayList<>()).add(dto);
+                    }
+            );
+        } catch (Exception e) {
+            log.warn("Failed to load onec_stocks for {} products: {}", refKeys.size(), e.getMessage());
+            return Map.of();
+        }
+        grouped.replaceAll((ref, warehouses) -> List.copyOf(warehouses));
+        return grouped;
+    }
+
+    /**
+     * Последняя (по updated_at) ненулевая цена из onec_prices — так же, как OneCEventService.applyStoredAvailability.
+     */
+    private Map<String, BigDecimal> loadOneCPricesByRef(List<String> refKeys) {
+        Map<String, BigDecimal> prices = new HashMap<>();
+        try {
+            namedJdbcTemplate.query(
+                    "SELECT DISTINCT ON (product_ref_key) product_ref_key, amount FROM onec_prices " +
+                            "WHERE product_ref_key IN (:refKeys) AND amount IS NOT NULL " +
+                            "ORDER BY product_ref_key, updated_at DESC",
+                    new MapSqlParameterSource("refKeys", refKeys),
+                    rs -> {
+                        prices.put(rs.getString("product_ref_key"), rs.getBigDecimal("amount"));
+                    }
+            );
+        } catch (Exception e) {
+            log.warn("Failed to load onec_prices for {} products: {}", refKeys.size(), e.getMessage());
+            return Map.of();
+        }
+        return prices;
+    }
+
     private Map<String, BigDecimal> loadPricesByGuid(List<String> externalCodes) {
         return cmlPriceRepository.findAllByProductGuidIn(externalCodes).stream()
                 .collect(Collectors.toMap(
@@ -265,5 +344,7 @@ public class ProductEnrichmentService {
         private String brand;
         private String imageUrl;
         private String productCode;
+        /** true, если цена/остатки взяты из onec_prices / onec_stocks (JSON-вебхук 1С). */
+        private boolean fromOneCEvents;
     }
 }

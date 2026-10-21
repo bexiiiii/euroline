@@ -1,8 +1,9 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
 import { analyticsApi } from "@/lib/api/analytics";
+import WidgetError from "./WidgetError";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -15,20 +16,59 @@ interface HeatmapDataPoint {
 export default function SalesHeatmap() {
   const [loading, setLoading] = useState(true);
   const [heatmapData, setHeatmapData] = useState<HeatmapDataPoint[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await analyticsApi.getSalesHeatmap();
+      setHeatmapData(result ?? []);
+    } catch (err) {
+      console.error("Failed to fetch sales heatmap:", err);
+      setError("Не удалось загрузить тепловую карту");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const result = await analyticsApi.getSalesHeatmap();
-        setHeatmapData(result);
-      } catch (error) {
-        console.error("Failed to fetch sales heatmap:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  // Пиковый час и самый активный день по реальным данным
+  const dayFullNames: Record<string, string> = {
+    "Пн": "Понедельник",
+    "Вт": "Вторник",
+    "Ср": "Среда",
+    "Чт": "Четверг",
+    "Пт": "Пятница",
+    "Сб": "Суббота",
+    "Вс": "Воскресенье",
+  };
+  const hourTotals = new Map<number, number>();
+  const dayTotals = new Map<string, number>();
+  heatmapData.forEach((item) => {
+    const sales = Number(item.sales) || 0;
+    hourTotals.set(item.hour, (hourTotals.get(item.hour) ?? 0) + sales);
+    dayTotals.set(item.day, (dayTotals.get(item.day) ?? 0) + sales);
+  });
+  const pickMax = <K,>(totals: Map<K, number>): K | null => {
+    let bestKey: K | null = null;
+    let bestValue = 0;
+    totals.forEach((total, key) => {
+      if (total > bestValue) {
+        bestValue = total;
+        bestKey = key;
+      }
+    });
+    return bestKey as K | null;
+  };
+  const peakHour = pickMax(hourTotals);
+  const activeDay = pickMax(dayTotals);
+  const pad = (h: number) => `${String(h % 24).padStart(2, "0")}:00`;
+  const peakHourLabel = peakHour === null ? "—" : `${pad(peakHour)} - ${pad(peakHour + 1)}`;
+  const activeDayLabel = activeDay === null ? "—" : dayFullNames[activeDay] ?? activeDay;
 
   // Трансформируем данные для ApexCharts
   const transformDataForChart = () => {
@@ -52,7 +92,7 @@ export default function SalesHeatmap() {
     chart: {
       type: "heatmap",
       fontFamily: "Outfit, sans-serif",
-      height: 350,
+      height: 280,
       toolbar: { show: false },
     },
     plotOptions: {
@@ -99,41 +139,26 @@ export default function SalesHeatmap() {
   };
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            Тепловая карта продаж
-          </h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Активность по часам и дням недели
-          </p>
-        </div>
+    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+          Активность по часам
+        </h3>
+        {!loading && !error && peakHour !== null && (
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            Пик: {peakHourLabel}, {activeDayLabel.toLowerCase()}
+          </span>
+        )}
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center h-[350px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="flex items-center justify-center h-[280px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
         </div>
+      ) : error ? (
+        <WidgetError message="Не удалось загрузить данные" onRetry={fetchData} className="h-[280px] py-0" />
       ) : (
-        <>
-          <ReactApexChart options={options} series={series} type="heatmap" height={300} />
-          
-          <div className="mt-6 grid grid-cols-2 gap-4">
-            <div className="rounded-xl bg-blue-50 p-4 dark:bg-blue-900/10">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Пиковые часы</p>
-              <p className="mt-2 text-lg font-bold text-blue-600 dark:text-blue-400">
-                10:00 - 16:00
-              </p>
-            </div>
-            <div className="rounded-xl bg-purple-50 p-4 dark:bg-purple-900/10">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Самый активный день</p>
-              <p className="mt-2 text-lg font-bold text-purple-600 dark:text-purple-400">
-                Среда
-              </p>
-            </div>
-          </div>
-        </>
+        <ReactApexChart options={options} series={series} type="heatmap" height={260} />
       )}
     </div>
   );

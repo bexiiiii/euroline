@@ -1,39 +1,28 @@
 package autoparts.kz.integration.umapi.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 /**
- * Category DTO from UMAPI
+ * Parts category node from UMAPI v2 autocatalog /Categories ("root" tree, up to 5 levels).
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CategoryDto {
 
-    /**
-     * Category ID
-     */
-    @JsonProperty("categoryId")
+    @JsonAlias("CATEGORY_ID")
     private Long id;
 
-    /**
-     * Category name
-     */
-    @JsonProperty("categoryName")
+    @JsonAlias("DES")
     private String name;
 
-    /**
-     * Parent category ID (if subcategory)
-     */
-    @JsonProperty("parentId")
-    private Long parentId;
-
-    /**
-     * Number of products in this category
-     */
-    @JsonProperty("productCount")
-    private Integer productCount;
+    @JsonAlias("CHILD")
+    private List<CategoryDto> children;
 }

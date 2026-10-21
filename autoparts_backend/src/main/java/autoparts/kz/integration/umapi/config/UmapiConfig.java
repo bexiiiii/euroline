@@ -40,20 +40,12 @@ public class UmapiConfig {
             // Add X-App-Key header
             request.getHeaders().add("X-App-Key", apiKey);
             
-            // Detailed logging
-            log.info("=== UMAPI Request ===");
-            log.info("URL: {}", request.getURI());
-            log.info("Method: {}", request.getMethod());
-            log.info("Full X-App-Key: {}", apiKey);
-            log.info("All Headers: {}", request.getHeaders());
-            log.info("====================");
+            // Never log credentials or request headers: the X-App-Key is sensitive.
+            log.debug("UMAPI request: {} {}", request.getMethod(), request.getURI());
             
             var response = execution.execute(request, body);
             
-            log.info("=== UMAPI Response ===");
-            log.info("Status: {}", response.getStatusCode());
-            log.info("Headers: {}", response.getHeaders());
-            log.info("======================");
+            log.debug("UMAPI response: {}", response.getStatusCode());
             
             return response;
         };

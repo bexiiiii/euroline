@@ -1,6 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import ComponentCard from "@/components/common/ComponentCard";
+import React, { useState } from "react";
 import CartsStats from "@/components/carts/CartsStats";
 import CartsToolbar from "@/components/carts/CartsToolbar";
 import AbandonedCartsTable from "@/components/carts/AbandonedCartsTable";
@@ -11,11 +10,13 @@ import { exportAdminData } from "@/lib/api/importExport";
 import { useToast } from "@/context/ToastContext";
 
 const CartsManagement: React.FC = () => {
-  const [selectedCarts, setSelectedCarts] = useState<number[]>([]);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [selectedCart, setSelectedCart] = useState<CustomerCart | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { success: showSuccess, error: showError } = useToast();
+
+  const errorMessage = (error: unknown, fallback: string) =>
+    error instanceof Error && error.message ? error.message : fallback;
 
   const handleViewCart = async (cartId: number) => {
     try {
@@ -24,23 +25,18 @@ const CartsManagement: React.FC = () => {
       setIsViewModalOpen(true);
     } catch (error) {
       console.error("Ошибка при загрузке корзины:", error);
+      showError(errorMessage(error, "Не удалось загрузить корзину"));
     }
   };
 
   const handleSendReminder = async (cartId: number) => {
     try {
       await cartsApi.sendAbandonedCartEmail(cartId);
-      console.log("Напоминание отправлено для корзины:", cartId);
-      // Показать уведомление об успехе
+      showSuccess(`Напоминание по корзине #${cartId} отправлено`);
     } catch (error) {
       console.error("Ошибка при отправке напоминания:", error);
-      // Показать уведомление об ошибке
+      showError(errorMessage(error, "Не удалось отправить напоминание"));
     }
-  };
-
-  const handleSendBulkReminders = () => {
-    console.log("Отправка массовых напоминаний");
-    // TODO: Реализовать массовую отправку напоминаний
   };
 
   const buildFileName = (base: string, from?: string, to?: string) => {
@@ -70,50 +66,55 @@ const CartsManagement: React.FC = () => {
   };
 
   const handleClearCart = async (cartId: number) => {
+    if (!window.confirm(`Очистить корзину #${cartId}? Все товары будут удалены из корзины клиента.`)) {
+      return;
+    }
     try {
       await cartsApi.clearCart(cartId);
+      showSuccess(`Корзина #${cartId} очищена`);
+      setIsViewModalOpen(false);
       setRefreshTrigger(prev => prev + 1);
-      console.log("Корзина очищена:", cartId);
     } catch (error) {
       console.error("Ошибка при очистке корзины:", error);
+      showError(errorMessage(error, "Не удалось очистить корзину"));
     }
   };
 
   const handleConvertToOrder = async (cartId: number) => {
+    if (!window.confirm(`Оформить заказ из корзины #${cartId}?`)) {
+      return;
+    }
     try {
       const result = await cartsApi.convertCartToOrder(cartId);
-      console.log("Корзина конвертирована в заказ:", result.orderId);
+      showSuccess(
+        result?.orderId
+          ? `Создан заказ #${result.orderId} из корзины #${cartId}`
+          : `Заказ из корзины #${cartId} создан`
+      );
+      setIsViewModalOpen(false);
       setRefreshTrigger(prev => prev + 1);
-      // Показать уведомление об успехе
     } catch (error) {
       console.error("Ошибка при конвертации корзины в заказ:", error);
+      showError(errorMessage(error, "Не удалось оформить заказ из корзины"));
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Статистика */}
+    <div className="space-y-4">
       <CartsStats refreshTrigger={refreshTrigger} />
-
-      {/* Панель инструментов */}
-      <CartsToolbar
-        onSendBulkReminders={handleSendBulkReminders}
-        onExport={handleExportCarts}
-        onRefresh={handleRefreshCarts}
+      <AbandonedCartsTable
+        actions={
+          <CartsToolbar
+            onExport={handleExportCarts}
+            onRefresh={handleRefreshCarts}
+          />
+        }
+        onViewCart={handleViewCart}
+        onSendReminder={handleSendReminder}
+        onClearCart={handleClearCart}
+        onConvertToOrder={handleConvertToOrder}
+        refreshTrigger={refreshTrigger}
       />
-
-      {/* Таблица брошенных корзин */}
-      <ComponentCard title="Управление корзинами">
-        <AbandonedCartsTable
-          onViewCart={handleViewCart}
-          onSendReminder={handleSendReminder}
-          onClearCart={handleClearCart}
-          onConvertToOrder={handleConvertToOrder}
-          refreshTrigger={refreshTrigger}
-        />
-      </ComponentCard>
-
-      {/* Модальное окно просмотра корзины */}
       <ViewCartModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}

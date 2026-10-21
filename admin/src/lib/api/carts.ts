@@ -1,4 +1,4 @@
-import { API_URL, apiFetch } from '../api';
+import { apiFetch } from '../api';
 import { PageResponse } from './types';
 
 export interface CartItem {
@@ -39,7 +39,8 @@ export interface CartStats {
   }[];
 }
 
-const BASE_URL = `${API_URL}/api/admin`;
+// apiFetch сам добавляет API_URL, здесь нужен только путь
+const BASE_URL = "/api/admin";
 
 export const cartsApi = {
   getCarts: async (page = 0, size = 10, sort = 'lastUpdated,desc', status?: 'ACTIVE' | 'ABANDONED'): Promise<PageResponse<CustomerCart>> => {
@@ -73,7 +74,7 @@ export const cartsApi = {
   },
 
   clearCart: async (id: number): Promise<void> => {
-    return apiFetch<void>(`${BASE_URL}/carts/${id}/clear`, {
+    return apiFetch<void>(`${BASE_URL}/carts/${id}`, {
       method: 'DELETE',
     });
   },

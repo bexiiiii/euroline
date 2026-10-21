@@ -6,48 +6,28 @@ const AboutUsComponent = () => {
       title="О Компании"
       description="Euroline занимается продажей легковых запчастей оптом. Наш опыт и современные технологии позволяют предложить клиентам только лучшую продукцию и сервис."
       mainImage={{
-        src: "https://shadcnblocks.com/images/block/placeholder-1.svg",
-        alt: "placeholder",
+        src: "/images/site/partners-slider-warehouse.jpg",
+        alt: "Склад Euroline",
       }}
       secondaryImage={{
-        src: "https://shadcnblocks.com/images/block/placeholder-2.svg",
-        alt: "placeholder",
+        src: "/images/site/benefit-manager.jpg",
+        alt: "Менеджер Euroline",
       }}
       breakout={{
-        src: "https://shadcnblocks.com/images/block/block-1.svg",
-        alt: "logo",
+        src: "/euroline-logo.png",
+        alt: "Euroline",
         title: "Euroline",
         description:
           "Мы предлагаем полный ассортимент запасных частей для легковых и грузовых автомобилей европейских, американских, японских, корейских и российских марок.",
         buttonText: "Узнать больше",
         buttonUrl: "/",
       }}
-      companiesTitle="Нас ценят клиенты по всему миру"
+      companiesTitle="Работаем с проверенными брендами"
       companies={[
-        {
-          src: "https://shadcnblocks.com/images/block/logos/company/fictional-company-logo-1.svg",
-          alt: "Arc",
-        },
-        {
-          src: "https://shadcnblocks.com/images/block/logos/company/fictional-company-logo-2.svg",
-          alt: "Descript",
-        },
-        {
-          src: "https://shadcnblocks.com/images/block/logos/company/fictional-company-logo-3.svg",
-          alt: "Mercury",
-        },
-        {
-          src: "https://shadcnblocks.com/images/block/logos/company/fictional-company-logo-4.svg",
-          alt: "Ramp",
-        },
-        {
-          src: "https://shadcnblocks.com/images/block/logos/company/fictional-company-logo-5.svg",
-          alt: "Retool",
-        },
-        {
-          src: "https://shadcnblocks.com/images/block/logos/company/fictional-company-logo-6.svg",
-          alt: "Watershed",
-        }
+        { src: "/logos/Bosch-logo.svg.png", alt: "Bosch" },
+        { src: "/logos/Denso_logo.svg.png", alt: "Denso" },
+        { src: "/logos/Varta-Logo.svg.png", alt: "Varta" },
+        { src: "/logos/total-logo-2.svg", alt: "Total" },
       ]}
       achievementsTitle="Наши достижения в цифрах"
       achievementsDescription="Мы предлагаем полный ассортимент запасных частей для легковых и грузовых автомобилей европейских, американских, японских, корейских и российских марок."

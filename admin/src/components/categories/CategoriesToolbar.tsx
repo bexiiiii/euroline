@@ -6,63 +6,40 @@ import ExportWithDateRange, { ExportDateRange } from "@/components/common/Export
 interface CategoriesToolbarProps {
   onAddCategory: () => void;
   onExport: (range: ExportDateRange) => Promise<void> | void;
-  onImport: () => void;
 }
 
 const CategoriesToolbar: React.FC<CategoriesToolbarProps> = ({
   onAddCategory,
   onExport,
-  onImport,
 }) => {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-4">
-        <div className="flex flex-wrap gap-3">
-          {/* Add Category Button */}
-          <Button
-            size="sm"
-            onClick={onAddCategory}
-            startIcon={
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            }
-          >
-            Добавить категорию
-          </Button>
-
-          
-
-          {/* Export Button */}
-          <ExportWithDateRange
-            triggerLabel="Экспорт"
-            variant="outline"
-            size="sm"
-            onConfirm={onExport}
-            title="Экспорт категорий"
-            description="Укажите период для выгрузки категорий в CSV."
-            icon={
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            }
-          />
-
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onImport}
-            startIcon={
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16a4 4 0 005 3.87V20a1 1 0 001 1h4a1 1 0 001-1v-.13A4 4 0 1016 12.1" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l-3-3m0 0l3-3m-3 3h12" />
-              </svg>
-            }
-          >
-            Импорт
-          </Button>
-        </div>
-      </div>
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <ExportWithDateRange
+        triggerLabel="Экспорт CSV"
+        variant="outline"
+        size="sm"
+        className="h-10 py-0"
+        onConfirm={onExport}
+        title="Экспорт категорий"
+        description="Укажите период выгрузки."
+        icon={
+          <svg className="size-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4" />
+          </svg>
+        }
+      />
+      <Button
+        size="sm"
+        className="h-10 py-0"
+        onClick={onAddCategory}
+        startIcon={
+          <svg className="size-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" viewBox="0 0 24 24">
+            <path d="M12 5v14m7-7H5" />
+          </svg>
+        }
+      >
+        Добавить категорию
+      </Button>
     </div>
   );
 };

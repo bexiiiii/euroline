@@ -1,12 +1,12 @@
 "use client";
 
 import { useParams, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Breadcrumbs from "@/components/Breadcrumb";
 import { DetailDto, UnitInfoDto } from "@/lib/api/vehicle";
 import { useVehicle } from "@/context/VehicleContext";
 import { vehicleApi } from "@/lib/api/vehicle";
-import { Loader2 } from "lucide-react";
+import { Info, Loader2 } from "lucide-react";
 import InteractivePartsDiagram from "@/components/InteractivePartsDiagram";
 
 interface VehicleInfo {
@@ -25,6 +25,15 @@ function UnitPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hoveredCode, setHoveredCode] = useState<string | null>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  // Наведение/клик по номеру на схеме: подсветить и прокрутить список к детали
+  const highlightFromDiagram = (code: string | null, smooth = false) => {
+    setHoveredCode(code);
+    if (!code || !listRef.current) return;
+    const item = listRef.current.querySelector<HTMLElement>(`[data-code="${CSS.escape(code)}"]`);
+    item?.scrollIntoView({ block: 'nearest', behavior: smooth ? 'smooth' : 'auto' });
+  };
   const { session, setSession } = useVehicle();
 
   useEffect(() => {
@@ -63,48 +72,51 @@ function UnitPage() {
     }
   }, [params, searchParams, setSession]);
 
-  // Загружаем детали узла и информацию об узле
+  // Загружаем детали узла и информацию об узле.
+  // Для функций узла Laximo нужен ssd самого узла (Unit@ssd), а не ssd автомобиля —
+  // иначе E_INVALIDPARAMETER:ssd. Зависим от примитивов, чтобы не слать запросы повторно.
+  const unitCatalog = searchParams?.get('catalog') || session?.catalog || '';
+  const unitSsd = searchParams?.get('unitSsd') || searchParams?.get('ssd') || session?.ssd || '';
+  const unitIdParam = params?.id as string | undefined;
+
   useEffect(() => {
-    const loadUnitData = async () => {
-      if (!session?.catalog || !session?.ssd || !params?.id) {
-        console.warn('UnitPage: Недостаточно данных для загрузки данных узла');
-        return;
-      }
+    if (!unitCatalog || !unitSsd || !unitIdParam) {
+      return;
+    }
 
-      const unitId = parseInt(params.id as string);
-      if (isNaN(unitId)) {
-        setError('Неверный ID узла');
-        setLoading(false);
-        return;
-      }
+    const unitId = parseInt(unitIdParam);
+    if (isNaN(unitId)) {
+      setError('Неверный ID узла');
+      setLoading(false);
+      return;
+    }
 
-      setLoading(true);
-      setError(null);
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
 
-      try {
-        console.log('UnitPage: Загружаем данные узла:', unitId);
-        
-        // Загружаем параллельно детали и информацию об узле
-        const [details, unitInfoData] = await Promise.all([
-          vehicleApi.getUnitDetails(session.catalog, unitId, session.ssd),
-          vehicleApi.getUnitInfo(session.catalog, unitId, session.ssd)
-        ]);
-        
-        console.log('UnitPage: Получено деталей:', details.length);
+    Promise.all([
+      vehicleApi.getUnitDetails(unitCatalog, unitId, unitSsd),
+      vehicleApi.getUnitInfo(unitCatalog, unitId, unitSsd)
+    ])
+      .then(([details, unitInfoData]) => {
+        if (cancelled) return;
         setUnitDetails(details);
         setUnitInfo(unitInfoData);
-      } catch (err) {
-        console.error('UnitPage: Ошибка загрузки данных узла:', err);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Ошибка загрузки узла:', err);
         setError('Ошибка загрузки данных узла');
-      } finally {
-        setLoading(false);
-      }
-    };
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
-    if (session) {
-      loadUnitData();
-    }
-  }, [session, params?.id]);
+    return () => {
+      cancelled = true;
+    };
+  }, [unitCatalog, unitSsd, unitIdParam]);
 
   const items = [
     { label: "Главная", href: "/" },
@@ -188,18 +200,19 @@ function UnitPage() {
           </div>
 
           {/* Контент */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4">
-            {/* Схема слева */}
-            <section className="relative bg-white rounded-2xl shadow overflow-hidden">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-4 items-start">
+            {/* Схема слева — закреплена при прокрутке */}
+            <section className="relative bg-white rounded-2xl shadow p-3 lg:sticky lg:top-28">
               {unitInfo?.imageUrl ? (
                 <InteractivePartsDiagram
                   unitDetails={unitDetails}
                   imageUrl={unitInfo.imageUrl}
                   unitName={unitName}
-                  catalog={session?.catalog || ''}
+                  catalog={unitCatalog}
                   unitId={parseInt(params?.id as string) || 0}
-                  ssd={session?.ssd || ''}
-                  onHoverChange={setHoveredCode}
+                  ssd={unitSsd}
+                  onHoverChange={(code) => highlightFromDiagram(code)}
+                  onSelect={(code) => highlightFromDiagram(code, true)}
                   hoveredCode={hoveredCode}
                 />
               ) : (
@@ -210,7 +223,7 @@ function UnitPage() {
             </section>
 
             {/* Список деталей справа */}
-            <aside className="bg-white rounded-2xl shadow p-3 md:p-4 h-fit">
+            <aside className="bg-white rounded-2xl shadow p-3 md:p-4 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:sticky lg:top-28">
               {/* Шапка комплекта */}
               <div className="mb-3 rounded border-l-4 border-amber-500 bg-amber-50 p-3">
                 <div className="text-sm text-gray-700 font-medium">{unitName}</div>
@@ -220,13 +233,14 @@ function UnitPage() {
               </div>
 
               {/* Список деталей */}
-              <ul className="divide-y">
+              <ul ref={listRef} className="divide-y">
                 {unitDetails.map((detail, index) => {
                   const isHovered = hoveredCode === detail.codeOnImage;
                   
                   return (
                     <li 
-                      key={detail.id || index} 
+                      key={`${detail.oem}-${index}`}
+                      data-code={detail.codeOnImage || undefined}
                       className={`py-2 transition-all duration-200 ${
                         isHovered ? 'bg-orange-50 border-l-4 border-orange-400 pl-2' : ''
                       }`}
@@ -283,14 +297,14 @@ function UnitPage() {
                             <div className={`text-xs mt-1 transition-colors ${
                               isHovered ? 'text-orange-600' : 'text-gray-500'
                             }`}>
-                              📝 {detail.note}
+                              {detail.note}
                             </div>
                           )}
                           {detail.footnote && (
                             <div className={`text-xs mt-1 italic transition-colors ${
                               isHovered ? 'text-orange-600' : 'text-blue-600'
                             }`}>
-                              ℹ️ {detail.footnote}
+                              {detail.footnote}
                             </div>
                           )}
                           {/* Показываем дополнительные атрибуты из allAttributes */}
@@ -299,7 +313,7 @@ function UnitPage() {
                               isHovered ? 'text-orange-400' : 'text-gray-400'
                             }`}>
                               {Object.entries(detail.allAttributes)
-                                .filter(([key]) => !['amount', 'note', 'footnote', 'addnote', 'replacedoem'].includes(key))
+                                .filter(([key]) => !['amount', 'note', 'footnote', 'addnote', 'replacedoem', 'substType'].includes(key))
                                 .map(([key, value]) => (
                                   <span key={key} className="mr-2">
                                     {key}: {value}
@@ -309,9 +323,12 @@ function UnitPage() {
                             </div>
                           )}
                         </div>
-                        <div className={`cursor-help transition-colors ${
-                          isHovered ? 'text-orange-400' : 'text-gray-300'
-                        }`} title="Информация о детали">ⓘ</div>
+                        <Info
+                          className={`h-4 w-4 shrink-0 cursor-help transition-colors ${
+                            isHovered ? 'text-orange-400' : 'text-gray-300'
+                          }`}
+                          aria-label="Информация о детали"
+                        />
                       </div>
                     </li>
                   );

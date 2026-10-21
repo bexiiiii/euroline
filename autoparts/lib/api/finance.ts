@@ -84,3 +84,59 @@ export async function getMyBalance(): Promise<BalanceResponse> {
   if (!res.ok) throw new Error(`Failed to load balance: ${res.status}`);
   return res.json();
 }
+
+// ── Kaspi Pay top-up (invoice to phone / QR). Balance is credited server-side after Kaspi confirms payment. ──
+
+export type KaspiAvailability = {
+  available: boolean;
+  minAmount: number;
+  maxAmount: number;
+}
+
+export type KaspiTopUp = {
+  id: number;
+  type: 'INVOICE' | 'QR';
+  amount: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  kaspiStatus?: string | null;
+  phone?: string | null;
+  qrToken?: string | null;
+  expiresAt?: string | null;
+  createdAt: string;
+}
+
+async function kaspiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE}/api/finance/my/kaspi${path}`, { ...init, headers });
+  if (!res.ok) {
+    let message = `Ошибка ${res.status}`;
+    try {
+      const body = await res.json();
+      if (body?.message) message = body.message;
+    } catch { /* ignore */ }
+    throw new Error(message);
+  }
+  return res.json();
+}
+
+export function getKaspiAvailability(): Promise<KaspiAvailability> {
+  return kaspiRequest('/availability');
+}
+
+export function createKaspiInvoice(amount: number, phone: string): Promise<KaspiTopUp> {
+  return kaspiRequest('/invoice', { method: 'POST', body: JSON.stringify({ amount, phone }) });
+}
+
+export function createKaspiQr(amount: number): Promise<KaspiTopUp> {
+  return kaspiRequest('/qr', { method: 'POST', body: JSON.stringify({ amount }) });
+}
+
+export function getKaspiTopUp(id: number): Promise<KaspiTopUp> {
+  return kaspiRequest(`/top-ups/${id}`);
+}
+
+export function cancelKaspiTopUp(id: number): Promise<KaspiTopUp> {
+  return kaspiRequest(`/top-ups/${id}/cancel`, { method: 'POST' });
+}

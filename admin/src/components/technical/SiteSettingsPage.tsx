@@ -1,8 +1,6 @@
 "use client";
 import React, { useState, useEffect, useCallback } from "react";
-import ComponentCard from "../common/ComponentCard";
 import Button from "../ui/button/Button";
-import Badge from "../ui/badge/Badge";
 import { Modal } from "../ui/modal";
 import Label from "../form/Label";
 import Input from "../form/input/InputField";
@@ -60,7 +58,6 @@ interface SiteSettings {
 const SiteSettingsPage = () => {
   const { success: showSuccess, error: showError } = useToast();
 
-  const [activeTab, setActiveTab] = useState("general");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -74,9 +71,9 @@ const SiteSettingsPage = () => {
       siteDescription: "",
       siteUrl: "",
       adminEmail: "",
-      timezone: "Europe/Moscow",
+      timezone: "Asia/Almaty",
       language: "ru",
-      currency: "RUB"
+      currency: "KZT"
     },
     appearance: {
       logo: "",
@@ -123,10 +120,8 @@ const SiteSettingsPage = () => {
       setHasUnsavedChanges(false);
       setError(null);
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Не удалось загрузить настройки';
-      setError(message);
+      setError('Не удалось загрузить настройки');
       console.error('Failed to fetch settings:', err);
-      showError('Не удалось загрузить настройки');
     } finally {
       setLoading(false);
     }
@@ -147,9 +142,9 @@ const SiteSettingsPage = () => {
         siteDescription: settingsMap.get('site.description') || '',
         siteUrl: settingsMap.get('site.url') || '',
         adminEmail: settingsMap.get('site.admin_email') || '',
-        timezone: settingsMap.get('site.timezone') || 'Europe/Moscow',
+        timezone: settingsMap.get('site.timezone') || 'Asia/Almaty',
         language: settingsMap.get('site.language') || 'ru',
-        currency: settingsMap.get('site.currency') || 'RUB'
+        currency: settingsMap.get('site.currency') || 'KZT'
       },
       appearance: {
         logo: settingsMap.get('appearance.logo') || '',
@@ -189,6 +184,9 @@ const SiteSettingsPage = () => {
   };
 
   const timezoneOptions = [
+    { value: "Asia/Almaty", label: "Алматы, Астана (UTC+5)" },
+    { value: "Asia/Aqtobe", label: "Актобе (UTC+5)" },
+    { value: "Asia/Oral", label: "Уральск (UTC+5)" },
     { value: "Europe/Moscow", label: "Москва (UTC+3)" },
     { value: "Europe/Samara", label: "Самара (UTC+4)" },
     { value: "Asia/Yekaterinburg", label: "Екатеринбург (UTC+5)" },
@@ -204,6 +202,7 @@ const SiteSettingsPage = () => {
   ];
 
   const currencyOptions = [
+    { value: "KZT", label: "Казахстанский тенге (₸)" },
     { value: "RUB", label: "Российский рубль (₽)" },
     { value: "USD", label: "Доллар США ($)" },
     { value: "EUR", label: "Евро (€)" }
@@ -281,11 +280,11 @@ const SiteSettingsPage = () => {
       })));
 
       setHasUnsavedChanges(false);
-      showSuccess('Настройки успешно сохранены');
+      showSuccess('Настройки сохранены');
       await fetchSettings();
     } catch (error) {
       console.error('Failed to save settings:', error);
-      showError('Ошибка сохранения настроек');
+      showError('Не удалось сохранить настройки');
     } finally {
       setSaving(false);
     }
@@ -301,7 +300,7 @@ const SiteSettingsPage = () => {
       await settingsApi.reset();
       await fetchSettings();
       setHasUnsavedChanges(false);
-      showSuccess('Настройки сброшены к значениям по умолчанию');
+      showSuccess('Настройки сброшены');
       setIsModalOpen(false);
     } catch (err) {
       console.error('Failed to reset settings:', err);
@@ -311,458 +310,371 @@ const SiteSettingsPage = () => {
     }
   };
 
+  const textareaClass =
+    "w-full rounded-lg border border-gray-300 bg-transparent px-4 py-2.5 text-sm text-gray-800 shadow-theme-xs placeholder:text-gray-400 focus:border-brand-300 focus:outline-hidden focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:placeholder:text-white/30";
+
+  if (loading) {
+    return <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">Загрузка...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-white/[0.03]">
+        <p className="text-sm text-error-600 dark:text-error-400">Не удалось загрузить данные</p>
+        <Button size="xs" variant="outline" className="mt-3" onClick={() => fetchSettings()}>
+          Повторить
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
-      {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="text-gray-500 dark:text-gray-400">
-            <p className="text-lg font-medium">Загрузка настроек...</p>
-          </div>
-        </div>
-      ) : error ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="text-red-500 dark:text-red-400">
-            <p className="text-lg font-medium">Ошибка загрузки: {error}</p>
-            <button 
-              onClick={() => fetchSettings()} 
-              className="mt-2 text-sm underline hover:no-underline"
-            >
-              Обновить страницу
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-      {/* Уведомление о несохраненных изменениях */}
-      {hasUnsavedChanges && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <svg className="w-5 h-5 text-yellow-600 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <span className="text-yellow-800 dark:text-yellow-200">
-                У вас есть несохраненные изменения
-              </span>
-            </div>
-            <div className="flex space-x-3">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  fetchSettings();
-                  setHasUnsavedChanges(false);
-                }}
-                disabled={saving}
-              >
-                Отменить
-              </Button>
-              <Button size="sm" onClick={saveSettings} disabled={saving}>
-                {saving ? "Сохранение..." : "Сохранить"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Основной контент */}
-      <ComponentCard
-        title="Настройки сайта"
-        description="Конфигурация основных параметров сайта"
-        action={
-          <div className="flex space-x-2">
-            <Button size="sm" variant="outline" onClick={resetSettings} disabled={saving || resetLoading}>
-              Сбросить
-            </Button>
-            <Button size="sm" onClick={saveSettings} disabled={!hasUnsavedChanges || saving}>
-              {saving ? "Сохранение..." : "Сохранить изменения"}
-            </Button>
-          </div>
-        }
-      >
-        {/* Табы */}
-        <div className="border-b border-gray-200 dark:border-gray-700 -mx-6 px-6">
-          <nav className="flex space-x-8 overflow-x-auto" aria-label="Tabs">
-            {[
-              { id: "general", name: "Общие" },
-              { id: "appearance", name: "Внешний вид" },
-              { id: "seo", name: "SEO" },
-              { id: "business", name: "Организация" },
-              { id: "social", name: "Соц. сети" }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === tab.id
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                }`}
-              >
-                {tab.name}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Контент табов */}
-        <div className="mt-6">
-          {activeTab === "general" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <Label>Название сайта</Label>
-                <Input
-                  value={settings.general.siteName}
-                  onChange={(e) => updateSetting("general", "siteName", e.target.value)}
-                  placeholder="Введите название сайта"
-                />
-              </div>
-              <div>
-                <Label>URL сайта</Label>
-                <Input
-                  value={settings.general.siteUrl}
-                  onChange={(e) => updateSetting("general", "siteUrl", e.target.value)}
-                  placeholder="https://example.com"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label>Описание сайта</Label>
-                <textarea
-                  value={settings.general.siteDescription}
-                  onChange={(e) => updateSetting("general", "siteDescription", e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="Краткое описание сайта"
-                />
-              </div>
-              <div>
-                <Label>Email администратора</Label>
-                <Input
-                  type="email"
-                  value={settings.general.adminEmail}
-                  onChange={(e) => updateSetting("general", "adminEmail", e.target.value)}
-                  placeholder="admin@example.com"
-                />
-              </div>
-              <div>
-                <Label>Часовой пояс</Label>
-                <Select
-                  options={timezoneOptions}
-                  value={settings.general.timezone}
-                  onChange={(value) => updateSetting("general", "timezone", value)}
-                  placeholder="Выберите часовой пояс"
-                />
-              </div>
-              <div>
-                <Label>Язык по умолчанию</Label>
-                <Select
-                  options={languageOptions}
-                  value={settings.general.language}
-                  onChange={(value) => updateSetting("general", "language", value)}
-                  placeholder="Выберите язык"
-                />
-              </div>
-              <div>
-                <Label>Валюта</Label>
-                <Select
-                  options={currencyOptions}
-                  value={settings.general.currency}
-                  onChange={(value) => updateSetting("general", "currency", value)}
-                  placeholder="Выберите валюту"
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === "appearance" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <Label>Логотип сайта</Label>
-                <Input
-                  value={settings.appearance.logo}
-                  onChange={(e) => updateSetting("appearance", "logo", e.target.value)}
-                  placeholder="/images/logo.svg"
-                />
-              </div>
-              <div>
-                <Label>Фавикон</Label>
-                <Input
-                  value={settings.appearance.favicon}
-                  onChange={(e) => updateSetting("appearance", "favicon", e.target.value)}
-                  placeholder="/images/favicon.ico"
-                />
-              </div>
-              <div>
-                <Label>Основной цвет</Label>
-                <div className="flex space-x-2">
-                  <Input
-                    type="color"
-                    value={settings.appearance.primaryColor}
-                    onChange={(e) => updateSetting("appearance", "primaryColor", e.target.value)}
-                    className="w-16"
-                  />
-                  <Input
-                    value={settings.appearance.primaryColor}
-                    onChange={(e) => updateSetting("appearance", "primaryColor", e.target.value)}
-                    placeholder="#3B82F6"
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Дополнительный цвет</Label>
-                <div className="flex space-x-2">
-                  <Input
-                    type="color"
-                    value={settings.appearance.secondaryColor}
-                    onChange={(e) => updateSetting("appearance", "secondaryColor", e.target.value)}
-                    className="w-16"
-                  />
-                  <Input
-                    value={settings.appearance.secondaryColor}
-                    onChange={(e) => updateSetting("appearance", "secondaryColor", e.target.value)}
-                    placeholder="#10B981"
-                    className="flex-1"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Тема оформления</Label>
-                <Select
-                  options={themeOptions}
-                  value={settings.appearance.theme}
-                  onChange={(value) => updateSetting("appearance", "theme", value)}
-                  placeholder="Выберите тему"
-                />
-              </div>
-              <div>
-                <Label>Шрифт</Label>
-                <Input
-                  value={settings.appearance.fontFamily}
-                  onChange={(e) => updateSetting("appearance", "fontFamily", e.target.value)}
-                  placeholder="Inter, Arial, sans-serif"
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === "seo" && (
-            <div className="space-y-6">
-              <div>
-                <Label>Meta Title</Label>
-                <Input
-                  value={settings.seo.metaTitle}
-                  onChange={(e) => updateSetting("seo", "metaTitle", e.target.value)}
-                  placeholder="Заголовок для поисковых систем"
-                />
-              </div>
-              <div>
-                <Label>Meta Description</Label>
-                <textarea
-                  value={settings.seo.metaDescription}
-                  onChange={(e) => updateSetting("seo", "metaDescription", e.target.value)}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  placeholder="Описание для поисковых систем"
-                />
-              </div>
-              <div>
-                <Label>Ключевые слова</Label>
-                <Input
-                  value={settings.seo.metaKeywords}
-                  onChange={(e) => updateSetting("seo", "metaKeywords", e.target.value)}
-                  placeholder="ключевое слово 1, ключевое слово 2"
-                />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label>Google Analytics ID</Label>
-                  <Input
-                    value={settings.seo.googleAnalytics}
-                    onChange={(e) => updateSetting("seo", "googleAnalytics", e.target.value)}
-                    placeholder="GA_MEASUREMENT_ID"
-                  />
-                </div>
-                <div>
-                  <Label>Яндекс.Метрика ID</Label>
-                  <Input
-                    value={settings.seo.yandexMetrica}
-                    onChange={(e) => updateSetting("seo", "yandexMetrica", e.target.value)}
-                    placeholder="12345678"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label>Robots.txt</Label>
-                <textarea
-                  value={settings.seo.robotsTxt}
-                  onChange={(e) => updateSetting("seo", "robotsTxt", e.target.value)}
-                  rows={6}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white font-mono text-sm"
-                  placeholder="Содержимое файла robots.txt"
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === "business" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <Label>Название организации</Label>
-                <Input
-                  value={settings.business.companyName}
-                  onChange={(e) => updateSetting("business", "companyName", e.target.value)}
-                  placeholder='ООО "Название компании"'
-                />
-              </div>
-              <div>
-                <Label>Телефон</Label>
-                <Input
-                  value={settings.business.companyPhone}
-                  onChange={(e) => updateSetting("business", "companyPhone", e.target.value)}
-                  placeholder="+7 (495) 123-45-67"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label>Адрес</Label>
-                <Input
-                  value={settings.business.companyAddress}
-                  onChange={(e) => updateSetting("business", "companyAddress", e.target.value)}
-                  placeholder="г. Город, ул. Улица, д. Дом"
-                />
-              </div>
-              <div>
-                <Label>Email</Label>
-                <Input
-                  type="email"
-                  value={settings.business.companyEmail}
-                  onChange={(e) => updateSetting("business", "companyEmail", e.target.value)}
-                  placeholder="info@company.ru"
-                />
-              </div>
-              <div>
-                <Label>Часы работы</Label>
-                <Input
-                  value={settings.business.workingHours}
-                  onChange={(e) => updateSetting("business", "workingHours", e.target.value)}
-                  placeholder="Пн-Пт: 9:00-18:00"
-                />
-              </div>
-              <div>
-                <Label>ИНН</Label>
-                <Input
-                  value={settings.business.inn}
-                  onChange={(e) => updateSetting("business", "inn", e.target.value)}
-                  placeholder="1234567890"
-                />
-              </div>
-              <div>
-                <Label>КПП</Label>
-                <Input
-                  value={settings.business.kpp}
-                  onChange={(e) => updateSetting("business", "kpp", e.target.value)}
-                  placeholder="123456789"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <Label>ОГРН</Label>
-                <Input
-                  value={settings.business.ogrn}
-                  onChange={(e) => updateSetting("business", "ogrn", e.target.value)}
-                  placeholder="1234567890123"
-                />
-              </div>
-            </div>
-          )}
-
-          {activeTab === "social" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <Label>Facebook</Label>
-                <Input
-                  value={settings.social.facebook}
-                  onChange={(e) => updateSetting("social", "facebook", e.target.value)}
-                  placeholder="https://facebook.com/username"
-                />
-              </div>
-              <div>
-                <Label>Instagram</Label>
-                <Input
-                  value={settings.social.instagram}
-                  onChange={(e) => updateSetting("social", "instagram", e.target.value)}
-                  placeholder="https://instagram.com/username"
-                />
-              </div>
-              <div>
-                <Label>ВКонтакте</Label>
-                <Input
-                  value={settings.social.vkontakte}
-                  onChange={(e) => updateSetting("social", "vkontakte", e.target.value)}
-                  placeholder="https://vk.com/username"
-                />
-              </div>
-              <div>
-                <Label>Telegram</Label>
-                <Input
-                  value={settings.social.telegram}
-                  onChange={(e) => updateSetting("social", "telegram", e.target.value)}
-                  placeholder="https://t.me/username"
-                />
-              </div>
-              <div>
-                <Label>WhatsApp</Label>
-                <Input
-                  value={settings.social.whatsapp}
-                  onChange={(e) => updateSetting("social", "whatsapp", e.target.value)}
-                  placeholder="+7 (495) 123-45-67"
-                />
-              </div>
-              <div>
-                <Label>YouTube</Label>
-                <Input
-                  value={settings.social.youtube}
-                  onChange={(e) => updateSetting("social", "youtube", e.target.value)}
-                  placeholder="https://youtube.com/c/username"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-      </ComponentCard>
-
-      {/* Модальное окно подтверждения сброса */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} size="md">
-        <div className="p-6">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-            Сброс настроек
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Вы уверены, что хотите сбросить все настройки к значениям по умолчанию? 
-            Это действие нельзя отменить.
-          </p>
-          <div className="flex justify-end space-x-3">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        {hasUnsavedChanges && (
+          <span className="text-sm text-warning-600 dark:text-warning-400">Есть несохранённые изменения</span>
+        )}
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-10! py-0!"
+            onClick={resetSettings}
+            disabled={saving || resetLoading}
+          >
+            Сбросить по умолчанию
+          </Button>
+          {hasUnsavedChanges && (
             <Button
+              size="sm"
               variant="outline"
-              onClick={() => setIsModalOpen(false)}
-              disabled={resetLoading}
+              className="h-10! py-0!"
+              onClick={() => fetchSettings()}
+              disabled={saving}
             >
               Отменить
             </Button>
+          )}
+          <Button size="sm" className="h-10! py-0!" onClick={saveSettings} disabled={!hasUnsavedChanges || saving}>
+            {saving ? "Сохранение..." : "Сохранить"}
+          </Button>
+        </div>
+      </div>
+
+      <Section title="Общие">
+        <Field label="Название сайта">
+          <Input
+                value={settings.general.siteName}
+                onChange={(e) => updateSetting("general", "siteName", e.target.value)}
+                placeholder="Euroline"
+              />
+        </Field>
+        <Field label="Адрес сайта">
+          <Input
+                value={settings.general.siteUrl}
+                onChange={(e) => updateSetting("general", "siteUrl", e.target.value)}
+                placeholder="https://euroline.kz"
+              />
+        </Field>
+        <Field label="Описание" wide>
+          <textarea
+            value={settings.general.siteDescription}
+            onChange={(e) => updateSetting("general", "siteDescription", e.target.value)}
+            rows={2}
+            className={textareaClass}
+          />
+        </Field>
+        <Field label="Email администратора">
+          <Input
+                type="email"
+                value={settings.general.adminEmail}
+                onChange={(e) => updateSetting("general", "adminEmail", e.target.value)}
+                placeholder="admin@euroline.kz"
+              />
+        </Field>
+        <Field label="Часовой пояс">
+          <Select
+            options={timezoneOptions}
+            value={settings.general.timezone}
+            onChange={(value) => updateSetting("general", "timezone", value)}
+            placeholder="Часовой пояс"
+          />
+        </Field>
+        <Field label="Язык">
+          <Select
+            options={languageOptions}
+            value={settings.general.language}
+            onChange={(value) => updateSetting("general", "language", value)}
+            placeholder="Язык"
+          />
+        </Field>
+        <Field label="Валюта">
+          <Select
+            options={currencyOptions}
+            value={settings.general.currency}
+            onChange={(value) => updateSetting("general", "currency", value)}
+            placeholder="Валюта"
+          />
+        </Field>
+      </Section>
+
+      <Section title="Организация">
+        <Field label="Название">
+          <Input
+                value={settings.business.companyName}
+                onChange={(e) => updateSetting("business", "companyName", e.target.value)}
+                placeholder="ТОО «Euroline»"
+              />
+        </Field>
+        <Field label="Телефон">
+          <Input
+                value={settings.business.companyPhone}
+                onChange={(e) => updateSetting("business", "companyPhone", e.target.value)}
+                placeholder="+7 (727) 000-00-00"
+              />
+        </Field>
+        <Field label="Адрес" wide>
+          <Input
+                value={settings.business.companyAddress}
+                onChange={(e) => updateSetting("business", "companyAddress", e.target.value)}
+                placeholder="г. Алматы, ул. ..."
+              />
+        </Field>
+        <Field label="Email">
+          <Input
+                type="email"
+                value={settings.business.companyEmail}
+                onChange={(e) => updateSetting("business", "companyEmail", e.target.value)}
+                placeholder="info@euroline.kz"
+              />
+        </Field>
+        <Field label="Часы работы">
+          <Input
+                value={settings.business.workingHours}
+                onChange={(e) => updateSetting("business", "workingHours", e.target.value)}
+                placeholder="Пн-Пт 9:00-18:00"
+              />
+        </Field>
+        <Field label="ИНН">
+          <Input
+                value={settings.business.inn}
+                onChange={(e) => updateSetting("business", "inn", e.target.value)}
+              />
+        </Field>
+        <Field label="КПП">
+          <Input
+                value={settings.business.kpp}
+                onChange={(e) => updateSetting("business", "kpp", e.target.value)}
+              />
+        </Field>
+        <Field label="ОГРН">
+          <Input
+                value={settings.business.ogrn}
+                onChange={(e) => updateSetting("business", "ogrn", e.target.value)}
+              />
+        </Field>
+      </Section>
+
+      <Section title="Соцсети">
+        <Field label="Instagram">
+          <Input
+                value={settings.social.instagram}
+                onChange={(e) => updateSetting("social", "instagram", e.target.value)}
+                placeholder="https://instagram.com/..."
+              />
+        </Field>
+        <Field label="Telegram">
+          <Input
+                value={settings.social.telegram}
+                onChange={(e) => updateSetting("social", "telegram", e.target.value)}
+                placeholder="https://t.me/..."
+              />
+        </Field>
+        <Field label="WhatsApp">
+          <Input
+                value={settings.social.whatsapp}
+                onChange={(e) => updateSetting("social", "whatsapp", e.target.value)}
+                placeholder="+7 700 000 00 00"
+              />
+        </Field>
+        <Field label="YouTube">
+          <Input
+                value={settings.social.youtube}
+                onChange={(e) => updateSetting("social", "youtube", e.target.value)}
+                placeholder="https://youtube.com/..."
+              />
+        </Field>
+        <Field label="Facebook">
+          <Input
+                value={settings.social.facebook}
+                onChange={(e) => updateSetting("social", "facebook", e.target.value)}
+                placeholder="https://facebook.com/..."
+              />
+        </Field>
+        <Field label="ВКонтакте">
+          <Input
+                value={settings.social.vkontakte}
+                onChange={(e) => updateSetting("social", "vkontakte", e.target.value)}
+                placeholder="https://vk.com/..."
+              />
+        </Field>
+      </Section>
+
+      <Section title="SEO">
+        <Field label="Заголовок" wide>
+          <Input
+                value={settings.seo.metaTitle}
+                onChange={(e) => updateSetting("seo", "metaTitle", e.target.value)}
+              />
+        </Field>
+        <Field label="Описание" wide>
+          <textarea
+            value={settings.seo.metaDescription}
+            onChange={(e) => updateSetting("seo", "metaDescription", e.target.value)}
+            rows={2}
+            className={textareaClass}
+          />
+        </Field>
+        <Field label="Ключевые слова" wide>
+          <Input
+                value={settings.seo.metaKeywords}
+                onChange={(e) => updateSetting("seo", "metaKeywords", e.target.value)}
+              />
+        </Field>
+        <Field label="Google Analytics ID">
+          <Input
+                value={settings.seo.googleAnalytics}
+                onChange={(e) => updateSetting("seo", "googleAnalytics", e.target.value)}
+                placeholder="G-XXXXXXX"
+              />
+        </Field>
+        <Field label="Яндекс Метрика ID">
+          <Input
+                value={settings.seo.yandexMetrica}
+                onChange={(e) => updateSetting("seo", "yandexMetrica", e.target.value)}
+              />
+        </Field>
+        <Field label="robots.txt" wide>
+          <textarea
+            value={settings.seo.robotsTxt}
+            onChange={(e) => updateSetting("seo", "robotsTxt", e.target.value)}
+            rows={4}
+            className={`${textareaClass} font-mono`}
+          />
+        </Field>
+      </Section>
+
+      <Section title="Внешний вид">
+        <Field label="Логотип">
+          <Input
+                value={settings.appearance.logo}
+                onChange={(e) => updateSetting("appearance", "logo", e.target.value)}
+                placeholder="/images/logo.svg"
+              />
+        </Field>
+        <Field label="Фавикон">
+          <Input
+                value={settings.appearance.favicon}
+                onChange={(e) => updateSetting("appearance", "favicon", e.target.value)}
+                placeholder="/favicon.ico"
+              />
+        </Field>
+        <Field label="Основной цвет">
+          <div className="flex gap-2">
+            <div className="w-14 shrink-0">
+              <Input
+                type="color"
+                value={settings.appearance.primaryColor}
+                onChange={(e) => updateSetting("appearance", "primaryColor", e.target.value)}
+                className="px-1!"
+              />
+            </div>
+            <div className="flex-1">
+              <Input
+                value={settings.appearance.primaryColor}
+                onChange={(e) => updateSetting("appearance", "primaryColor", e.target.value)}
+                placeholder="#3B82F6"
+              />
+            </div>
+          </div>
+        </Field>
+        <Field label="Дополнительный цвет">
+          <div className="flex gap-2">
+            <div className="w-14 shrink-0">
+              <Input
+                type="color"
+                value={settings.appearance.secondaryColor}
+                onChange={(e) => updateSetting("appearance", "secondaryColor", e.target.value)}
+                className="px-1!"
+              />
+            </div>
+            <div className="flex-1">
+              <Input
+                value={settings.appearance.secondaryColor}
+                onChange={(e) => updateSetting("appearance", "secondaryColor", e.target.value)}
+                placeholder="#10B981"
+              />
+            </div>
+          </div>
+        </Field>
+        <Field label="Тема">
+          <Select
+            options={themeOptions}
+            value={settings.appearance.theme}
+            onChange={(value) => updateSetting("appearance", "theme", value)}
+            placeholder="Тема"
+          />
+        </Field>
+        <Field label="Шрифт">
+          <Input
+                value={settings.appearance.fontFamily}
+                onChange={(e) => updateSetting("appearance", "fontFamily", e.target.value)}
+                placeholder="Inter"
+              />
+        </Field>
+      </Section>
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} size="md">
+        <div className="space-y-4 p-5">
+          <h3 className="pr-8 text-base font-semibold text-gray-800 dark:text-white/90">Сбросить настройки?</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Все параметры вернутся к значениям по умолчанию. Отменить это нельзя.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => setIsModalOpen(false)} disabled={resetLoading}>
+              Отмена
+            </Button>
             <Button
-              variant="primary"
-              className="!bg-red-600 hover:!bg-red-700"
+              size="sm"
+              className="bg-error-500! hover:bg-error-600!"
               onClick={confirmReset}
               disabled={resetLoading}
             >
-              {resetLoading ? "Сбрасываем..." : "Сбросить"}
+              {resetLoading ? "Сброс..." : "Сбросить"}
             </Button>
           </div>
         </div>
       </Modal>
-        </>
-      )}
     </div>
   );
 };
+
+const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03] sm:p-5">
+    <h3 className="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">{title}</h3>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{children}</div>
+  </section>
+);
+
+const Field: React.FC<{ label: string; wide?: boolean; children: React.ReactNode }> = ({
+  label,
+  wide,
+  children,
+}) => (
+  <div className={wide ? "lg:col-span-2" : undefined}>
+    <Label>{label}</Label>
+    {children}
+  </div>
+);
 
 export default SiteSettingsPage;

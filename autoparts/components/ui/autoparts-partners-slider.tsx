@@ -4,11 +4,9 @@ import React from "react";
 import { ImagesSlider } from "@/components/ui/images-slider";
 
 export function AutoPartsPartnersSlider() {
-  // Images related to automotive parts, warehouses, partnerships
   const images = [
-    "https://images.unsplash.com/photo-1619642751034-765dfdf7c58e?q=80&w=1914&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Auto parts warehouse
-    "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Car parts
-    "https://images.unsplash.com/photo-1487754180451-c456f719a1fc?q=80&w=2069&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D", // Business handshake
+    "/images/site/partners-slider-warehouse.jpg",
+    "/images/site/partners-slider-parts.jpg",
   ];
   
   return (

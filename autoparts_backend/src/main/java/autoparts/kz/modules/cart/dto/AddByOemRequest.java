@@ -9,6 +9,8 @@ public class AddByOemRequest {
     private String brand;     // бренд (если известен)
     private Integer price;    // цена (если известна)
     private String imageUrl;  // изображение (опционально)
+    private String warehouseName;
+    private String warehouseRefKey;
     private int quantity;     // количество
 }
 

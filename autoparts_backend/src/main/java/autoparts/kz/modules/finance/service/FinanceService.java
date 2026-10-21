@@ -22,6 +22,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -270,8 +271,10 @@ public class FinanceService {
         }
         return null;
     }
+    @Transactional
     public FinanceDtos.TopUpResponse patchTopUp(Long id, FinanceDtos.PatchStatus r){
-        TopUp t = topups.findById(id).orElseThrow();
+        // row lock: serialises with Kaspi auto-approval so a top-up is never credited twice
+        TopUp t = topups.findByIdForUpdate(id).orElseThrow();
         boolean statusChanged = false;
 
         if (r.paymentMethod() != null && !r.paymentMethod().isBlank()) {
@@ -314,6 +317,51 @@ public class FinanceService {
         }
 
         return toTopUpResponse(t);
+    }
+
+    /**
+     * Approves a PENDING top-up confirmed by an external payment provider (Kaspi) and credits the balance.
+     * Idempotent: locks the row and only acts on PENDING, so repeated/concurrent confirmations credit once.
+     * @return true if this call credited the balance
+     */
+    @Transactional
+    public boolean approveExternalTopUp(Long topUpId, String comment) {
+        TopUp t = topups.findByIdForUpdate(topUpId).orElseThrow(() -> new EntityNotFoundException("TopUp not found"));
+        if (t.getStatus() != TopUp.Status.PENDING) {
+            return false;
+        }
+        t.setStatus(TopUp.Status.APPROVED);
+        t.setAdminComment(appendComment(t.getAdminComment(), comment));
+        topups.save(t);
+        applyApprovedTopUp(t);
+        try {
+            telegramNotificationService.notifyBalanceTopUp(t);
+        } catch (Exception ex) {
+            log.warn("Telegram notify failed for top-up {}: {}", t.getId(), ex.getMessage());
+        }
+        notifications.createAndBroadcast(t.getClientId(), "Баланс пополнен",
+                "Оплата " + t.getAmount() + " ₸ через Kaspi получена. Баланс пополнен.",
+                Notification.Type.FINANCE, Notification.Severity.SUCCESS);
+        return true;
+    }
+
+    /** Rejects a PENDING top-up whose external payment failed/expired. No-op for non-PENDING rows. */
+    @Transactional
+    public boolean rejectExternalTopUp(Long topUpId, String comment) {
+        TopUp t = topups.findByIdForUpdate(topUpId).orElseThrow(() -> new EntityNotFoundException("TopUp not found"));
+        if (t.getStatus() != TopUp.Status.PENDING) {
+            return false;
+        }
+        t.setStatus(TopUp.Status.REJECTED);
+        t.setAdminComment(appendComment(t.getAdminComment(), comment));
+        topups.save(t);
+        return true;
+    }
+
+    private static String appendComment(String existing, String add) {
+        if (add == null || add.isBlank()) return existing;
+        String joined = (existing == null || existing.isBlank()) ? add : existing + "; " + add;
+        return joined.length() > 1024 ? joined.substring(0, 1024) : joined;
     }
 
     private void applyApprovedTopUp(TopUp topUp) {

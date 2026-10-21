@@ -1,121 +1,111 @@
 package autoparts.kz.integration.umapi.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Article DTO from UMAPI
+ * Article DTO from UMAPI v2 autocatalog /Articles ("data" items).
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ArticleDto {
 
-    /**
-     * Article ID
-     */
-    @JsonProperty("articleId")
+    @JsonAlias("ART_ID")
     private Long id;
 
-    /**
-     * Article number (part number)
-     */
-    @JsonProperty("articleNr")
+    @JsonAlias("ARTICLE_NR")
     private String articleNumber;
 
-    /**
-     * Supplier/Brand ID
-     */
-    @JsonProperty("supplierId")
+    @JsonAlias("SUP_ID")
     private Long supplierId;
 
-    /**
-     * Supplier/Brand name
-     */
-    @JsonProperty("supplierName")
-    private String supplierName;
+    @JsonAlias("BRAND")
+    private String brand;
 
-    /**
-     * Article name
-     */
-    @JsonProperty("articleName")
+    @JsonAlias("COMPLETE_DES")
     private String name;
 
-    /**
-     * Generic article number
-     */
-    @JsonProperty("genericArticleNr")
-    private String genericArticleNumber;
+    @JsonAlias("DES")
+    private String shortName;
+
+    @JsonAlias("STATUS_DES")
+    private String status;
 
     /**
-     * OE numbers (original equipment numbers)
+     * Main image file name (UMAPI media file, not a full URL)
      */
-    @JsonProperty("oeNumbers")
-    private List<String> oeNumbers;
+    @JsonAlias("MEDIA_FILE")
+    private String mediaFile;
 
-    /**
-     * Trade numbers
-     */
-    @JsonProperty("tradeNumbers")
-    private List<String> tradeNumbers;
+    @JsonAlias("PRODUCTS")
+    private List<Product> products;
 
-    /**
-     * EAN/Barcode
-     */
-    @JsonProperty("eanNumbers")
-    private List<String> eanNumbers;
+    @JsonAlias("MEDIAS")
+    private List<Media> medias;
 
-    /**
-     * Criteria (specifications)
-     */
-    @JsonProperty("criteria")
+    @JsonAlias("CRITERIAS")
     private List<Criterion> criteria;
 
-    /**
-     * Images
-     */
-    @JsonProperty("images")
-    private List<String> images;
+    @JsonAlias("OE_CODES")
+    private List<OeCode> oeCodes;
 
-    /**
-     * Documents
-     */
-    @JsonProperty("documents")
-    private List<DocumentInfo> documents;
+    @JsonAlias("EAN_CODES")
+    private List<String> eanCodes;
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class Criterion {
-        @JsonProperty("criterionId")
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Product {
+        @JsonAlias("PT_ID")
         private Long id;
-
-        @JsonProperty("criterionName")
+        @JsonAlias("DES")
         private String name;
+    }
 
-        @JsonProperty("criterionValue")
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Media {
+        @JsonAlias("SORT")
+        private Integer sort;
+        @JsonAlias("FILE_NAME")
+        private String fileName;
+        @JsonAlias("SUP_ID")
+        private Long supplierId;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class Criterion {
+        @JsonAlias("CRI_ID")
+        private Long id;
+        @JsonAlias("CRI_DES")
+        private String name;
+        @JsonAlias("VALUE")
         private String value;
-
-        @JsonProperty("criterionUnit")
+        @JsonAlias("CRI_UNIT_DES")
         private String unit;
     }
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class DocumentInfo {
-        @JsonProperty("documentType")
-        private String type;
-
-        @JsonProperty("documentUrl")
-        private String url;
-
-        @JsonProperty("fileName")
-        private String fileName;
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class OeCode {
+        @JsonAlias("DISPLAY_NR")
+        private String number;
+        @JsonAlias("BRAND")
+        private String brand;
     }
 }

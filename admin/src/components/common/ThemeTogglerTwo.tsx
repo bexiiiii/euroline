@@ -7,6 +7,7 @@ export default function ThemeTogglerTwo() {
   return (
     <button
       onClick={toggleTheme}
+      aria-label="Переключить тему"
       className="inline-flex size-14 items-center justify-center rounded-full bg-brand-500 text-white transition-colors hover:bg-brand-600"
     >
       <svg

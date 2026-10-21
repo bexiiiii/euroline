@@ -1,11 +1,16 @@
 import ApiManagementPage from "@/components/technical/ApiManagementPage";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Управление API | Админ панель AutoParts",
-  description: "Настройка API endpoints, ключей и мониторинг использования",
+  title: "API",
 };
 
 export default function ApiManagementPageRoute() {
-  return <ApiManagementPage />;
+  return (
+    <>
+      <PageBreadcrumb pageTitle="API" />
+      <ApiManagementPage />
+    </>
+  );
 }

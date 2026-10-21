@@ -1,8 +1,8 @@
 
 import Link from 'next/link';
-import React from 'react';
-import { DetailDto } from '@/lib/api/vehicle';
-import { Loader2, MousePointer, FolderTree, Package } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { DetailDto, StockByOem, normalizeOem, vehicleApi } from '@/lib/api/vehicle';
+import { Loader2, MousePointer, FolderTree, Package, Info, Wrench } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useVehicle } from '@/context/VehicleContext';
 
@@ -38,6 +38,26 @@ const CatalogCardComponent: React.FC<CatalogCardComponentProps> = ({ selectedQui
   const router = useRouter();
   const { session } = useVehicle();
 
+  // Остатки из 1С для деталей выбранной группы (один запрос на группу)
+  const [stock, setStock] = useState<Record<string, StockByOem>>({});
+  const [stockLoading, setStockLoading] = useState(false);
+  const detailsForStock = selectedQuickGroup?.isLoading ? null : selectedQuickGroup?.details;
+
+  useEffect(() => {
+    if (!detailsForStock || detailsForStock.length === 0) {
+      setStock({});
+      return;
+    }
+    let cancelled = false;
+    setStockLoading(true);
+    vehicleApi
+      .getStockByOem(detailsForStock.map((d) => d.oem))
+      .then((res) => { if (!cancelled) setStock(res || {}); })
+      .catch(() => { if (!cancelled) setStock({}); })
+      .finally(() => { if (!cancelled) setStockLoading(false); });
+    return () => { cancelled = true; };
+  }, [detailsForStock]);
+
   // Обработчик клика для навигации к странице unit
   const handleUnitClick = (detail: DetailDto) => {
     if (!session) {
@@ -67,6 +87,8 @@ const CatalogCardComponent: React.FC<CatalogCardComponentProps> = ({ selectedQui
       ssd: session.ssd,
       catalog: session.catalog
     });
+    // Функциям узла Laximo нужен ssd узла (Unit@ssd), а не автомобиля
+    if (detail.unitSsd) params.set('unitSsd', detail.unitSsd);
 
     const unitUrl = `/unit/${unitId}?${params.toString()}`;
     console.log('Навигация к unit:', unitUrl);
@@ -227,7 +249,6 @@ const CatalogCardComponent: React.FC<CatalogCardComponentProps> = ({ selectedQui
                       if (parent) {
                         parent.innerHTML = `<div class="w-full h-full flex items-center justify-center text-sm text-gray-500">
                           <div class="text-center">
-                            <div class="mb-2">📦</div>
                             <div>Изображение недоступно</div>
                             <div class="text-xs mt-1">${unit.title}</div>
                           </div>
@@ -241,7 +262,7 @@ const CatalogCardComponent: React.FC<CatalogCardComponentProps> = ({ selectedQui
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-sm text-gray-500">
                     <div className="text-center">
-                      <div className="text-4xl mb-2">🔧</div>
+                      <Wrench className="h-10 w-10 mx-auto mb-2 text-gray-400" />
                       <div>Изображение узла {idx + 1}</div>
                       <div className="text-xs mt-1">{unit.title}</div>
                     </div>
@@ -264,12 +285,26 @@ const CatalogCardComponent: React.FC<CatalogCardComponentProps> = ({ selectedQui
                 <div
                   key={index}
                   className="border-l-4 pl-2 py-1 hover:border-orange-500 hover:bg-orange-100 transition-colors cursor-pointer"
-                  title={`${part.qty ? `Количество: ${part.qty}` : ''}${part.note ? ` | Примечание: ${part.note}` : ''}`}
+                  title={`${part.qty ? `Количество на авто: ${part.qty}` : ''}${part.note ? ` | Примечание: ${part.note}` : ''}`}
                 >
-                  <p className="text-sm">
-                    {part.name}
-                    {part.qty && <span className="text-green-600 ml-2 font-medium">📦 {part.qty} шт.</span>}
-                    {part.note && <span className="text-blue-600 ml-2" title={part.note}>ℹ️</span>}
+                  <p className="text-sm flex items-center flex-wrap gap-x-2">
+                    <span>{part.name}</span>
+                    {(() => {
+                      const s1c = stock[normalizeOem(part.code)];
+                      if (stockLoading && !s1c) {
+                        return <span className="text-gray-400 text-xs">проверяем наличие…</span>;
+                      }
+                      if (s1c && s1c.stock > 0) {
+                        return (
+                          <span className="text-green-700 font-medium">
+                            В наличии: {s1c.stock} шт.
+                            {s1c.price != null && <span className="text-gray-700 ml-2">{s1c.price.toLocaleString('ru-RU')} ₸</span>}
+                          </span>
+                        );
+                      }
+                      return <span className="text-gray-500">Нет в наличии</span>;
+                    })()}
+                    {part.note && <Info className="h-4 w-4 text-blue-600" aria-label={part.note} />}
                   </p>
                   <div className="flex items-center gap-2">
                     <a href="#" className="text-blue-600 text-sm hover:text-blue-800">

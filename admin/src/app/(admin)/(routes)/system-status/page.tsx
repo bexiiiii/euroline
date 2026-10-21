@@ -1,11 +1,16 @@
 import SystemStatusPage from "@/components/technical/SystemStatusPage";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Состояние системы | Админ панель AutoParts",
-  description: "Мониторинг состояния сервисов и системных метрик",
+  title: "Состояние системы",
 };
 
 export default function SystemStatusPageRoute() {
-  return <SystemStatusPage />;
+  return (
+    <>
+      <PageBreadcrumb pageTitle="Состояние системы" />
+      <SystemStatusPage />
+    </>
+  );
 }

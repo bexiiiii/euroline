@@ -1,51 +1,44 @@
 package autoparts.kz.integration.umapi.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Model Series DTO from UMAPI
+ * Model series DTO from UMAPI v2 autocatalog /ModelSeries.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ModelSeriesDto {
 
-    /**
-     * Model ID
-     */
-    @JsonProperty("modelId")
+    @JsonAlias("MS_ID")
     private Long id;
 
-    /**
-     * Model name
-     */
-    @JsonProperty("modelName")
+    @JsonAlias("MODEL_SERIES")
     private String name;
 
-    /**
-     * Manufacturer ID
-     */
-    @JsonProperty("manuId")
+    @JsonAlias("MFA_ID")
     private Long manufacturerId;
 
-    /**
-     * Manufacturer name
-     */
-    @JsonProperty("manuName")
+    @JsonAlias("MANUFACTURER")
     private String manufacturerName;
 
     /**
-     * Year from
+     * Production start, yyyy-MM-dd
      */
-    @JsonProperty("yearOfConstrFrom")
-    private Integer yearFrom;
+    @JsonAlias("CI_FROM")
+    private String dateFrom;
 
     /**
-     * Year to
+     * Production end, yyyy-MM-dd (empty while still produced)
      */
-    @JsonProperty("yearOfConstrTo")
-    private Integer yearTo;
+    @JsonAlias("CI_TO")
+    private String dateTo;
+
+    @JsonAlias("TYPE")
+    private String types;
 }

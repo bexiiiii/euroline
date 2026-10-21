@@ -1,33 +1,39 @@
 package autoparts.kz.integration.umapi.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Manufacturer (Brand) DTO from UMAPI
+ * Manufacturer (Brand) DTO from UMAPI v2 autocatalog /Manufacturers.
+ * Reads UMAPI field names via @JsonAlias, serializes to our camelCase names.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ManufacturerDto {
 
-    /**
-     * Manufacturer ID
-     */
-    @JsonProperty("manuId")
+    @JsonAlias("MFA_ID")
     private Long id;
 
-    /**
-     * Manufacturer name
-     */
-    @JsonProperty("manuName")
+    @JsonAlias("MANUFACTURER")
     private String name;
 
+    @JsonAlias("MANUFACTURER_RU")
+    private String nameRu;
+
+    @JsonAlias("COUNTRY")
+    private String country;
+
     /**
-     * Vehicle type (e.g., "P" - Passenger, "C" - Commercial, "M" - Motorbike)
+     * Comma-separated UMAPI vehicle types, e.g. "Engine,PC"
      */
-    @JsonProperty("linkingTargetType")
-    private String vehicleType;
+    @JsonAlias("TYPE")
+    private String types;
+
+    @JsonAlias("IS_LOGO")
+    private Integer hasLogo;
 }

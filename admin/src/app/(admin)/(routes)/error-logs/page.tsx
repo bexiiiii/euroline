@@ -1,11 +1,16 @@
 import ErrorLogsPage from "@/components/technical/ErrorLogsPage";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Логи ошибок | Админ панель AutoParts",
-  description: "Мониторинг и анализ ошибок системы",
+  title: "Логи ошибок",
 };
 
 export default function ErrorLogsPageRoute() {
-  return <ErrorLogsPage />;
+  return (
+    <>
+      <PageBreadcrumb pageTitle="Логи ошибок" />
+      <ErrorLogsPage />
+    </>
+  );
 }

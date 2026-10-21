@@ -3,11 +3,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import CustomerSelector from "./CustomerSelector";
-import TextArea from "@/components/form/input/TextArea";
-import Input from "@/components/form/input/InputField";
 import Badge from "@/components/ui/badge/Badge";
 import { TopUpResponse } from "@/lib/api/finance";
 import { API_URL } from "@/lib/api";
+import { formatDateTime, formatKzt } from "@/lib/format";
+import { controlClass, fieldLabelClass } from "./tableUi";
 
 interface SelectedCustomer {
   id: number;
@@ -54,23 +54,6 @@ const statusOptions = [
   { value: "APPROVED", label: "Одобрен" },
   { value: "REJECTED", label: "Отклонён" },
 ];
-
-const formatAmount = (amount: number) =>
-  new Intl.NumberFormat("kk-KZ", {
-    style: "currency",
-    currency: "KZT",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount);
-
-const formatDateTime = (value: string) =>
-  new Date(value).toLocaleString("ru-RU", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 
 const statusBadge: Record<string, { color: React.ComponentProps<typeof Badge>["color"]; label: string }> = {
   PENDING: { color: "warning", label: "Ожидает" },
@@ -198,37 +181,54 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
     return null;
   }
 
+  const methodOptions = (
+    <>
+      {paymentMethods.map((method) => (
+        <option key={method} value={method}>
+          {method}
+        </option>
+      ))}
+      {!paymentMethods.includes(paymentMethod) && <option value={paymentMethod}>{paymentMethod}</option>}
+    </>
+  );
+
+  const footer = (submitLabel: string, cancelLabel: string) => (
+    <div className="flex justify-end gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={onClose}>
+        {cancelLabel}
+      </Button>
+      <Button type="submit" variant="primary" size="sm" disabled={loading}>
+        {loading ? "Сохранение…" : submitLabel}
+      </Button>
+    </div>
+  );
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg">
-      <div className="p-6 space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              {isCreate ? "Создать пополнение баланса" : `Заявка на пополнение #${topUp?.id}`}
+    <Modal isOpen={isOpen} onClose={onClose} size="md" className="p-0">
+      <div className="space-y-4 p-5">
+        <div className="pr-12">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">
+              {isCreate ? "Новое пополнение" : `Пополнение #${topUp?.id}`}
             </h2>
-            {!isCreate && topUp && (
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Создана {formatDateTime(topUp.createdAt)}
-              </p>
+            {!isCreate && statusInfo && (
+              <Badge size="sm" color={statusInfo.color}>{statusInfo.label}</Badge>
             )}
           </div>
-          {!isCreate && statusInfo && (
-            <Badge color={statusInfo.color}>{statusInfo.label}</Badge>
+          {!isCreate && topUp && (
+            <p className="text-sm tabular-nums text-gray-500 dark:text-gray-400">{formatDateTime(topUp.createdAt)}</p>
           )}
         </div>
 
         {serverError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-900/20 dark:text-red-200">
+          <div role="alert" className="rounded-lg border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
             {serverError}
           </div>
         )}
 
         {isCreate ? (
-          <div className="space-y-6">
-            <div className="p-4 bg-gray-50 dark:bg-gray-900/40 rounded-lg">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                Выбор клиента
-              </h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
               <CustomerSelector
                 selectedCustomer={selectedCustomer}
                 onSelectCustomer={(customer) => {
@@ -237,40 +237,20 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
                     setErrors((prev) => ({ ...prev, customer: "" }));
                   }
                 }}
-                placeholder="Выберите клиента для пополнения"
+                placeholder="Выберите клиента"
               />
               {errors.customer && (
-                <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.customer}</p>
-              )}
-
-              {selectedCustomer && (
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600 dark:text-gray-300">
-                  <div>
-                    <span className="font-medium text-gray-800 dark:text-gray-100">Имя:</span>
-                    <span className="ml-2">{selectedCustomer.name}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-800 dark:text-gray-100">Email:</span>
-                    <span className="ml-2">{selectedCustomer.email}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-800 dark:text-gray-100">Телефон:</span>
-                    <span className="ml-2">{selectedCustomer.phone || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-gray-800 dark:text-gray-100">Текущий баланс:</span>
-                    <span className="ml-2">{formatAmount(selectedCustomer.balance)}</span>
-                  </div>
-                </div>
+                <p className="mt-1 text-xs text-error-600 dark:text-error-500">{errors.customer}</p>
               )}
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Сумма пополнения *
+                <label htmlFor="topup-amount" className={fieldLabelClass}>
+                  Сумма, ₸
                 </label>
-                <Input
+                <input
+                  id="topup-amount"
                   type="number"
                   min="1"
                   step={1}
@@ -282,108 +262,73 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
                     }
                   }}
                   placeholder="0"
-                  className={errors.amount ? "border-red-300 dark:border-red-600" : ""}
+                  className={`${controlClass} w-full ${errors.amount ? "border-error-500 dark:border-error-500" : ""}`}
                 />
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Валюта: тенге (₸)</p>
                 {errors.amount && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.amount}</p>
+                  <p className="mt-1 text-xs text-error-600 dark:text-error-500">{errors.amount}</p>
                 )}
               </div>
-
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="topup-method" className={fieldLabelClass}>
                   Способ оплаты
                 </label>
                 <select
+                  id="topup-method"
                   value={paymentMethod}
                   onChange={(event) => setPaymentMethod(event.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  className={`${controlClass} w-full`}
                 >
-                  {paymentMethods.map((method) => (
-                    <option key={method} value={method}>
-                      {method}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Комментарий администратора
-                </label>
-                <TextArea
-                  value={adminComment}
-                  onChange={setAdminComment}
-                  rows={4}
-                  placeholder="Примечания к заявке"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-                >
-                  Отменить
-                </button>
-                <Button variant="primary" size="sm" disabled={loading}>
-                  {loading ? "Сохраняем…" : "Создать"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        ) : topUp ? (
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900/40 rounded-lg">
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Имя</p>
-                <p className="text-sm text-gray-900 dark:text-white">{topUp.clientName || "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Email</p>
-                <p className="text-sm text-gray-900 dark:text-white">{topUp.clientEmail || "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Телефон</p>
-                <p className="text-sm text-gray-900 dark:text-white">{topUp.clientPhone || "—"}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Дата запроса</p>
-                <p className="text-sm text-gray-900 dark:text-white">{formatDateTime(topUp.createdAt)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Сумма</p>
-                <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatAmount(topUp.amount)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Способ пополнения</p>
-                <select
-                  value={paymentMethod}
-                  onChange={(event) => setPaymentMethod(event.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                >
-                  {paymentMethods.map((method) => (
-                    <option key={method} value={method}>
-                      {method}
-                    </option>
-                  ))}
-                  {!paymentMethods.includes(paymentMethod) && (
-                    <option value={paymentMethod}>{paymentMethod}</option>
-                  )}
+                  {methodOptions}
                 </select>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Статус заявки
+            <div>
+              <label htmlFor="topup-comment" className={fieldLabelClass}>
+                Комментарий
+              </label>
+              <textarea
+                id="topup-comment"
+                value={adminComment}
+                onChange={(event) => setAdminComment(event.target.value)}
+                rows={3}
+                className={`${controlClass} h-auto w-full py-2`}
+              />
+            </div>
+
+            {footer("Создать", "Отмена")}
+          </form>
+        ) : topUp ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <dl className="grid grid-cols-2 gap-3 text-sm">
+              <div className="col-span-2">
+                <dt className="text-gray-500 dark:text-gray-400">Клиент</dt>
+                <dd className="text-gray-800 dark:text-white/90">
+                  {topUp.clientName || `Клиент #${topUp.clientId}`}
+                  {(topUp.clientEmail || topUp.clientPhone) && (
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {", "}
+                      {[topUp.clientEmail, topUp.clientPhone].filter(Boolean).join(", ")}
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-gray-500 dark:text-gray-400">Сумма</dt>
+                <dd className="font-medium tabular-nums text-gray-800 dark:text-white/90">{formatKzt(topUp.amount)}</dd>
+              </div>
+            </dl>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="topup-status" className={fieldLabelClass}>
+                  Статус
                 </label>
                 <select
+                  id="topup-status"
                   value={status}
                   onChange={(event) => setStatus(event.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  className={`${controlClass} w-full`}
                 >
                   {statusOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -392,64 +337,58 @@ const TopUpBalanceModal: React.FC<TopUpBalanceModalProps> = ({
                   ))}
                 </select>
               </div>
-
-              <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Чек пополнения</p>
-                {topUp.receiptUrl ? (
-                  <div className="space-y-3">
-                    <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
-                      <ReceiptPreview
-                        candidates={receiptUrlCandidates}
-                        alt="Квитанция"
-                      />
-                    </div>
-                    {receiptLinkHref ? (
-                      <a
-                        href={receiptLinkHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
-                      >
-                        Открыть оригинал
-                      </a>
-                    ) : (
-                      <span className="inline-flex items-center text-sm text-gray-500 dark:text-gray-400">
-                        Ссылка на оригинал недоступна
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400">
-                    Чек не прикреплён
-                  </div>
-                )}
+              <div>
+                <label htmlFor="topup-method" className={fieldLabelClass}>
+                  Способ оплаты
+                </label>
+                <select
+                  id="topup-method"
+                  value={paymentMethod}
+                  onChange={(event) => setPaymentMethod(event.target.value)}
+                  className={`${controlClass} w-full`}
+                >
+                  {methodOptions}
+                </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Комментарий администратора
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Чек</span>
+                {topUp.receiptUrl && receiptLinkHref && (
+                  <a
+                    href={receiptLinkHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-brand-500 hover:text-brand-600 dark:text-brand-400"
+                  >
+                    Открыть оригинал
+                  </a>
+                )}
+              </div>
+              {topUp.receiptUrl ? (
+                <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
+                  <ReceiptPreview candidates={receiptUrlCandidates} alt="Чек пополнения" />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400">Чек не прикреплен</p>
+              )}
+            </div>
+
+            <div>
+              <label htmlFor="topup-comment" className={fieldLabelClass}>
+                Комментарий
               </label>
-              <TextArea
+              <textarea
+                id="topup-comment"
                 value={adminComment}
-                onChange={setAdminComment}
-                rows={4}
-                placeholder="Добавьте примечание для истории"
+                onChange={(event) => setAdminComment(event.target.value)}
+                rows={3}
+                className={`${controlClass} h-auto w-full py-2`}
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-              >
-                Закрыть
-              </button>
-              <Button type="submit" variant="primary" size="sm" disabled={loading}>
-                {loading ? "Сохраняем…" : "Сохранить изменения"}
-              </Button>
-            </div>
+            {footer("Сохранить", "Закрыть")}
           </form>
         ) : null}
       </div>
@@ -463,7 +402,7 @@ interface ReceiptPreviewProps {
 }
 
 const receiptFallback = (
-  <div className="flex h-64 w-full items-center justify-center bg-gray-100 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+  <div className="flex h-48 w-full items-center justify-center bg-gray-100 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">
     Изображение недоступно
   </div>
 );
@@ -498,7 +437,7 @@ const ReceiptPreview: React.FC<ReceiptPreviewProps> = ({ candidates, alt = "" })
     <img
       src={currentSrc}
       alt={alt}
-      className="h-64 w-full bg-gray-100 object-contain dark:bg-gray-800"
+      className="h-48 w-full bg-gray-100 object-contain dark:bg-gray-800"
       onError={handleError}
     />
   );

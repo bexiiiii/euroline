@@ -28,8 +28,7 @@ public class OutboxMessage {
     @Column(nullable = false, length = 64)
     private String eventType;     // "OrderCreated"
 
-    @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "text")
     private String payloadJson;   // JSON события
 
     @Enumerated(EnumType.STRING)

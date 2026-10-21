@@ -13,11 +13,12 @@ import java.util.List;
 @Repository
 public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpecificationExecutor<Product> {
 
-    // Поиск по названию (частичное совпадение), коду или VIN (в нашем случае VIN = externalCode)
+    // Поиск по названию, артикулу и стабильному ключу новой интеграции 1С.
     @Query("SELECT p FROM Product p WHERE " +
             "LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
             "LOWER(p.code) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-            "LOWER(p.externalCode) LIKE LOWER(CONCAT('%', :query, '%'))")
+            "LOWER(p.externalCode) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+            "LOWER(p.oneCRefKey) LIKE LOWER(CONCAT('%', :query, '%'))")
     List<Product> searchByQuery(@Param("query") String query);
 
     // Подборка товаров недели
@@ -28,6 +29,8 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     List<Product> findAllByIdWithProperties(@Param("ids") List<Long> ids);
 
     java.util.Optional<Product> findFirstByCodeIgnoreCase(String code);
+
+    java.util.Optional<Product> findByOneCRefKey(String oneCRefKey);
 
     // ✅ НОВЫЙ МЕТОД: Подсчет товаров по категориям (агрегирующий запрос)
     @Query("SELECT c.name, COUNT(p) FROM Product p " +
@@ -50,5 +53,13 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     // 🚀 BATCH OPTIMIZATION: Найти несколько товаров по артикулам одним запросом
     @Query("SELECT p FROM Product p WHERE LOWER(p.code) IN :articles OR LOWER(p.sku) IN :articles")
     List<Product> findAllByArticleIn(@Param("articles") List<String> articles);
-}
 
+    // Совпадение артикула без учёта регистра, пробелов, дефисов и точек (OEM из каталога vs код в 1С)
+    @Query(value = "SELECT * FROM products p WHERE " +
+            "regexp_replace(lower(coalesce(p.code, '')), '[^a-z0-9]', '', 'g') IN (:keys) " +
+            "OR regexp_replace(lower(coalesce(p.sku, '')), '[^a-z0-9]', '', 'g') IN (:keys) " +
+            "OR ((p.sku IS NULL OR trim(p.sku) = '') AND lower(p.brand) = '1c' " +
+            "AND regexp_replace(lower(split_part(trim(p.name), ' ', 2)), '[^a-z0-9]', '', 'g') IN (:keys))",
+            nativeQuery = true)
+    List<Product> findAllByNormalizedArticleIn(@Param("keys") List<String> keys);
+}

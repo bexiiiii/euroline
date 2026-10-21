@@ -6,6 +6,7 @@ import type { SearchItem, SearchWarehouse } from '@/lib/api/search';
 import { useCartStore } from '@/lib/stores/cartStore';
 import { toast } from 'sonner';
 import { ShoppingCart } from 'lucide-react';
+import ProductPhoto from '@/components/ProductPhoto';
 
 interface AnalogsTableProps {
   analogs: SearchItem[];
@@ -78,13 +79,7 @@ export default function AnalogsTable({ analogs }: AnalogsTableProps) {
               return (
                 <tr key={quantityKey} className="hover:bg-gray-50 transition">
                   <Cell className="text-center">
-                    {imageUrl ? (
-                      <img src={imageUrl} alt={productName} className="w-12 h-12 object-cover rounded mx-auto" />
-                    ) : (
-                      <div className="w-12 h-12 bg-gray-100 rounded mx-auto flex items-center justify-center">
-                        <span className="text-gray-400 text-xs">Нет фото</span>
-                      </div>
-                    )}
+                    <ProductPhoto src={imageUrl} alt={productName} />
                   </Cell>
                   <Cell>
                     <div className="text-sm font-medium text-gray-900">{productBrand}</div>
@@ -194,7 +189,7 @@ function ensureAbsoluteUrl(url?: string | null): string | undefined {
     return url;
   }
   if (url.startsWith('/')) {
-    return `https://api.umapi.ru${url}`;
+    return url.startsWith("/IMAGE/") ? `https://image.umapi.ru${url}` : `https://image.umapi.ru/IMAGE${url}`;
   }
   return url;
 }

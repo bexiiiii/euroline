@@ -6,6 +6,7 @@ import org.springframework.http.*;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -27,6 +28,17 @@ public class RestExceptionHandler {
                 .collect(HashMap::new, 
                     (map, fieldError) -> map.put(fieldError.getField(), fieldError.getDefaultMessage()),
                     HashMap::putAll))
+            .build();
+        return ResponseEntity.badRequest().body(error);
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> onUnreadableJson(HttpMessageNotReadableException e) {
+        ErrorResponse error = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.BAD_REQUEST.value())
+            .error("Bad Request")
+            .message("Invalid JSON payload")
             .build();
         return ResponseEntity.badRequest().body(error);
     }
@@ -77,6 +89,18 @@ public class RestExceptionHandler {
             .message("Invalid credentials or user is banned")
             .build();
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+    }
+
+    @ExceptionHandler(OrderValidationException.class)
+    public ResponseEntity<ErrorResponse> onOrderValidation(OrderValidationException e) {
+        log.warn("Order validation error: {}", e.getMessage());
+        ErrorResponse error = ErrorResponse.builder()
+            .timestamp(LocalDateTime.now())
+            .status(HttpStatus.UNPROCESSABLE_ENTITY.value())
+            .error("Order Validation Failed")
+            .message(e.getMessage())
+            .build();
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(error);
     }
 
     @ExceptionHandler(RuntimeException.class)

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,6 +21,7 @@ import jakarta.validation.constraints.*;
 @Validated
 public class UserAdminController {
     private final UserRepository repo;
+    private final PasswordEncoder passwordEncoder;
 
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -37,7 +39,7 @@ public class UserAdminController {
     public User create(@RequestBody @Valid CreateUser r) {
         User u = new User();
         u.setEmail(r.email());
-        u.setPassword(/* TODO: encode */ r.password());
+        u.setPassword(passwordEncoder.encode(r.password()));
         u.setRole(Role.valueOf(r.role()));
         u.setBanned(false);
         // Optionally set name/phone if provided
@@ -97,4 +99,3 @@ public class UserAdminController {
             String phone
     ) {}
 }
-

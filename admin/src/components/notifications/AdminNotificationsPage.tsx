@@ -5,6 +5,7 @@ import NotificationComposerWidget from "@/components/notifications/NotificationC
 import AdminNotificationHistoryTable from "@/components/notifications/AdminNotificationHistoryTable";
 import Button from "@/components/ui/button/Button";
 import { Modal } from "@/components/ui/modal";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 
 const AdminNotificationsPage: React.FC = () => {
   const [refreshKey, setRefreshKey] = useState(() => Date.now());
@@ -16,34 +17,32 @@ const AdminNotificationsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Центр уведомлений</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Создавайте системные сообщения, управляйте историей рассылок и отслеживайте аудитории.
-          </p>
-        </div>
-        <Button onClick={() => setIsComposerOpen(true)} className="w-full sm:w-auto">
-          Новое уведомление
-        </Button>
+    <div>
+      <PageBreadcrumb pageTitle="Уведомления" />
+      <div className="space-y-4">
+        <AdminNotificationHistoryTable
+          refreshKey={refreshKey}
+          action={
+            <Button size="sm" onClick={() => setIsComposerOpen(true)} className="h-10! py-0!">
+              Новое уведомление
+            </Button>
+          }
+        />
+
+        <Modal
+          isOpen={isComposerOpen}
+          onClose={() => setIsComposerOpen(false)}
+          size="xl"
+          className="p-0"
+        >
+          <div className="p-5">
+            <NotificationComposerWidget
+              onSent={handleNotificationSent}
+              className="border-0 p-0"
+            />
+          </div>
+        </Modal>
       </div>
-
-      <AdminNotificationHistoryTable refreshKey={refreshKey} />
-
-      <Modal
-        isOpen={isComposerOpen}
-        onClose={() => setIsComposerOpen(false)}
-        size="xl"
-        className="p-0"
-      >
-        <div className="p-6 sm:p-8">
-          <NotificationComposerWidget
-            onSent={handleNotificationSent}
-            className="border-0 p-0 shadow-none"
-          />
-        </div>
-      </Modal>
     </div>
   );
 };

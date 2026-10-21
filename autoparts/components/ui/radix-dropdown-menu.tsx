@@ -36,9 +36,12 @@ type DropdownMenuProps = React.ComponentPropsWithoutRef<
   typeof DropdownMenuPrimitive.Root
 >;
 const DropdownMenu: React.FC<DropdownMenuProps> = ({ children, ...props }) => {
-  const [isOpen, setIsOpen] = React.useState(
+  const [uncontrolledOpen, setIsOpen] = React.useState(
     props?.open ?? props?.defaultOpen ?? false,
   );
+  // В контролируемом режиме родитель закрывает меню через open=false,
+  // поэтому анимированный контент должен следовать за пропом, а не за своим state.
+  const isOpen = props.open ?? uncontrolledOpen;
   const [activeValue, setActiveValueState] = React.useState<string | null>(
     null,
   );

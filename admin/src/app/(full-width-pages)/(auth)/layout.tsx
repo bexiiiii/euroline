@@ -25,12 +25,12 @@ export default function AuthLayout({
                   <Image
                     width={231}
                     height={48}
-                    src="./images/logo/auth-logo.svg"
-                    alt="Logo"
+                    src="/images/logo/auth-logo.svg"
+                    alt="Euroline"
                   />
                 </Link>
                 <p className="text-center text-gray-400 dark:text-white/60">
-                Административная панель Euroline - Управляйте с легкостью
+                Административная панель Euroline: заказы, товары, клиенты и платежи
                 </p>
               </div>
             </div>

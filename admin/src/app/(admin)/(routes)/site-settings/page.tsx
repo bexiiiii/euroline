@@ -1,11 +1,16 @@
 import SiteSettingsPage from "@/components/technical/SiteSettingsPage";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Настройки сайта | Админ панель AutoParts",
-  description: "Конфигурация основных параметров и интеграций сайта",
+  title: "Настройки сайта",
 };
 
 export default function SiteSettingsPageRoute() {
-  return <SiteSettingsPage />;
+  return (
+    <>
+      <PageBreadcrumb pageTitle="Настройки сайта" />
+      <SiteSettingsPage />
+    </>
+  );
 }

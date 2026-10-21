@@ -31,4 +31,10 @@ public class CartItem {
     private int quantity;
     private BigDecimal price;
 
+    @Column(name = "warehouse_name", length = 255)
+    private String warehouseName;
+
+    @Column(name = "warehouse_ref_key", length = 64)
+    private String warehouseRefKey;
+
 }

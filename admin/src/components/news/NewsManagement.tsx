@@ -1,10 +1,12 @@
 "use client";
 import React, { useCallback, useEffect, useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
+import Button from "@/components/ui/button/Button";
 import { getNews, createNews, updateNews, deleteNews, NewsItem, NewsRequest } from "@/lib/api/news";
 import NewsTable from "@/components/news/NewsTable";
 import NewsModal from "@/components/news/NewsModal";
 import { useToast } from "@/context/ToastContext";
+import { PlusIcon } from "@/components/finance/tableUi";
 
 const NewsManagement: React.FC = () => {
   const [newsItems, setNewsItems] = useState<NewsItem[]>([]);
@@ -12,20 +14,22 @@ const NewsManagement: React.FC = () => {
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { success: showSuccess, error: showError } = useToast();
 
   const fetchNews = useCallback(async () => {
     try {
       setIsLoading(true);
+      setLoadError(null);
       const news = await getNews();
       setNewsItems(news);
     } catch (error) {
       console.error("Error fetching news:", error);
-      showError("Не удалось загрузить новости. Попробуйте обновить страницу.");
+      setLoadError("Не удалось загрузить данные");
     } finally {
       setIsLoading(false);
     }
-  }, [showError]);
+  }, []);
 
   useEffect(() => {
     fetchNews();
@@ -42,16 +46,16 @@ const NewsManagement: React.FC = () => {
   };
 
   const handleDeleteNews = async (id: number) => {
-    if (!window.confirm("Вы уверены, что хотите удалить эту новость?")) {
+    if (!window.confirm("Удалить новость?")) {
       return;
     }
     try {
       await deleteNews(id);
-      showSuccess("Новость удалена.");
+      showSuccess("Новость удалена");
       await fetchNews();
     } catch (error) {
       console.error("Error deleting news:", error);
-      showError("Ошибка при удалении новости.");
+      showError("Не удалось удалить новость");
     }
   };
 
@@ -60,17 +64,17 @@ const NewsManagement: React.FC = () => {
       setIsSaving(true);
       if (selectedNews) {
         await updateNews(selectedNews.id, newsData);
-        showSuccess("Новость обновлена.");
+        showSuccess("Новость обновлена");
       } else {
         await createNews(newsData);
-        showSuccess("Новость создана.");
+        showSuccess("Новость создана");
       }
       setIsModalOpen(false);
       setSelectedNews(null);
       await fetchNews();
     } catch (error) {
       console.error("Error saving news:", error);
-      showError("Не удалось сохранить новость. Проверьте данные и попробуйте снова.");
+      showError("Не удалось сохранить новость");
       throw error;
     } finally {
       setIsSaving(false);
@@ -78,23 +82,20 @@ const NewsManagement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <h2 className="text-xl font-bold text-gray-800">Новости</h2>
-          <button
-            onClick={handleCreateNews}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-          >
+    <div className="space-y-4">
+      <ComponentCard
+        title=""
+        action={
+          <Button size="sm" startIcon={<PlusIcon />} onClick={handleCreateNews}>
             Создать новость
-          </button>
-        </div>
-      </div>
-
-      <ComponentCard title="Список новостей">
+          </Button>
+        }
+      >
         <NewsTable
           newsItems={newsItems}
           isLoading={isLoading}
+          error={loadError}
+          onRetry={fetchNews}
           onEdit={handleEditNews}
           onDelete={handleDeleteNews}
         />

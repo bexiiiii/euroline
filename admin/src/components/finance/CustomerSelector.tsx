@@ -2,6 +2,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { customersApi } from "@/lib/api/customers";
 import { financeApi } from "@/lib/api/finance";
+import { formatKzt } from "@/lib/format";
+import { controlClass, fieldLabelClass } from "./tableUi";
 
 interface SelectorCustomer {
   id: number;
@@ -33,7 +35,7 @@ const buildDisplayName = (customer: import("@/lib/api/customers").Customer) => {
 const CustomerSelector: React.FC<CustomerSelectorProps> = ({
   selectedCustomer,
   onSelectCustomer,
-  placeholder = "Поиск клиента..."
+  placeholder = "Поиск клиента"
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -78,14 +80,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({
     };
   }, []);
 
-  const formatCurrency = useCallback((amount: number) => {
-    return new Intl.NumberFormat('kk-KZ', {
-      style: 'currency',
-      currency: 'KZT',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  }, []);
+  const formatCurrency = formatKzt;
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -135,29 +130,27 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-        Клиент *
-      </label>
+      <span className={fieldLabelClass}>Клиент</span>
 
       {selectedCustomer ? (
-        <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white flex items-center justify-between">
-          <div className="flex-1">
-            <div className="font-medium">{selectedCustomer.name}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              {selectedCustomer.email} • {selectedCustomer.phone || "—"}
-            </div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Баланс: {formatCurrency(selectedCustomer.balance)}
+        <div className="flex w-full items-center justify-between rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90">
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium">{selectedCustomer.name}</div>
+            <div className="truncate text-xs text-gray-500 dark:text-gray-400">
+              {[selectedCustomer.email, selectedCustomer.phone].filter(Boolean).join(", ")}
+              {", баланс "}
+              <span className="tabular-nums">{formatCurrency(selectedCustomer.balance)}</span>
             </div>
           </div>
           <button
             type="button"
             onClick={handleClearSelection}
-            className="ml-2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            className="ml-2 inline-flex size-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-white/90"
             title="Очистить выбор"
+            aria-label="Очистить выбор клиента"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg className="size-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 18 18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
@@ -169,40 +162,39 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({
             value={searchTerm}
             onChange={handleInputChange}
             onFocus={() => setIsOpen(true)}
-            className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+            className={`${controlClass} w-full pr-10`}
             placeholder={placeholder}
+            aria-label="Поиск клиента"
           />
           <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            <svg className="size-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="m20 20-3.5-3.5" />
             </svg>
           </div>
         </div>
       )}
 
       {isOpen && !selectedCustomer && (
-        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+        <div className="absolute z-50 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-theme-lg dark:border-gray-800 dark:bg-gray-900">
           {loading ? (
-            <div className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm">Загрузка…</div>
+            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">Загрузка…</div>
           ) : error ? (
-            <div className="px-4 py-3 text-red-600 dark:text-red-400 text-sm">{error}</div>
+            <div className="px-3 py-2 text-sm text-error-600 dark:text-error-500">{error}</div>
           ) : visibleCustomers.length === 0 ? (
-            <div className="px-4 py-3 text-gray-500 dark:text-gray-400 text-sm">Клиенты не найдены</div>
+            <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">Клиенты не найдены</div>
           ) : (
             visibleCustomers.map((customer) => (
               <div
                 key={customer.id}
                 onClick={() => handleCustomerSelect(customer)}
-                className="px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0"
+                className="cursor-pointer border-b border-gray-100 px-3 py-2 last:border-b-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/[0.04]"
               >
-                <div className="font-medium text-gray-900 dark:text-white">
+                <div className="text-sm font-medium text-gray-800 dark:text-white/90">
                   {buildDisplayName(customer)}
                 </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {customer.email}
-                </div>
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {customer.phone || "—"}
+                <div className="text-xs text-gray-500 dark:text-gray-400">
+                  {[customer.email, customer.phone].filter(Boolean).join(", ") || "—"}
                 </div>
               </div>
             ))

@@ -38,6 +38,8 @@ public class CacheConfig {
     public static final String VEHICLE_BY_FRAME_CACHE = "vehicleByFrame";
     public static final String VEHICLE_BY_PLATE_CACHE = "vehicleByPlate";
     public static final String WIZARD_START_CACHE = "wizardStart";
+    public static final String WIZARD_STEP_CACHE = "wizardStep";
+    public static final String WIZARD_VEHICLES_CACHE = "wizardVehicles";
     public static final String FULLTEXT_DETAILS_CACHE = "fulltextDetails";
     public static final String VEHICLE_INFO_CACHE = "vehicleInfo";
     public static final String QUICK_GROUPS_CACHE = "quickGroups";
@@ -130,9 +132,13 @@ public class CacheConfig {
         cacheConfigurations.put(VEHICLE_BY_PLATE_CACHE,
             defaultConfig.entryTtl(Duration.ofHours(6)));
 
-        // Старт мастера — кешируем на 2 часа
+        // Мастер подбора — шаги детерминированы ssd, а запросы к Laximo лимитированы: кешируем на 7 дней
         cacheConfigurations.put(WIZARD_START_CACHE,
-            defaultConfig.entryTtl(Duration.ofHours(2)));
+            defaultConfig.entryTtl(Duration.ofDays(7)));
+        cacheConfigurations.put(WIZARD_STEP_CACHE,
+            defaultConfig.entryTtl(Duration.ofDays(7)));
+        cacheConfigurations.put(WIZARD_VEHICLES_CACHE,
+            defaultConfig.entryTtl(Duration.ofDays(7)));
 
         // Полнотекстовый поиск деталей — кешируем на 15 минут
         cacheConfigurations.put(FULLTEXT_DETAILS_CACHE,

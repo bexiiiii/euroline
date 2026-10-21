@@ -1,0 +1,16 @@
+autoparts_backend/src/main/java/autoparts/kz/integration/umapi/client/UmapiClient.java
+autoparts_backend/src/main/java/autoparts/kz/integration/umapi/service/OeCatalogCache.java
+autoparts_backend/src/main/java/autoparts/kz/integration/umapi/service/AutomaticAnalogService.java
+autoparts_backend/src/main/java/autoparts/kz/modules/mainSearch/service/MainSearchService.java
+autoparts_backend/src/main/java/autoparts/kz/modules/mainSearch/dto/SearchResponse.java
+autoparts_backend/src/main/java/autoparts/kz/modules/mainSearch/controller/SearchController.java
+autoparts_backend/src/main/java/autoparts/kz/modules/mainSearch/controller/MainSearchController.java
+autoparts_backend/src/test/java/autoparts/kz/modules/mainSearch/service/BrandSelectionSearchTest.java
+autoparts_backend/src/test/java/autoparts/kz/modules/order/service/CheckoutDatabaseTest.java
+autoparts_backend/src/test/java/autoparts/kz/integration/umapi/service/AutomaticAnalogServiceTest.java
+autoparts_backend/src/test/java/autoparts/kz/integration/umapi/service/AutomaticAnalogLiveTest.java
+autoparts_backend/src/test/java/autoparts/kz/modules/mainSearch/controller/SearchRefreshTest.java
+autoparts/lib/api/search.ts
+autoparts/lib/stores/searchStore.ts
+autoparts/app/(routes)/search/page.tsx
+autoparts/tests/search-store.test.cjs

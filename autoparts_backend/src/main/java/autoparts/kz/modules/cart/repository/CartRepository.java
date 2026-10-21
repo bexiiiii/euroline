@@ -14,6 +14,10 @@ import java.util.List;
 
 @Repository
 public interface CartRepository extends JpaRepository<Cart, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select c from Cart c where c.user.id = :uid")
+    Optional<Cart> findLockedByUserId(@Param("uid") Long userId);
+
     Optional<Cart> findByUserId(Long userId);
 
     @Query("select distinct c from Cart c left join fetch c.items i left join fetch i.product p where c.user.id = :uid")

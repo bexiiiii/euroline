@@ -1,11 +1,20 @@
 "use client";
-import React, { useState, useEffect } from "react";
-import ComponentCard from "../common/ComponentCard";
+import React, { useState, useEffect, useCallback } from "react";
+import StatCard, { StatGrid } from "../common/StatCard";
+import Checkbox from "../form/input/Checkbox";
+import {
+  AlertIcon,
+  CheckCircleIcon,
+  ClockIcon,
+  EyeIcon,
+  RefreshIcon,
+  iconButtonClass,
+  toolbarIconButtonClass,
+} from "../analytics/StatIcons";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
 import { Modal } from "../ui/modal";
 import { Table, TableBody, TableCell, TableHeader, TableRow } from "../ui/table";
-import Label from "../form/Label";
 import Input from "../form/input/InputField";
 import Select from "../form/Select";
 import ExportWithDateRange, { ExportDateRange } from "@/components/common/ExportWithDateRange";
@@ -32,7 +41,6 @@ interface ErrorLog {
 }
 
 const ErrorLogsPage = () => {
-  const [activeTab, setActiveTab] = useState("all");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedError, setSelectedError] = useState<ErrorLog | null>(null);
   const [filterLevel, setFilterLevel] = useState("");
@@ -44,33 +52,34 @@ const ErrorLogsPage = () => {
   const { success: showSuccess, error: showError } = useToast();
 
   // Fetch error logs from API
-  useEffect(() => {
-    const fetchErrorLogs = async () => {
-      try {
-        setLoading(true);
-        const response = await fetch(`${API_URL}/api/admin/error-logs`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch error logs');
+  const fetchErrorLogs = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`${API_URL}/api/admin/error-logs`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+          'Content-Type': 'application/json'
         }
-        
-        const data = await response.json();
-        setErrorLogs(data.content || data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'An error occurred');
-        console.error('Failed to fetch error logs:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      });
 
-    fetchErrorLogs();
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const data = await response.json();
+      setErrorLogs(data.content || data);
+    } catch (err) {
+      setError('Не удалось загрузить логи ошибок');
+      console.error('Failed to fetch error logs:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchErrorLogs();
+  }, [fetchErrorLogs]);
 
   const formatDateTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleString('ru-RU', {
@@ -86,30 +95,15 @@ const ErrorLogsPage = () => {
   const getLevelBadge = (level: string) => {
     switch (level) {
       case "FATAL":
-        return <Badge color="dark" size="sm">Критическая</Badge>;
+        return <Badge variant="light" color="dark" size="sm">Критическая</Badge>;
       case "ERROR":
-        return <Badge color="error" size="sm">Ошибка</Badge>;
+        return <Badge variant="light" color="error" size="sm">Ошибка</Badge>;
       case "WARN":
-        return <Badge color="warning" size="sm">Предупреждение</Badge>;
+        return <Badge variant="light" color="warning" size="sm">Предупреждение</Badge>;
       case "INFO":
-        return <Badge color="info" size="sm">Информация</Badge>;
+        return <Badge variant="light" color="info" size="sm">Информация</Badge>;
       default:
-        return <Badge color="light" size="sm">{level}</Badge>;
-    }
-  };
-
-  const getLevelIcon = (level: string) => {
-    switch (level) {
-      case "FATAL":
-        return <div className="w-2 h-2 rounded-full bg-red-700 animate-pulse"></div>;
-      case "ERROR":
-        return <div className="w-2 h-2 rounded-full bg-red-500"></div>;
-      case "WARN":
-        return <div className="w-2 h-2 rounded-full bg-yellow-500"></div>;
-      case "INFO":
-        return <div className="w-2 h-2 rounded-full bg-blue-500"></div>;
-      default:
-        return <div className="w-2 h-2 rounded-full bg-gray-400"></div>;
+        return <Badge variant="light" color="light" size="sm">Прочее</Badge>;
     }
   };
 
@@ -120,8 +114,8 @@ const ErrorLogsPage = () => {
 
   const markAsResolved = async (errorId: number) => {
     try {
-      const response = await fetch(`${API_URL}/api/admin/error-logs/${errorId}/resolve`, {
-        method: 'PUT',
+      const response = await fetch(`${API_URL}/api/admin/error-logs/${errorId}?resolved=true`, {
+        method: 'PATCH',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
           'Content-Type': 'application/json'
@@ -145,14 +139,14 @@ const ErrorLogsPage = () => {
       if (selectedError?.id === errorId) {
         setIsModalOpen(false);
       }
+      showSuccess('Отмечено как решённое');
     } catch (err) {
       console.error('Failed to resolve error:', err);
-      alert('Не удалось пометить ошибку как решенную');
+      showError('Не удалось обновить статус');
     }
   };
 
   const filteredErrors = errorLogs.filter(error => {
-    if (activeTab !== "all" && error.level !== activeTab) return false;
     if (filterLevel && error.level !== filterLevel) return false;
     if (!showResolved && error.resolved) return false;
     if (searchTerm && 
@@ -181,7 +175,7 @@ const ErrorLogsPage = () => {
     });
 
     if (filtered.length === 0) {
-      showError("За выбранный период нет логов ошибок");
+      showError("За период записей нет");
       return;
     }
 
@@ -213,421 +207,233 @@ const ErrorLogsPage = () => {
 
   const stats = getErrorStats();
 
+  const hasFilters = Boolean(searchTerm || filterLevel || showResolved);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {loading ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="text-gray-500 dark:text-gray-400">
-            <p className="text-lg font-medium">Загрузка логов ошибок...</p>
-          </div>
-        </div>
+        <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">Загрузка...</div>
       ) : error ? (
-        <div className="flex justify-center items-center py-12">
-          <div className="text-red-500 dark:text-red-400">
-            <p className="text-lg font-medium">Ошибка загрузки: {error}</p>
-            <button 
-              onClick={() => window.location.reload()} 
-              className="mt-2 text-sm underline hover:no-underline"
-            >
-              Обновить страницу
-            </button>
-          </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-white/[0.03]">
+          <p className="text-sm text-error-600 dark:text-error-400">Не удалось загрузить данные</p>
+          <Button size="xs" variant="outline" className="mt-3" onClick={fetchErrorLogs}>
+            Повторить
+          </Button>
         </div>
       ) : (
         <>
-          {/* Статистика */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Всего ошибок</h3>
-              <div className="mt-2 flex items-baseline">
-                <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
-              </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">записей в логе</p>
-            </div>
+          <StatGrid>
+            <StatCard
+              label="Критические"
+              value={stats.critical}
+              icon={<AlertIcon />}
+              tone={stats.critical > 0 ? "error" : "default"}
+            />
+            <StatCard
+              label="Ошибки"
+              value={stats.errors}
+              icon={<AlertIcon />}
+              tone={stats.errors > 0 ? "error" : "default"}
+            />
+            <StatCard
+              label="Предупреждения"
+              value={stats.warnings}
+              icon={<ClockIcon />}
+              tone={stats.warnings > 0 ? "warning" : "default"}
+            />
+            <StatCard label="Решено" value={stats.resolved} icon={<CheckCircleIcon />} hint={`из ${stats.total}`} />
+          </StatGrid>
 
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Критические</h3>
-              <div className="mt-2 flex items-baseline">
-                <p className="text-3xl font-bold text-red-700 dark:text-red-400">{stats.critical}</p>
-                {stats.critical > 0 && (
-                  <div className="ml-2 flex items-center">
-                    <div className="w-2 h-2 rounded-full bg-red-700 animate-pulse"></div>
-                  </div>
-                )}
-              </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">требуют внимания</p>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Ошибки</h3>
-              <div className="mt-2 flex items-baseline">
-                <p className="text-3xl font-bold text-red-500 dark:text-red-400">{stats.errors}</p>
-              </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">активных ошибок</p>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Предупреждения</h3>
-              <div className="mt-2 flex items-baseline">
-                <p className="text-3xl font-bold text-yellow-500 dark:text-yellow-400">{stats.warnings}</p>
-              </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">предупреждений</p>
-            </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">Решено</h3>
-              <div className="mt-2 flex items-baseline">
-                <p className="text-3xl font-bold text-green-500 dark:text-green-400">{stats.resolved}</p>
-              </div>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">ошибок исправлено</p>
-            </div>
-          </div>
-
-          {/* Фильтры */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <Label>Поиск по сообщению или файлу</Label>
+          <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+            <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 p-4 dark:border-gray-800">
+              <label htmlFor="error-log-search" className="sr-only">
+                Поиск по сообщению
+              </label>
+              <div className="w-full sm:w-64">
                 <Input
+                  id="error-log-search"
                   type="text"
-                  placeholder="Введите текст для поиска..."
-                  defaultValue={searchTerm}
+                  placeholder="Поиск"
+                  value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
+                  className="h-10!"
                 />
               </div>
-              <div>
-                <Label>Уровень ошибки</Label>
+              <label className="block w-full sm:w-48">
+                <span className="sr-only">Уровень</span>
                 <Select
                   options={levelOptions}
+                  value={filterLevel}
                   onChange={(value) => setFilterLevel(value)}
-                  placeholder="Выберите уровень"
+                  placeholder="Уровень"
+                  className="h-10!"
                 />
-              </div>
-              <div className="flex items-end">
-                <label className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    checked={showResolved}
-                    onChange={(e) => setShowResolved(e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700 dark:text-gray-300">
-                    Показать решенные
-                  </span>
-                </label>
-              </div>
-              <div className="flex items-end">
-                <Button 
-                  variant="outline" 
+              </label>
+              <Checkbox label="Решённые" checked={showResolved} onChange={setShowResolved} />
+              {hasFilters && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-10! py-0!"
                   onClick={() => {
                     setSearchTerm("");
                     setFilterLevel("");
                     setShowResolved(false);
                   }}
-                  className="w-full"
                 >
-                  Сбросить фильтры
+                  Сбросить
                 </Button>
+              )}
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={fetchErrorLogs}
+                  className={toolbarIconButtonClass}
+                  aria-label="Обновить"
+                  title="Обновить"
+                >
+                  <RefreshIcon />
+                </button>
+                <ExportWithDateRange
+                  triggerLabel="Экспорт"
+                  size="sm"
+                  variant="outline"
+                  className="h-10! py-0!"
+                  onConfirm={handleExportLogs}
+                />
               </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <Table className="min-w-[760px]">
+                <TableHeader className="border-b border-gray-100 dark:border-gray-800">
+                  <TableRow>
+                    <TableCell isHeader className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Время</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Уровень</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Сообщение</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">Статус</TableCell>
+                    <TableCell isHeader className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                      <span className="sr-only">Действия</span>
+                    </TableCell>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {filteredErrors.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="px-4 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                        {hasFilters ? "Ничего не найдено" : "Ошибок нет"}
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredErrors.map((error) => (
+                      <TableRow
+                        key={error.id}
+                        className={`hover:bg-gray-50 dark:hover:bg-white/[0.02] ${error.resolved ? "opacity-60" : ""}`}
+                      >
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap tabular-nums">
+                          {formatDateTime(error.timestamp)}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{getLevelBadge(error.level)}</TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                          <div className="max-w-lg line-clamp-2 text-gray-800 dark:text-white/90">{error.message}</div>
+                          {error.className && (
+                            <div className="max-w-lg truncate text-xs text-gray-500 dark:text-gray-400">{error.className}</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                          {error.resolved ? (
+                            <Badge variant="light" color="success" size="sm">Решено</Badge>
+                          ) : (
+                            <Badge variant="light" color="error" size="sm">Активна</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => openErrorDetails(error)}
+                              className={iconButtonClass}
+                              aria-label="Просмотр"
+                              title="Просмотр"
+                            >
+                              <EyeIcon />
+                            </button>
+                            {!error.resolved && (
+                              <button
+                                type="button"
+                                onClick={() => markAsResolved(error.id)}
+                                className={iconButtonClass}
+                                aria-label="Отметить решённой"
+                                title="Отметить решённой"
+                              >
+                                <CheckCircleIcon />
+                              </button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </div>
           </div>
 
-          {/* Основной контент */}
-          <ComponentCard
-            title="Логи ошибок системы"
-            description="Мониторинг и анализ ошибок приложения"
-            action={
-              <div className="flex space-x-2">
-                <Button size="sm" variant="outline">Очистить старые логи</Button>
-                <ExportWithDateRange
-                  triggerLabel="Экспорт логов"
-                  variant="outline"
-                  onConfirm={handleExportLogs}
-                  icon={
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                  }
-                />
-                <Button size="sm">Настройки логирования</Button>
-              </div>
-            }
-          >
-            {/* Табы */}
-            <div className="border-b border-gray-200 dark:border-gray-700 -mx-6 px-6">
-              <nav className="flex space-x-8 overflow-x-auto" aria-label="Tabs">
-                <button
-                  onClick={() => setActiveTab("all")}
-                  className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === "all"
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
-                >
-                  Все ошибки
-                </button>
-                <button
-                  onClick={() => setActiveTab("FATAL")}
-                  className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === "FATAL"
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
-                >
-                  Критические
-                </button>
-                <button
-                  onClick={() => setActiveTab("ERROR")}
-                  className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === "ERROR"
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
-                >
-                  Ошибки
-                </button>
-                <button
-                  onClick={() => setActiveTab("WARN")}
-                  className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-                    activeTab === "WARN"
-                      ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
-                  }`}
-                >
-                  Предупреждения
-                </button>
-              </nav>
-            </div>
-
-            {/* Таблица ошибок */}
-            <div className="mt-6">
-              <div className="mx-auto overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-white/[0.05] dark:bg-white/[0.03] xl:max-w-[960px]">
-                <div className="max-w-full overflow-x-auto">
-                  <div className="min-w-[820px]">
-                    <Table>
-                      <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
-                        <TableRow>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Время</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Уровень</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Сообщение</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Логгер</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Класс</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Метод</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Статус</TableCell>
-                          <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">Действия</TableCell>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                        {filteredErrors.map((error) => (
-                          <TableRow key={error.id} className={error.resolved ? "opacity-60" : ""}>
-                            <TableCell className="px-5 py-4 sm:px-6 text-start">
-                              <div className="text-gray-700 text-theme-sm dark:text-gray-300 font-mono">
-                                {formatDateTime(error.timestamp)}
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-start text-theme-sm">
-                              <div className="flex items-center space-x-2">
-                                {getLevelIcon(error.level)}
-                                {getLevelBadge(error.level)}
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-start text-theme-sm">
-                              <div className="max-w-md">
-                                <div className="font-medium text-gray-800 dark:text-white/90 line-clamp-2">
-                                  {error.message}
-                                </div>
-                                {error.exception && (
-                                  <div className="text-gray-500 text-theme-xs dark:text-gray-400 mt-1">
-                                    {error.exception}
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-start text-theme-sm">
-                              <div className="font-mono text-gray-700 dark:text-gray-300">
-                                <div className="truncate max-w-xs">{error.logger}</div>
-                                {error.threadName && (
-                                  <div className="text-gray-500 text-theme-xs dark:text-gray-400">
-                                    Thread: {error.threadName}
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-start text-theme-sm">
-                              <div className="font-mono text-gray-700 dark:text-gray-300">
-                                {error.className && (
-                                  <div className="truncate max-w-xs">{error.className}</div>
-                                )}
-                                {error.fileName && (
-                                  <div className="text-gray-500 text-theme-xs dark:text-gray-400">
-                                    {error.fileName}
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-start text-theme-sm">
-                              <div className="font-mono text-gray-700 dark:text-gray-300">
-                                {error.methodName && (
-                                  <div className="truncate max-w-xs">{error.methodName}</div>
-                                )}
-                                {error.lineNumber && (
-                                  <div className="text-gray-500 text-theme-xs dark:text-gray-400">
-                                    Строка {error.lineNumber}
-                                  </div>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-start text-theme-sm">
-                              {error.resolved ? (
-                                <Badge color="success" size="sm">Решено</Badge>
-                              ) : (
-                                <Badge color="error" size="sm">Активна</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="px-4 py-3 text-start">
-                              <div className="flex items-center space-x-2">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => openErrorDetails(error)}
-                                >
-                                  Подробнее
-                                </Button>
-                                {!error.resolved && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => markAsResolved(error.id)}
-                                  >
-                                    Решено
-                                  </Button>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </div>
-
-              {filteredErrors.length === 0 && (
-                <div className="text-center py-12">
-                  <div className="text-gray-500 dark:text-gray-400">
-                    <p className="text-lg font-medium">Ошибки не найдены</p>
-                    <p className="text-sm mt-1">Попробуйте изменить фильтры поиска</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ComponentCard>
-
-          {/* Модальное окно с подробностями ошибки */}
           <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} size="xl">
             {selectedError && (
-              <div className="p-6">
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-6">
-                  Подробности ошибки
-                </h3>
-                
-                <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Время возникновения</Label>
-                      <div className="font-mono text-sm text-gray-700 dark:text-gray-300">
-                        {formatDateTime(selectedError.timestamp)}
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Уровень</Label>
-                      <div>{getLevelBadge(selectedError.level)}</div>
-                    </div>
-                    <div>
-                      <Label>Метод</Label>
-                      <div className="font-mono text-sm text-gray-700 dark:text-gray-300">
-                        {selectedError.methodName || 'Не указан'}
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Поток</Label>
-                      <div className="text-sm text-gray-700 dark:text-gray-300">
-                        {selectedError.threadName || 'Не указан'}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Сообщение об ошибке</Label>
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-800 dark:text-red-300">
-                      {selectedError.message}
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label>Логгер</Label>
-                    <div className="font-mono text-sm text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-800 rounded p-2">
-                      {selectedError.logger}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Класс</Label>
-                      <div className="font-mono text-sm text-gray-700 dark:text-gray-300">
-                        {selectedError.className || 'Не указан'}
-                      </div>
-                    </div>
-                    <div>
-                      <Label>Файл и строка</Label>
-                      <div className="font-mono text-sm text-gray-700 dark:text-gray-300">
-                        {selectedError.fileName && selectedError.lineNumber 
-                          ? `${selectedError.fileName}:${selectedError.lineNumber}`
-                          : 'Не указано'
-                        }
-                      </div>
-                    </div>
-                  </div>
-
-                  {selectedError.stackTrace && (
-                    <div>
-                      <Label>Stack Trace</Label>
-                      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 text-sm text-gray-700 dark:text-gray-300 font-mono whitespace-pre-wrap max-h-60 overflow-y-auto">
-                        {selectedError.stackTrace}
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedError.exception && (
-                    <div>
-                      <Label>Исключение</Label>
-                      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-800 dark:text-red-300 font-mono">
-                        {selectedError.exception}
-                      </div>
-                    </div>
-                  )}
-
+              <div className="space-y-4 p-5">
+                <div className="flex flex-wrap items-center gap-2 pr-8">
+                  <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">Ошибка</h3>
+                  {getLevelBadge(selectedError.level)}
                   {selectedError.resolved && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                      <div className="text-green-800 dark:text-green-300">
-                        <div className="font-medium">Ошибка решена</div>
-                        <div className="text-sm mt-1">
-                          Решена {formatDateTime(selectedError.resolvedAt!)} пользователем {selectedError.resolvedBy}
-                        </div>
-                      </div>
-                    </div>
+                    <Badge variant="light" color="success" size="sm">Решено</Badge>
                   )}
                 </div>
 
-                <div className="flex justify-end pt-6 space-x-3">
-                  {!selectedError.resolved && (
-                    <Button onClick={() => markAsResolved(selectedError.id)}>
-                      Пометить как решено
-                    </Button>
+                <p className="text-sm text-gray-800 dark:text-white/90">{selectedError.message}</p>
+
+                <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs text-gray-500 dark:text-gray-400">Время</dt>
+                    <dd className="tabular-nums text-gray-800 dark:text-white/90">{formatDateTime(selectedError.timestamp)}</dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-xs text-gray-500 dark:text-gray-400">Источник</dt>
+                    <dd className="truncate font-mono text-xs text-gray-700 dark:text-gray-300" title={selectedError.logger}>
+                      {selectedError.fileName && selectedError.lineNumber
+                        ? `${selectedError.fileName}:${selectedError.lineNumber}`
+                        : selectedError.className || selectedError.logger}
+                    </dd>
+                  </div>
+                  {selectedError.resolved && (
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs text-gray-500 dark:text-gray-400">Решена</dt>
+                      <dd className="text-gray-800 dark:text-white/90">
+                        {selectedError.resolvedAt ? formatDateTime(selectedError.resolvedAt) : "—"}
+                        {selectedError.resolvedBy ? `, ${selectedError.resolvedBy}` : ""}
+                      </dd>
+                    </div>
                   )}
-                  <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+                </dl>
+
+                {(selectedError.exception || selectedError.stackTrace) && (
+                  <div>
+                    <p className="mb-1 text-xs text-gray-500 dark:text-gray-400">Подробности</p>
+                    <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded-lg bg-gray-50 p-3 font-mono text-xs text-gray-700 dark:bg-white/[0.03] dark:text-gray-300">
+                      {[selectedError.exception, selectedError.stackTrace].filter(Boolean).join("\n\n")}
+                    </pre>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setIsModalOpen(false)}>
                     Закрыть
                   </Button>
+                  {!selectedError.resolved && (
+                    <Button size="sm" onClick={() => markAsResolved(selectedError.id)}>
+                      Отметить решённой
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

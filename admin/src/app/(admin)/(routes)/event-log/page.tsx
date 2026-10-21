@@ -1,11 +1,16 @@
 import EventLogPage from "@/components/events/EventLogPage";
+import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Журнал событий | Админ панель AutoParts",
-  description: "Мониторинг и анализ событий системы AutoParts",
+  title: "Журнал событий",
 };
 
 export default function EventLogPageRoute() {
-  return <EventLogPage />;
+  return (
+    <>
+      <PageBreadcrumb pageTitle="Журнал событий" />
+      <EventLogPage />
+    </>
+  );
 }

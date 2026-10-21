@@ -5,18 +5,18 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSidebar } from "../context/SidebarContext";
 import {
-  BoxCubeIcon,
   BellIcon,
-  CalenderIcon,
+  BoxCubeIcon,
   ChevronDownIcon,
+  DocsIcon,
   DollarLineIcon,
   GridIcon,
-  HorizontaLDots,
-  ListIcon,
-  PageIcon,
-  PieChartIcon,
+  GroupIcon,
+  LockIcon,
   PlugInIcon,
-  TableIcon,
+  ShootingStarIcon,
+  TaskIcon,
+  TimeIcon,
   UserCircleIcon,
 } from "../icons/index";
 
@@ -25,152 +25,97 @@ type NavItem = {
   name: string;
   icon: React.ReactNode;
   path?: string;
-  subItems?: { name: string; path: string; pro?: boolean; new?: boolean }[];
+  subItems?: { name: string; path: string }[];
 };
 
 const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
-    name: "Дешборд",
-    subItems: [{ name: "Статистика", path: "/", pro: false }, { name: "Аналитика", path: "/analytics", pro: false }],
-
+    name: "Дашборд",
+    subItems: [
+      { name: "Статистика", path: "/" },
+      { name: "Аналитика", path: "/analytics" },
+    ],
   },
   {
     icon: <BellIcon />,
     name: "Уведомления",
     path: "/notifications",
   },
-  // {
-  //   icon: <CalenderIcon />,
-  //   name: "Календарь",
-  //   path: "/calendar",
-  // },
   {
-    icon: <UserCircleIcon />,
-    name: "Профиль пользователя",
-    path: "/profile",
+    icon: <BoxCubeIcon />,
+    name: "Товары",
+    subItems: [
+      { name: "Товары", path: "/products" },
+      { name: "Категории и подкатегории", path: "/categories" },
+    ],
   },
   {
-    icon: <PlugInIcon />,
-    name: "Управление товарами",
-    subItems: [{ name: "Товары", path: "/products", pro: false }, { name: "Категории и подкатегории", path: "/categories", pro: false }],
+    icon: <TaskIcon />,
+    name: "Заказы",
+    subItems: [
+      { name: "Заказы", path: "/orders" },
+      { name: "Корзины", path: "/carts" },
+      { name: "Возвраты", path: "/returns" },
+    ],
   },
   {
-    icon: <PlugInIcon />,
-    name: "Управление заказами",
-    subItems: [{ name: "Заказы", path: "/orders", pro: false }, { name: "Корзины", path: "/carts", pro: false }, { name: "Возвраты", path: "/returns", pro: false }],
+    icon: <GroupIcon />,
+    name: "Клиенты",
+    subItems: [
+      { name: "Клиенты", path: "/customers" },
+      { name: "История поиска", path: "/customer-search-history" },
+    ],
   },
-  {
-    icon: <PlugInIcon />,
-    name: "Управление клиентами",
-    subItems: [{ name: "Клиенты", path: "/customers", pro: false }, { name: "История поиска", path: "/customer-search-history", pro: false }],
-  },
-  //  {
-  //   icon: <PlugInIcon />,
-  //   name: "Управление складом и запасами",
-  //   subItems: [{ name: "Склад", path: "/inventory", pro: false }, { name: "Запасы", path: "/stock", pro: false }],
-  // },
   {
     icon: <DollarLineIcon />,
     name: "Финансы и платежи",
     subItems: [
-      { name: "Пополнение баланса", path: "/payment", pro: false },
-      { name: "Запросы на возврат", path: "/return-requests", pro: false },
-      { name: "История возвратов", path: "/return-history", pro: false },
-      { name: "Остатки на счетах", path: "/account-balances", pro: false },
-      { name: "Кредитные лимиты", path: "/payment/credit-settings", pro: false },
+      { name: "Пополнение баланса", path: "/payment" },
+      { name: "Запросы на возврат", path: "/return-requests" },
+      { name: "История возвратов", path: "/return-history" },
+      { name: "Остатки на счетах", path: "/account-balances" },
+      { name: "Кредитные лимиты", path: "/payment/credit-settings" },
     ],
   },
-  //  {
-  //   icon: <PlugInIcon />,
-  //   name: "Управление доставкой",
-  //   subItems: [{ name: "Статусы доставки", path: "/delivery-statuses", pro: false }, { name: "Запросы на доставку", path: "/delivery-requests", pro: false }, { name: "История доставок", path: "/delivery-history", pro: false }],
-  // },
   {
-    icon: <PlugInIcon />, 
-    name: "Маркетинг и акции",
-    subItems: [ { name: "Рекламные баннеры", path: "/product-banners", pro: false }],
+    icon: <ShootingStarIcon />,
+    name: "Маркетинг",
+    subItems: [{ name: "Рекламные баннеры", path: "/product-banners" }],
   },
   {
-    icon: <PlugInIcon />,
+    icon: <DocsIcon />,
     name: "Новости",
     path: "/news",
   },
   {
-    icon: <PlugInIcon />,
-    name: "Управление пользователями ",
+    icon: <LockIcon />,
+    name: "Пользователи",
     path: "/users",
   },
   {
-    icon: <PlugInIcon />,
+    icon: <TimeIcon />,
     name: "Журнал событий",
     path: "/event-log",
   },
   {
     icon: <PlugInIcon />,
     name: "Технические настройки",
-    subItems: [{ name: "API", path: "/api-management", pro: false }, { name: "Настройки сайта", path: "/site-settings", pro: false }, { name: "Логи ошибок", path: "/error-logs", pro: false },{ name: "Состояние системы", path: "/system-status", pro: false }, ],
+    subItems: [
+      { name: "API", path: "/api-management" },
+      { name: "Настройки сайта", path: "/site-settings" },
+      { name: "Логи ошибок", path: "/error-logs" },
+      { name: "Состояние системы", path: "/system-status" },
+    ],
   },
-  
-
-
-
-
-
-  
-
-
-
-  // {
-  //   name: "Forms",
-  //   icon: <ListIcon />,
-  //   subItems: [{ name: "Form Elements", path: "/form-elements", pro: false }],
-  // },
-  // {
-  //   name: "Tables",
-  //   icon: <TableIcon />,
-  //   subItems: [{ name: "Basic Tables", path: "/basic-tables", pro: false }],
-  // },
-  // {
-  //   name: "Pages",
-  //   icon: <PageIcon />,
-  //   subItems: [
-  //     { name: "Blank Page", path: "/blank", pro: false },
-  //     { name: "404 Error", path: "/error-404", pro: false },
-  //   ],
-  // },
+  {
+    icon: <UserCircleIcon />,
+    name: "Мой профиль",
+    path: "/profile",
+  },
 ];
 
-const othersItems: NavItem[] = [
-  // {
-  //   icon: <PieChartIcon />,
-  //   name: "Charts",
-  //   subItems: [
-  //     { name: "Line Chart", path: "/line-chart", pro: false },
-  //     { name: "Bar Chart", path: "/bar-chart", pro: false },
-  //   ],
-  // },
-  // {
-  //   icon: <BoxCubeIcon />,
-  //   name: "UI Elements",
-  //   subItems: [
-  //     { name: "Alerts", path: "/alerts", pro: false },
-  //     { name: "Avatar", path: "/avatars", pro: false },
-  //     { name: "Badge", path: "/badge", pro: false },
-  //     { name: "Buttons", path: "/buttons", pro: false },
-  //     { name: "Images", path: "/images", pro: false },
-  //     { name: "Videos", path: "/videos", pro: false },
-  //   ],
-  // },
-  // {
-  //   icon: <PlugInIcon />,
-  //   name: "Authentication",
-  //   subItems: [
-  //     { name: "Sign In", path: "/signin", pro: false },
-  //     { name: "Sign Up", path: "/signup", pro: false },
-  //   ],
-  // },
-];
+const othersItems: NavItem[] = [];
 
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
@@ -180,12 +125,15 @@ const AppSidebar: React.FC = () => {
     navItems: NavItem[],
     menuType: "main" | "others"
   ) => (
-    <ul className="flex flex-col gap-4">
+    <ul className="flex flex-col gap-1">
       {navItems.map((nav, index) => (
-        <li key={nav.name}>
+        <li key={`${nav.name}-${index}`}>
           {nav.subItems ? (
             <button
+              type="button"
               onClick={() => handleSubmenuToggle(index, menuType)}
+              aria-expanded={openSubmenu?.type === menuType && openSubmenu?.index === index}
+              aria-label={!isExpanded && !isHovered && !isMobileOpen ? nav.name : undefined}
               className={`menu-item group  ${
                 openSubmenu?.type === menuType && openSubmenu?.index === index
                   ? "menu-item-active"
@@ -197,7 +145,7 @@ const AppSidebar: React.FC = () => {
               }`}
             >
               <span
-                className={` ${
+                className={`flex size-6 shrink-0 items-center justify-center ${
                   openSubmenu?.type === menuType && openSubmenu?.index === index
                     ? "menu-item-icon-active"
                     : "menu-item-icon-inactive"
@@ -223,12 +171,14 @@ const AppSidebar: React.FC = () => {
             nav.path && (
               <Link
                 href={nav.path}
+                aria-label={!isExpanded && !isHovered && !isMobileOpen ? nav.name : undefined}
+                aria-current={isActive(nav.path) ? "page" : undefined}
                 className={`menu-item group ${
                   isActive(nav.path) ? "menu-item-active" : "menu-item-inactive"
                 }`}
               >
                 <span
-                  className={`${
+                  className={`flex size-6 shrink-0 items-center justify-center ${
                     isActive(nav.path)
                       ? "menu-item-icon-active"
                       : "menu-item-icon-inactive"
@@ -255,11 +205,12 @@ const AppSidebar: React.FC = () => {
                     : "0px",
               }}
             >
-              <ul className="mt-2 space-y-1 ml-9">
+              <ul className="mt-1 mb-1 space-y-0.5 ml-9">
                 {nav.subItems.map((subItem) => (
                   <li key={subItem.name}>
                     <Link
                       href={subItem.path}
+                      aria-current={isActive(subItem.path) ? "page" : undefined}
                       className={`menu-dropdown-item ${
                         isActive(subItem.path)
                           ? "menu-dropdown-item-active"
@@ -267,30 +218,6 @@ const AppSidebar: React.FC = () => {
                       }`}
                     >
                       {subItem.name}
-                      <span className="flex items-center gap-1 ml-auto">
-                        {subItem.new && (
-                          <span
-                            className={`ml-auto ${
-                              isActive(subItem.path)
-                                ? "menu-dropdown-badge-active"
-                                : "menu-dropdown-badge-inactive"
-                            } menu-dropdown-badge `}
-                          >
-                            new
-                          </span>
-                        )}
-                        {subItem.pro && (
-                          <span
-                            className={`ml-auto ${
-                              isActive(subItem.path)
-                                ? "menu-dropdown-badge-active"
-                                : "menu-dropdown-badge-inactive"
-                            } menu-dropdown-badge `}
-                          >
-                            pro
-                          </span>
-                        )}
-                      </span>
                     </Link>
                   </li>
                 ))}
@@ -382,7 +309,7 @@ const AppSidebar: React.FC = () => {
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
-        className={`py-8 flex  ${
+        className={`py-6 flex  ${
           !isExpanded && !isHovered ? "lg:justify-center" : "justify-start"
         }`}
       >
@@ -392,45 +319,43 @@ const AppSidebar: React.FC = () => {
               <Image
                 className="dark:hidden"
                 src="/images/logo/logo.svg"
-                alt="Logo"
+                alt="Euroline"
                 width={150}
                 height={40}
               />
               <Image
                 className="hidden dark:block"
                 src="/images/logo/logo-dark.svg"
-                alt="Logo"
+                alt="Euroline"
                 width={150}
                 height={40}
               />
             </>
           ) : (
-            <Image
-              src="/images/logo/logo-icon.svg"
-              alt="Logo"
-              width={32}
-              height={32}
-            />
+            // Свёрнутый сайдбар: показываем только знак (левую часть логотипа)
+            <span className="flex h-8 w-8 items-center overflow-hidden">
+              <Image
+                className="max-w-none dark:hidden"
+                src="/images/logo/logo.svg"
+                alt="Euroline"
+                width={140}
+                height={29}
+              />
+              <Image
+                className="hidden max-w-none dark:block"
+                src="/images/logo/logo-dark.svg"
+                alt="Euroline"
+                width={140}
+                height={29}
+              />
+            </span>
           )}
         </Link>
       </div>
       <div className="flex flex-col overflow-y-auto duration-300 ease-linear no-scrollbar">
-        <nav className="mb-6">
+        <nav className="mb-6" aria-label="Основное меню">
           <div className="flex flex-col gap-4">
             <div>
-              <h2
-                className={`mb-4 text-xs uppercase flex leading-[20px] text-gray-400 ${
-                  !isExpanded && !isHovered
-                    ? "lg:justify-center"
-                    : "justify-start"
-                }`}
-              >
-                {isExpanded || isHovered || isMobileOpen ? (
-                  "Menu"
-                ) : (
-                  <HorizontaLDots />
-                )}
-              </h2>
               {renderMenuItems(navItems, "main")}
             </div>
 

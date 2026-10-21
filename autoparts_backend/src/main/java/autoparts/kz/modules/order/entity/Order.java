@@ -35,11 +35,27 @@ public class Order {
     @Column(name = "public_code", length = 10, unique = true)
     private String publicCode;
 
+    /** Stable document key assigned by 1C after the site order is accepted there. */
+    @Column(name = "onec_ref_key", length = 64, unique = true)
+    private String oneCRefKey;
+
+    /** Warehouse selected for the order in 1C. */
+    @Column(name = "onec_warehouse_ref_key", length = 64)
+    private String oneCWarehouseRefKey;
+
+    /** Last order comment received from 1C. */
+    @Column(name = "onec_comment", columnDefinition = "TEXT")
+    private String oneCComment;
+
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     private User user;
 
     @Column(name = "customer_email", nullable = false, length = 255)
     private String customerEmail;
+
+    /** Комментарий клиента, введённый при оформлении заказа. */
+    @Column(name = "comment", columnDefinition = "TEXT")
+    private String comment;
 
     /** Адрес доставки, который требуется 1С. */
     @Column(length = 500)

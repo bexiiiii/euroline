@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { useVehicle } from "@/context/VehicleContext"
 import { vehicleApi, DetailDto } from "@/lib/api/vehicle"
 import { apiCache } from "@/lib/cache"
+import { catalogTreeState } from "@/lib/catalogTreeState"
 
 type TreeNode = {
   name: string
@@ -22,6 +23,7 @@ interface LazyTreeItemProps {
   onNodeUpdate?: (nodeId: string, updatedNode: TreeNode) => void
   onQuickGroupSelected?: (groupId: number, groupName: string, details: DetailDto[]) => void
   onQuickGroupLoading?: (groupId: number, groupName: string) => void
+  stateKey?: string | null
 }
 
 export function LazyTreeItem({
@@ -30,8 +32,11 @@ export function LazyTreeItem({
   onNodeUpdate,
   onQuickGroupSelected,
   onQuickGroupLoading,
+  stateKey = null,
 }: LazyTreeItemProps) {
-  const [isOpen, setIsOpen] = useState(false)
+  const nodeKey = `${node.type}-${node.id}`
+  // Раскрытие ветки переживает уход со страницы и «Назад»
+  const [isOpen, setIsOpen] = useState(() => catalogTreeState.isOpen(stateKey, nodeKey))
   const [isLoading, setIsLoading] = useState(false)
   const { session } = useVehicle()
 
@@ -81,6 +86,20 @@ export function LazyTreeItem({
       return []
     }
   }, [session])
+
+  // Детали группы: сначала sessionStorage, потом API (лимит запросов Laximo)
+  const fetchGroupDetails = useCallback(async (groupId: number): Promise<DetailDto[]> => {
+    const cached = catalogTreeState.getGroupDetails(stateKey, groupId)
+    if (cached) return cached
+    const details = await vehicleApi.getQuickDetails(
+      session!.catalog,
+      session!.vehicleId,
+      session!.ssd,
+      groupId
+    )
+    catalogTreeState.setGroupDetails(stateKey, groupId, details)
+    return details
+  }, [session, stateKey])
 
   // Загружаем детали QuickGroup (для узлов с link=true)
   const loadQuickGroupDetails = useCallback(async (groupId: number) => {
@@ -149,12 +168,7 @@ export function LazyTreeItem({
         
         try {
           // Получаем детали из API и передаем их напрямую
-          const apiDetails = await vehicleApi.getQuickDetails(
-            session.catalog!, 
-            session.vehicleId!, 
-            session.ssd!, 
-            groupId
-          )
+          const apiDetails = await fetchGroupDetails(groupId)
           
           // Уведомляем о завершении загрузки с данными
           if (onQuickGroupSelected) {
@@ -184,12 +198,7 @@ export function LazyTreeItem({
         console.log(`LazyTreeItem: QuickGroup ${groupId} уже загружен, показываем данные повторно`)
         if (onQuickGroupSelected && session) {
           try {
-            const apiDetails = await vehicleApi.getQuickDetails(
-              session.catalog, 
-              session.vehicleId, 
-              session.ssd, 
-              groupId
-            )
+            const apiDetails = await fetchGroupDetails(groupId)
             onQuickGroupSelected(groupId, node.name, apiDetails)
           } catch (error) {
             console.error(`LazyTreeItem: Ошибка повторной загрузки деталей для QuickGroup ${groupId}:`, error)
@@ -233,8 +242,10 @@ export function LazyTreeItem({
     }
     
     // Раскрываем/сворачиваем узел только если у него есть реальные дочерние элементы
-    setIsOpen(!isOpen)
-  }, [isOpen, node, loadUnitDetails, onNodeUpdate, onQuickGroupSelected, onQuickGroupLoading, session])
+    const nextOpen = !isOpen
+    setIsOpen(nextOpen)
+    catalogTreeState.setOpen(stateKey, nodeKey, nextOpen)
+  }, [isOpen, node, nodeKey, stateKey, loadUnitDetails, fetchGroupDetails, onNodeUpdate, onQuickGroupSelected, onQuickGroupLoading, session])
 
   // Определяем, есть ли дочерние элементы
   const hasChildren = node.nodes && node.nodes.length > 0
@@ -288,6 +299,7 @@ export function LazyTreeItem({
         onNodeUpdate={onNodeUpdate}
         onQuickGroupSelected={onQuickGroupSelected}
         onQuickGroupLoading={onQuickGroupLoading}
+        stateKey={stateKey}
       />
     ))
 
@@ -328,7 +340,6 @@ export function LazyTreeItem({
             <ChevronIcon />
           </button>
         )}
-        {canExpand && console.log(`🔲 BUTTON RENDERED for ${node.type}-${node.id} "${node.name}", canExpand: ${canExpand}`)}
 
         {node.type === 'detail' ? (
           <File className="ml-[22px] size-6 text-gray-900 flex-shrink-0" />

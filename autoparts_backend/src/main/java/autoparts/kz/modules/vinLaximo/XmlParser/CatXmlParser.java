@@ -1,6 +1,7 @@
 package autoparts.kz.modules.vinLaximo.XmlParser;
 
 import autoparts.kz.modules.vinLaximo.dto.*;
+import jakarta.persistence.EntityNotFoundException;
 import org.w3c.dom.*;
 import org.xml.sax.InputSource;
 
@@ -103,7 +104,7 @@ public class CatXmlParser {
         return a == null ? null : a.getNodeValue();
     }
 
-    private static NodeList xp(Document d, String path) {
+    private static NodeList xp(Node d, String path) {
         try {
             XPath x = XPathFactory.newInstance().newXPath();
             return (NodeList) x.compile(path).evaluate(d, XPathConstants.NODESET);
@@ -270,126 +271,94 @@ public class CatXmlParser {
     }
 
     private static VehicleDto parseVehicleGeneric(String xml, String node) {
-        Document d = toDoc(xml);
-        Node r = xp(d, "//" + node + "/row").item(0);
-        if (r == null) throw new RuntimeException("Vehicle not found (" + node + ")");
-        VehicleDto v = new VehicleDto();
-        v.setVehicleId(attr(r, "vehicleid"));
-        v.setSsd(attr(r, "ssd"));
-        v.setCatalog(attr(r, "catalog"));
-        v.setBrand(attr(r, "brand"));
-        v.setName(attr(r, "name"));
-
-        List<VehicleAttrDto> lst = new ArrayList<>();
-        NodeList attrs = xp(d, "//" + node + "/row/attribute");
-        for (int i = 0; i < attrs.getLength(); i++) {
-            Node a = attrs.item(i);
-            VehicleAttrDto dto = new VehicleAttrDto();
-            dto.setCode(attr(a, "code"));
-            dto.setLabel(attr(a, "name"));
-            List<String> values = new ArrayList<>();
-            NodeList vs = a.getChildNodes();
-            for (int j = 0; j < vs.getLength(); j++) {
-                Node ch = vs.item(j);
-                if ("value".equalsIgnoreCase(ch.getNodeName())) values.add(ch.getTextContent());
-            }
-            dto.setValues(values);
-            lst.add(dto);
-        }
-        v.setAttributes(lst);
-        return v;
+        List<VehicleDto> list = parseVehicleList(xml, node);
+        if (list.isEmpty()) throw new EntityNotFoundException("Vehicle not found (" + node + ")");
+        return list.get(0);
     }
 
-    // -------- Wizard (GetWizard2 / GetWizardNextStep2) --------
+    public static List<VehicleDto> parseFindVehicleByWizard2List(String xml) {
+        return parseVehicleList(xml, "FindVehicleByWizard2");
+    }
+
+    private static List<VehicleDto> parseVehicleList(String xml, String node) {
+        Document d = toDoc(xml);
+        NodeList rows = xp(d, "//" + node + "/row");
+        List<VehicleDto> res = new ArrayList<>();
+        for (int i = 0; i < rows.getLength(); i++) {
+            Node r = rows.item(i);
+            VehicleDto v = new VehicleDto();
+            v.setVehicleId(attr(r, "vehicleid"));
+            v.setSsd(attr(r, "ssd"));
+            v.setCatalog(attr(r, "catalog"));
+            v.setBrand(attr(r, "brand"));
+            v.setName(attr(r, "name"));
+
+            List<VehicleAttrDto> lst = new ArrayList<>();
+            NodeList attrs = xp(r, "attribute");
+            for (int k = 0; k < attrs.getLength(); k++) {
+                Node a = attrs.item(k);
+                VehicleAttrDto dto = new VehicleAttrDto();
+                dto.setCode(attr(a, "key") != null ? attr(a, "key") : attr(a, "code"));
+                dto.setLabel(attr(a, "name"));
+                List<String> values = new ArrayList<>();
+                if (attr(a, "value") != null) values.add(attr(a, "value"));
+                NodeList vs = a.getChildNodes();
+                for (int j = 0; j < vs.getLength(); j++) {
+                    Node ch = vs.item(j);
+                    if ("value".equalsIgnoreCase(ch.getNodeName())) values.add(ch.getTextContent());
+                }
+                dto.setValues(values);
+                lst.add(dto);
+            }
+            v.setAttributes(lst);
+            res.add(v);
+        }
+        return res;
+    }
+
+    // -------- Wizard (GetWizard2) --------
+    // <GetWizard2><row conditionid name determined value ssd allowlistvehicles>
+    //   <options><row key="ssd для выбора" value="..."/></options></row></GetWizard2>
     public static WizardStepDto parseWizardStep(String xml, String node) {
         Document d = toDoc(xml);
-        WizardStepDto step = new WizardStepDto();
         Node root = xp(d, "//" + node).item(0);
         if (root == null) throw new RuntimeException("Wizard step not found");
+        WizardStepDto step = new WizardStepDto();
         step.setSsd(attr(root, "ssd"));
+
         List<WizardParamDto> params = new ArrayList<>();
-        NodeList groups = xp(d, "//" + node + "/group"); // некоторые каталоги группируют параметры
-        if (groups.getLength() == 0) {
-            // без групп – параметры сразу в <row> или <param>
-            params.addAll(extractWizardParams(xp(d, "//" + node + "//param|//" + node + "//row")));
-        } else {
-            for (int i = 0; i < groups.getLength(); i++) {
-                Node g = groups.item(i);
-                params.addAll(extractWizardParams(g.getChildNodes()));
+        boolean allowList = false;
+        NodeList rows = xp(d, "//" + node + "/row");
+        for (int i = 0; i < rows.getLength(); i++) {
+            Node r = rows.item(i);
+            String code = attr(r, "conditionid");
+            if (code == null) code = attr(r, "code");
+            if (code == null) continue;
+
+            WizardParamDto p = new WizardParamDto();
+            p.setCode(code);
+            p.setLabel(attr(r, "name"));
+            p.setDetermined("true".equalsIgnoreCase(attr(r, "determined")));
+            p.setValue(attr(r, "value"));
+            p.setRemoveKey(attr(r, "ssd"));
+            if ("true".equalsIgnoreCase(attr(r, "allowlistvehicles"))) allowList = true;
+
+            List<WizardValueDto> values = new ArrayList<>();
+            NodeList opts = xp(r, "options/row");
+            for (int j = 0; j < opts.getLength(); j++) {
+                Node o = opts.item(j);
+                WizardValueDto v = new WizardValueDto();
+                v.setCode(attr(o, "key"));
+                v.setLabel(attr(o, "value"));
+                values.add(v);
             }
+            p.setValues(values);
+            params.add(p);
         }
         step.setParams(params);
-        // эвристика: если нет параметров -> финальный шаг (дальше FindVehicleByWizard2)
-        step.setFinalStep(params.isEmpty());
+        step.setAllowListVehicles(allowList);
+        step.setFinalStep(params.stream().allMatch(WizardParamDto::isDetermined));
         return step;
-    }
-
-    private static List<WizardParamDto> extractWizardParams(NodeList nl) {
-        Map<String, WizardParamDto> map = new LinkedHashMap<>();
-        for (int i = 0; i < nl.getLength(); i++) {
-            Node n = nl.item(i);
-            String nodeName = n.getNodeName().toLowerCase();
-            if (!nodeName.equals("param") && !nodeName.equals("row")) continue;
-            
-            // Поддержка разных атрибутов для кода параметра
-            String pcode = attr(n, "code");
-            if (pcode == null) pcode = attr(n, "conditionid");
-            if (pcode == null) continue;
-            
-            String plabel = attr(n, "name");
-            
-            WizardParamDto p = map.computeIfAbsent(pcode, k -> {
-                WizardParamDto w = new WizardParamDto();
-                w.setCode(k);
-                w.setLabel(plabel);
-                w.setValues(new ArrayList<>());
-                return w;
-            });
-            
-            // Обрабатываем опции внутри <options> элемента (Laximo структура)
-            NodeList optionsChildNodes = n.getChildNodes();
-            Node optionsNode = null;
-            for (int j = 0; j < optionsChildNodes.getLength(); j++) {
-                Node child = optionsChildNodes.item(j);
-                if ("options".equalsIgnoreCase(child.getNodeName())) {
-                    optionsNode = child;
-                    break;
-                }
-            }
-            
-            if (optionsNode != null) {
-                NodeList rowNodes = optionsNode.getChildNodes();
-                for (int j = 0; j < rowNodes.getLength(); j++) {
-                    Node rowNode = rowNodes.item(j);
-                    if ("row".equalsIgnoreCase(rowNode.getNodeName())) {
-                        WizardValueDto val = new WizardValueDto();
-                        val.setCode(attr(rowNode, "key"));
-                        val.setLabel(attr(rowNode, "value"));
-                        p.getValues().add(val);
-                    }
-                }
-            } else {
-                // значения могут быть как дочерние <value code="X" name="..."/>
-                NodeList values = n.getChildNodes();
-                for (int j = 0; j < values.getLength(); j++) {
-                    Node v = values.item(j);
-                    if ("value".equalsIgnoreCase(v.getNodeName())) {
-                        WizardValueDto val = new WizardValueDto();
-                        val.setCode(attr(v, "code"));
-                        val.setLabel(attr(v, "name") != null ? attr(v, "name") : v.getTextContent());
-                        p.getValues().add(val);
-                    }
-                }
-                // иногда значение единственное в атрибутах param/row
-                if (p.getValues().isEmpty() && attr(n, "value") != null) {
-                    WizardValueDto val = new WizardValueDto();
-                    val.setCode(attr(n, "value"));
-                    val.setLabel(attr(n, "name"));
-                    p.getValues().add(val);
-                }
-            }
-        }
-        return new ArrayList<>(map.values());
     }
 
     // -------- Categories / Units / UnitInfo / Details / ImageMap / Filters --------
@@ -452,7 +421,7 @@ public class CatXmlParser {
         
         Document d = toDoc(xml);
         // The correct element name is ListDetailsByUnit (with 's')
-        NodeList rows = xp(d, "//ListDetailsByUnit/row");
+        NodeList rows = xp(d, "//ListDetailsByUnit/row|//ListDetailByUnit/row");
         
         List<DetailDto> res = new ArrayList<>();
         for (int i = 0; i < rows.getLength(); i++) {

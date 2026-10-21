@@ -1,99 +1,104 @@
 import React from "react";
 import { NewsItem } from "@/lib/api/news";
+import Badge from "@/components/ui/badge/Badge";
+import Button from "@/components/ui/button/Button";
+import {
+  DeleteIcon,
+  EditIcon,
+  RowAction,
+  rowClass,
+  tableWrapClass,
+  tbodyClass,
+  tdClass,
+  thClass,
+  theadClass,
+} from "@/components/finance/tableUi";
 
 interface NewsTableProps {
   newsItems: NewsItem[];
   isLoading: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   onEdit: (news: NewsItem) => void;
   onDelete: (id: number) => void;
 }
 
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
-  return date.toLocaleDateString('ru-RU', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("ru-RU", {
+    year: "numeric",
+    month: "2-digit",
+    day: "numeric",
   });
 };
 
-const NewsTable: React.FC<NewsTableProps> = ({ newsItems, isLoading, onEdit, onDelete }) => {
+const NewsTable: React.FC<NewsTableProps> = ({ newsItems, isLoading, error, onRetry, onEdit, onDelete }) => {
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="w-8 h-8 border-4 border-gray-300 border-t-blue-500 rounded-full animate-spin"></div>
+      <div className="flex items-center justify-center py-8" role="status" aria-label="Загрузка новостей">
+        <div className="size-6 animate-spin rounded-full border-2 border-gray-300 border-t-brand-500 dark:border-gray-700 dark:border-t-brand-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        role="alert"
+        className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-error-200 bg-error-50 px-4 py-3 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400"
+      >
+        <span>{error}</span>
+        {onRetry && (
+          <Button size="xs" variant="outline" onClick={onRetry}>
+            Повторить
+          </Button>
+        )}
       </div>
     );
   }
 
   if (newsItems.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-gray-500">Новости не найдены</p>
-      </div>
+      <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">Новостей пока нет</p>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-        <thead className="bg-gray-50 dark:bg-gray-800">
+    <div className={tableWrapClass}>
+      <table className="w-full min-w-[720px]">
+        <thead className={theadClass}>
           <tr>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Заголовок
-            </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Описание
-            </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Статус
-            </th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Дата создания
-            </th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Действия
-            </th>
+            <th className={thClass}>Заголовок</th>
+            <th className={thClass}>Статус</th>
+            <th className={thClass}>Создана</th>
+            <th className={`${thClass} text-right`}>Действия</th>
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-900 dark:divide-gray-700">
+        <tbody className={tbodyClass}>
           {newsItems.map((news) => (
-            <tr key={news.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-              <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {news.title}
+            <tr key={news.id} className={rowClass}>
+              <td className={tdClass}>
+                <div className="font-medium text-gray-800 dark:text-white/90">{news.title}</div>
+                {news.description && (
+                  <div className="line-clamp-1 max-w-xl text-xs text-gray-500 dark:text-gray-400">{news.description}</div>
+                )}
+              </td>
+              <td className={tdClass}>
+                <Badge size="sm" color={news.published ? "success" : "light"}>
+                  {news.published ? "Опубликована" : "Черновик"}
+                </Badge>
+              </td>
+              <td className={`${tdClass} whitespace-nowrap tabular-nums`}>{formatDate(news.createdAt)}</td>
+              <td className={tdClass}>
+                <div className="flex items-center justify-end gap-1">
+                  <RowAction label={`Редактировать новость «${news.title}»`} onClick={() => onEdit(news)}>
+                    <EditIcon />
+                  </RowAction>
+                  <RowAction label={`Удалить новость «${news.title}»`} onClick={() => onDelete(news.id)} destructive>
+                    <DeleteIcon />
+                  </RowAction>
                 </div>
-              </td>
-              <td className="px-6 py-4">
-                <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">
-                  {news.description}
-                </div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                  news.published 
-                    ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" 
-                    : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100"
-                }`}>
-                  {news.published ? "Опубликовано" : "Черновик"}
-                </span>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                {formatDate(news.createdAt)}
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                <button
-                  onClick={() => onEdit(news)}
-                  className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-3"
-                >
-                  Редактировать
-                </button>
-                <button
-                  onClick={() => onDelete(news.id)}
-                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                >
-                  Удалить
-                </button>
               </td>
             </tr>
           ))}

@@ -5,6 +5,7 @@ import FinanceStats from "../FinanceStats";
 import FinanceToolbar from "../FinanceToolbar";
 import TopUpBalanceModal from "../TopUpBalanceModal";
 import BalanceTopUpTable from "@/components/finance/BalanceTopUpTable";
+import KaspiConnectionCard from "../KaspiConnectionCard";
 import { financeApi, TopUpResponse } from "@/lib/api/finance";
 
 const BalanceTopUpPage: React.FC = () => {
@@ -76,6 +77,8 @@ const BalanceTopUpPage: React.FC = () => {
         addButtonText="Создать пополнение"
         onAddClick={openCreateModal}
       />
+
+      <KaspiConnectionCard />
 
       <ComponentCard title="Заявки на пополнение">
         <BalanceTopUpTable onTopUpBalance={openViewModal} refreshKey={refreshKey} />

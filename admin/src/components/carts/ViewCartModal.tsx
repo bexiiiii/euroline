@@ -1,1 +1,114 @@
-"use client";import React from "react";import { Modal } from "../ui/modal";import Badge from "../ui/badge/Badge";import { CustomerCart } from "@/lib/api/carts";interface ViewCartModalProps {  isOpen: boolean;  onClose: () => void;  cart: CustomerCart | null;  onSendReminder?: (cartId: number) => void;  onClearCart?: (cartId: number) => void;  onConvertToOrder?: (cartId: number) => void;}const ViewCartModal: React.FC<ViewCartModalProps> = ({  isOpen,  onClose,  cart,  onSendReminder,  onClearCart,  onConvertToOrder,}) => {  if (!cart) return null;  const formatCurrency = (amount: number) => {    return new Intl.NumberFormat("ru-RU", {      style: "currency",      currency: "RUB",    }).format(amount);  };  const formatDate = (dateString: string) => {    return new Date(dateString).toLocaleDateString("ru-RU", {      year: "numeric",      month: "short",      day: "numeric",      hour: "2-digit",      minute: "2-digit",    });  };  const getStatusColor = (isAbandoned: boolean): "success" | "error" => {    return isAbandoned ? "error" : "success";  };  const getStatusText = (isAbandoned: boolean): string => {    return isAbandoned ? "Брошенная" : "Активная";  };  const getDaysSinceLastActivity = (lastUpdated: string): number => {    const now = new Date();    const updatedDate = new Date(lastUpdated);    const diffTime = Math.abs(now.getTime() - updatedDate.getTime());    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));  };  return (    <Modal isOpen={isOpen} onClose={onClose} size="lg">      <div className="p-6">        {/* Header */}        <div className="flex items-center justify-between mb-6">          <h2 className="text-xl font-semibold text-gray-900">            Корзина #{cart.id}          </h2>          <Badge            color={getStatusColor(cart.isAbandoned)}            variant="light"          >            {getStatusText(cart.isAbandoned)}          </Badge>        </div>        {/* Customer Information */}        <div className="mb-6">          <h3 className="text-lg font-medium text-gray-900 mb-3">            Информация о клиенте          </h3>          <div className="bg-gray-50 rounded-lg p-4">            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">              <div>                <span className="block text-sm text-gray-500">Имя:</span>                <span className="block font-medium text-gray-900">                  {cart.customerName}                </span>              </div>              <div>                <span className="block text-sm text-gray-500">Email:</span>                <span className="block font-medium text-gray-900">                  {cart.customerEmail}                </span>              </div>              <div>                <span className="block text-sm text-gray-500">ID клиента:</span>                <span className="block font-medium text-gray-900">                  #{cart.customerId}                </span>              </div>              <div>                <span className="block text-sm text-gray-500">Дней с последней активности:</span>                <span className="block font-medium text-gray-900">                  {getDaysSinceLastActivity(cart.lastUpdated)} дн.                </span>              </div>            </div>          </div>        </div>        {/* Cart Items */}        <div className="mb-6">          <h3 className="text-lg font-medium text-gray-900 mb-3">            Товары в корзине ({cart.totalItems})          </h3>          <div className="space-y-3">            {cart.items.map((item) => (              <div                key={item.id}                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"              >                <div className="flex-1">                  <div className="font-medium text-gray-900">                    {item.productName}                  </div>                  <div className="text-sm text-gray-500">                    SKU: {item.productSku}                  </div>                  <div className="text-sm text-gray-500">                    Добавлено: {formatDate(item.addedAt)}                  </div>                </div>                <div className="text-right">                  <div className="font-medium text-gray-900">                    {item.quantity} × {formatCurrency(item.price)}                  </div>                  <div className="text-sm text-gray-500">                    Итого: {formatCurrency(item.totalPrice)}                  </div>                </div>              </div>            ))}          </div>        </div>        {/* Cart Summary */}        <div className="mb-6">          <h3 className="text-lg font-medium text-gray-900 mb-3">            Итоги корзины          </h3>          <div className="bg-gray-50 rounded-lg p-4">            <div className="grid grid-cols-2 gap-4">              <div>                <span className="block text-sm text-gray-500">Общее количество товаров:</span>                <span className="block font-medium text-gray-900">                  {cart.totalItems} шт.                </span>              </div>              <div>                <span className="block text-sm text-gray-500">Общая сумма:</span>                <span className="block text-xl font-bold text-gray-900">                  {formatCurrency(cart.totalAmount)}                </span>              </div>              <div>                <span className="block text-sm text-gray-500">Создана:</span>                <span className="block font-medium text-gray-900">                  {formatDate(cart.createdAt)}                </span>              </div>              <div>                <span className="block text-sm text-gray-500">Последнее обновление:</span>                <span className="block font-medium text-gray-900">                  {formatDate(cart.lastUpdated)}                </span>              </div>            </div>          </div>        </div>        {/* Actions */}        <div className="flex justify-end space-x-3">          <button            onClick={onClose}            className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"          >            Закрыть          </button>          {cart.isAbandoned && onSendReminder && (            <button              onClick={() => onSendReminder(cart.id)}              className="px-4 py-2 text-yellow-700 bg-yellow-100 rounded-lg hover:bg-yellow-200 transition-colors"            >              Отправить напоминание            </button>          )}          {onConvertToOrder && (            <button              onClick={() => onConvertToOrder(cart.id)}              className="px-4 py-2 text-green-700 bg-green-100 rounded-lg hover:bg-green-200 transition-colors"            >              Конвертировать в заказ            </button>          )}          {onClearCart && (            <button              onClick={() => onClearCart(cart.id)}              className="px-4 py-2 text-red-700 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"            >              Очистить корзину            </button>          )}        </div>      </div>    </Modal>  );};export default ViewCartModal;
+"use client";
+import React from "react";
+import { Modal } from "../ui/modal";
+import Badge from "../ui/badge/Badge";
+import Button from "../ui/button/Button";
+import { CustomerCart } from "@/lib/api/carts";
+import { formatKzt, formatDateTime } from "@/lib/format";
+
+interface ViewCartModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  cart: CustomerCart | null;
+  onSendReminder?: (cartId: number) => void;
+  onClearCart?: (cartId: number) => void;
+  onConvertToOrder?: (cartId: number) => void;
+}
+
+const ViewCartModal: React.FC<ViewCartModalProps> = ({
+  isOpen,
+  onClose,
+  cart,
+  onSendReminder,
+  onClearCart,
+  onConvertToOrder,
+}) => {
+  if (!cart) return null;
+
+  const fields: { label: string; value: React.ReactNode }[] = [
+    { label: "Клиент", value: cart.customerName || "—" },
+    { label: "Эл. почта", value: cart.customerEmail || "—" },
+    { label: "Создана", value: formatDateTime(cart.createdAt) },
+    { label: "Обновлена", value: formatDateTime(cart.lastUpdated) },
+  ];
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      <div className="p-5">
+        <div className="mb-4 flex items-center gap-2 pr-10">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+            Корзина #{cart.id}
+          </h2>
+          <Badge size="sm" color={cart.isAbandoned ? "warning" : "success"} variant="light">
+            {cart.isAbandoned ? "Брошенная" : "Активная"}
+          </Badge>
+        </div>
+
+        <div className="space-y-4">
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {fields.map((f) => (
+              <div key={f.label}>
+                <dt className="text-xs text-gray-500 dark:text-gray-400">{f.label}</dt>
+                <dd className="text-sm text-gray-800 dark:text-white/90">{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-800">
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+              {cart.items.length === 0 ? (
+                <li className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">Корзина пуста</li>
+              ) : (
+                cart.items.map((item) => (
+                  <li key={item.id} className="flex items-center justify-between gap-4 px-4 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <p className="truncate text-gray-800 dark:text-white/90">{item.productName}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {item.productSku} · {item.quantity} × {formatKzt(item.price)}
+                      </p>
+                    </div>
+                    <span className="whitespace-nowrap font-medium tabular-nums text-gray-800 dark:text-white/90">
+                      {formatKzt(item.totalPrice)}
+                    </span>
+                  </li>
+                ))
+              )}
+            </ul>
+            <div className="flex justify-between border-t border-gray-200 px-4 py-2.5 text-sm dark:border-gray-800">
+              <span className="text-gray-500 dark:text-gray-400">Итого, {cart.totalItems} шт.</span>
+              <span className="font-semibold tabular-nums text-gray-800 dark:text-white/90">{formatKzt(cart.totalAmount)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap justify-end gap-2">
+          {onClearCart && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mr-auto"
+              onClick={() => onClearCart(cart.id)}
+            >
+              Очистить
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={onClose}>
+            Закрыть
+          </Button>
+          {cart.isAbandoned && onSendReminder && (
+            <Button size="sm" variant="outline" onClick={() => onSendReminder(cart.id)}>
+              Напомнить клиенту
+            </Button>
+          )}
+          {onConvertToOrder && (
+            <Button size="sm" onClick={() => onConvertToOrder(cart.id)}>
+              Оформить заказ
+            </Button>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+export default ViewCartModal;

@@ -25,6 +25,11 @@ public class OrderResponse {
     private String customerEmail;
     private String customerName;
     private String customerPhone;
+    private String warehouseRefKey;
+    private String comment;
+    private String oneCComment;
+    private String customerCity;
+    private String customerAddress;
     private List<OrderItemDTO> items;
 
     @Getter
@@ -35,6 +40,9 @@ public class OrderResponse {
         private String productName;
         private String productCode;
         private String sku;
+        private String brand;
+        private String warehouseName;
+        private String warehouseRefKey;
         private int quantity;
         private BigDecimal price;
         private BigDecimal total;

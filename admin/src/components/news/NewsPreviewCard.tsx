@@ -1,4 +1,5 @@
-import { cn } from "@/lib/utils";
+import React from "react";
+import Badge from "@/components/ui/badge/Badge";
 
 interface NewsPreviewCardProps {
   title: string;
@@ -7,32 +8,26 @@ interface NewsPreviewCardProps {
   published: boolean;
 }
 
-const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1544077960-604201fe74bc?auto=format&fit=crop&w=1280&q=80";
-
 const NewsPreviewCard: React.FC<NewsPreviewCardProps> = ({ title, description, coverImageUrl, published }) => {
-  const imageSrc = coverImageUrl || FALLBACK_IMAGE;
-
   return (
-    <article className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+    <article className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
       <div
-        className="relative h-40 w-full overflow-hidden bg-center bg-cover"
-        style={{ backgroundImage: `url(${imageSrc})` }}
+        className="relative h-36 w-full overflow-hidden bg-gray-100 bg-center bg-cover dark:bg-gray-800"
+        style={coverImageUrl ? { backgroundImage: `url(${coverImageUrl})` } : undefined}
       >
-        <div className="absolute inset-0 bg-gradient-to-t from-gray-900/70 via-gray-900/20 to-transparent" />
-        <span
-          className={cn(
-            "absolute bottom-3 left-3 rounded-full px-3 py-1 text-xs font-semibold text-white backdrop-blur",
-            published ? "bg-emerald-500/80" : "bg-yellow-500/80"
-          )}
-        >
-          {published ? "Опубликовано" : "Черновик"}
-        </span>
+        {!coverImageUrl && (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
+            Нет обложки
+          </div>
+        )}
       </div>
 
-      <div className="p-4">
-        <p className="text-xs uppercase tracking-wide text-gray-400">Предпросмотр карточки</p>
-        <h3 className="mt-2 text-lg font-semibold text-gray-900 line-clamp-2">{title}</h3>
-        <p className="mt-3 text-sm text-gray-600 line-clamp-3">{description}</p>
+      <div className="space-y-2 p-4">
+        <Badge size="sm" color={published ? "success" : "light"}>
+          {published ? "Опубликована" : "Черновик"}
+        </Badge>
+        <h3 className="line-clamp-2 text-base font-semibold text-gray-800 dark:text-white/90">{title}</h3>
+        <p className="line-clamp-3 text-sm text-gray-500 dark:text-gray-400">{description}</p>
       </div>
     </article>
   );

@@ -1,51 +1,57 @@
 "use client";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { ApexOptions } from "apexcharts";
 import { analyticsApi, ChartDataPoint } from "@/lib/api/analytics";
+import WidgetError from "./WidgetError";
 
 const ReactApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
 export default function OrdersAnalytics() {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ChartDataPoint[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const result = await analyticsApi.getMonthlySales();
+      setData(result ?? []);
+    } catch (err) {
+      console.error("Failed to fetch monthly sales:", err);
+      setError("Не удалось загрузить заказы");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const result = await analyticsApi.getMonthlySales();
-        setData(result);
-      } catch (error) {
-        console.error("Failed to fetch monthly sales:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const monthNames = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
   
   const categories = data.map((d) => {
-    const [year, month] = d.date.split('-');
+    const month = d.date.split('-')[1];
     return monthNames[parseInt(month) - 1];
   });
 
   const seriesData = data.map((d) => Math.round(d.value));
 
   const options: ApexOptions = {
-    colors: ["#9C27B0"],
+    colors: ["#465FFF"],
     chart: {
       fontFamily: "Outfit, sans-serif",
       type: "bar",
-      height: 350,
+      height: 280,
       toolbar: { show: false },
     },
     plotOptions: {
       bar: {
         horizontal: false,
         columnWidth: "55%",
-        borderRadius: 8,
+        borderRadius: 4,
         borderRadiusApplication: "end",
       },
     },
@@ -61,7 +67,7 @@ export default function OrdersAnalytics() {
       axisTicks: { show: false },
     },
     yaxis: {
-      title: { text: "Количество заказов" },
+      labels: { formatter: (val: number) => Math.round(val).toString() },
     },
     fill: {
       opacity: 1,
@@ -85,24 +91,23 @@ export default function OrdersAnalytics() {
   ];
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-white/[0.03]">
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            Динамика заказов
-          </h3>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Количество заказов по месяцам
-          </p>
-        </div>
-      </div>
+    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+      <h3 className="mb-3 text-base font-semibold text-gray-800 dark:text-white/90">
+        Динамика заказов
+      </h3>
 
       {loading ? (
-        <div className="flex items-center justify-center h-[350px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="flex items-center justify-center h-[280px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
+        </div>
+      ) : error ? (
+        <WidgetError message="Не удалось загрузить данные" onRetry={fetchData} className="h-[280px] py-0" />
+      ) : data.length === 0 ? (
+        <div className="flex items-center justify-center h-[280px] text-sm text-gray-500 dark:text-gray-400">
+          Данных пока нет
         </div>
       ) : (
-        <ReactApexChart options={options} series={series} type="bar" height={350} />
+        <ReactApexChart options={options} series={series} type="bar" height={280} />
       )}
     </div>
   );

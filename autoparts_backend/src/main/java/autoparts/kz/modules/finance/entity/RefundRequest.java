@@ -24,7 +24,9 @@ public class RefundRequest {
     private String adminComment;
     
     // ✅ Интеграция с 1C через CommerceML
+    @Column(name = "sent_to_1c")
     private Boolean sentTo1C = false;  // Флаг отправки в 1C
+    @Column(name = "sent_to_1c_at")
     private Instant sentTo1CAt;        // Дата отправки в 1C
     private String externalId;         // ID документа в 1C (после подтверждения)
 

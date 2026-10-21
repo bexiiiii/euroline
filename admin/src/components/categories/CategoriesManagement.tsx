@@ -1,6 +1,5 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
-import ComponentCard from "@/components/common/ComponentCard";
 import CategoriesStats from "@/components/categories/CategoriesStats";
 import CategoriesToolbar from "@/components/categories/CategoriesToolbar";
 import CategoriesTable from "@/components/categories/CategoriesTable";
@@ -23,11 +22,6 @@ const flattenCategories = (items: Category[]): Category[] => {
   return result;
 };
 
-interface FeedbackState {
-  type: "success" | "error";
-  message: string;
-}
-
 const CategoriesManagement: React.FC = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [modalMode, setModalMode] = useState<CategoryModalMode | null>(null);
@@ -36,8 +30,7 @@ const CategoriesManagement: React.FC = () => {
   const [categoryOptions, setCategoryOptions] = useState<Category[]>([]);
   const [isModalSubmitting, setIsModalSubmitting] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<FeedbackState | null>(null);
-  const [isOptionsLoading, setIsOptionsLoading] = useState(false);
+  const [, setIsOptionsLoading] = useState(false);
   const { success: showSuccess, error: showError } = useToast();
 
   useEffect(() => {
@@ -102,7 +95,7 @@ const CategoriesManagement: React.FC = () => {
           sortOrder: values.sortOrder,
           isActive: values.isActive,
         });
-        setFeedback({ type: "success", message: "Категория обновлена" });
+        showSuccess("Категория обновлена");
       } else {
         await categoriesApi.createCategory({
           name: values.name,
@@ -113,7 +106,7 @@ const CategoriesManagement: React.FC = () => {
           sortOrder: values.sortOrder,
           isActive: values.isActive,
         });
-        setFeedback({ type: "success", message: "Категория создана" });
+        showSuccess("Категория создана");
       }
 
       setRefreshKey((prev) => prev + 1);
@@ -122,7 +115,6 @@ const CategoriesManagement: React.FC = () => {
       console.error("Ошибка при сохранении категории", error);
       const message = error instanceof ApiError ? error.message : "Не удалось сохранить категорию";
       setModalError(message);
-      setFeedback({ type: "error", message });
     } finally {
       setIsModalSubmitting(false);
       loadCategoryOptions();
@@ -132,38 +124,29 @@ const CategoriesManagement: React.FC = () => {
   const handleToggleStatus = async (category: Category) => {
     try {
       await categoriesApi.toggleCategoryStatus(category.id);
-      setFeedback({
-        type: "success",
-        message: category.isActive ? "Категория деактивирована" : "Категория активирована",
-      });
+      showSuccess(category.isActive ? "Категория деактивирована" : "Категория активирована");
       setRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error("Не удалось обновить статус категории", error);
       const message = error instanceof ApiError ? error.message : "Ошибка при обновлении статуса";
-      setFeedback({ type: "error", message });
+      showError(message);
     }
   };
 
   const handleDeleteCategory = async (category: Category) => {
-    const confirmed = window.confirm(`Удалить категорию "${category.name}"?`);
+    const confirmed = window.confirm(`Удалить категорию «${category.name}»?`);
     if (!confirmed) return;
 
     try {
       await categoriesApi.deleteCategory(category.id);
-      setFeedback({ type: "success", message: "Категория удалена" });
+      showSuccess("Категория удалена");
       setRefreshKey((prev) => prev + 1);
     } catch (error) {
       console.error("Ошибка при удалении категории", error);
       const message = error instanceof ApiError ? error.message : "Не удалось удалить категорию";
-      setFeedback({ type: "error", message });
+      showError(message);
     }
   };
-
-  useEffect(() => {
-    if (!feedback) return;
-    const timer = setTimeout(() => setFeedback(null), 5000);
-    return () => clearTimeout(timer);
-  }, [feedback]);
 
   const categoryNameById = useMemo(() => {
     const map: Record<number, string> = {};
@@ -204,37 +187,22 @@ const CategoriesManagement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <CategoriesStats refreshKey={refreshKey} />
 
       <CategoriesToolbar
         onAddCategory={openCreateModal}
         onExport={handleExportCategories}
-        onImport={() => console.log("Импорт категорий")}
       />
 
-      {feedback && (
-        <div
-          className={`rounded-lg border px-4 py-3 text-sm ${
-            feedback.type === "success"
-              ? "border-green-200 bg-green-50 text-green-700 dark:border-green-900/30 dark:bg-green-900/10 dark:text-green-300"
-              : "border-red-200 bg-red-50 text-red-700 dark:border-red-900/30 dark:bg-red-900/10 dark:text-red-300"
-          }`}
-        >
-          {feedback.message}
-        </div>
-      )}
-
-      <ComponentCard title="Список категорий">
-        <CategoriesTable
-          refreshKey={refreshKey}
-          parentNameById={categoryNameById}
-          onEdit={openEditModal}
-          onAddSubcategory={openCreateSubcategoryModal}
-          onToggleStatus={handleToggleStatus}
-          onDelete={handleDeleteCategory}
-        />
-      </ComponentCard>
+      <CategoriesTable
+        refreshKey={refreshKey}
+        parentNameById={categoryNameById}
+        onEdit={openEditModal}
+        onAddSubcategory={openCreateSubcategoryModal}
+        onToggleStatus={handleToggleStatus}
+        onDelete={handleDeleteCategory}
+      />
 
       {modalMode && (
         <CategoryModal
@@ -248,12 +216,6 @@ const CategoriesManagement: React.FC = () => {
           isSubmitting={isModalSubmitting}
           errorMessage={modalError}
         />
-      )}
-
-      {isOptionsLoading && modalMode && (
-        <div className="text-xs text-gray-500 dark:text-gray-400">
-          Обновление списка категорий...
-        </div>
       )}
     </div>
   );

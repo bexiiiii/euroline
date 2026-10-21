@@ -22,6 +22,7 @@ function Cart() {
   const { items: cartItems } = useCartStore()
   const total = useMemo(() => cartItems.reduce((s, it) => s + (it.price || 0) * it.quantity, 0), [cartItems])
   const hasItems = cartItems.length > 0
+  const hasUnpricedItems = cartItems.some((it) => !it.price)
 
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState<'check'|'insufficient'|'confirm'>('check')
@@ -60,8 +61,7 @@ function Cart() {
     try {
       setLoading(true)
       const key = (globalThis.crypto && (globalThis.crypto as any).randomUUID) ? (globalThis.crypto as any).randomUUID() : `order-${Date.now()}`
-      const address = `Самовывоз. ${comment ? 'Комментарий: ' + comment : ''}`.slice(0, 480)
-      await createOrder(address, key)
+      await createOrder('Самовывоз', key, comment.slice(0, 1000))
       toast.success('Заказ создан')
       setOpen(false)
       router.push('/order-history')
@@ -143,6 +143,11 @@ function Cart() {
                   <DialogTitle>Подтверждение заказа</DialogTitle>
                   <DialogDescription>
                     Сумма к оплате: {total.toLocaleString()} ₸
+                    {hasUnpricedItems && (
+                      <span className="block mt-1 text-amber-700">
+                        Для части товаров цена пока не указана — менеджер уточнит её при подтверждении заказа.
+                      </span>
+                    )}
                   </DialogDescription>
                 </DialogHeader>
                 <div className="mt-3">

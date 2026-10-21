@@ -36,6 +36,13 @@ const activityOptions = [
   { value: "other", label: "Другое" },
 ]
 
+// В профиле храним русское название: код (retail и т.п.) пользователь видеть не должен.
+// Старые записи с кодом переводим при показе.
+export function activityLabel(value?: string | null): string {
+  if (!value) return ""
+  return activityOptions.find((option) => option.value === value)?.label ?? value
+}
+
 export function ActivitySelect({ value, onChange, placeholder = "Выберите вид деятельности", disabled = false }: ActivitySelectProps) {
   const [open, setOpen] = useState(false)
 

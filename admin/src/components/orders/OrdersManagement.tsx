@@ -1,6 +1,5 @@
 "use client";
 import React, { useState } from "react";
-import ComponentCard from "@/components/common/ComponentCard";
 import OrdersStats from "@/components/orders/OrdersStats";
 import OrdersToolbar from "@/components/orders/OrdersToolbar";
 import ViewOrderModal from "@/components/orders/ViewOrderModal";
@@ -51,22 +50,19 @@ const OrdersManagement: React.FC = () => {
     status: OrderStatus,
     paymentStatus: PaymentStatus
   ) => {
-    try {
-      let updatedOrder = selectedOrder;
-      if (!selectedOrder || selectedOrder.status !== status) {
-        updatedOrder = await ordersApi.updateOrderStatus(orderId, status);
-      }
-      if (!updatedOrder || updatedOrder.paymentStatus !== paymentStatus) {
-        updatedOrder = await ordersApi.updatePaymentStatus(orderId, paymentStatus);
-      }
-      if (updatedOrder) {
-        updateSelectedOrder(updatedOrder);
-      }
-      setRefreshToken(`${Date.now()}`);
-    } catch (error) {
-      console.error("Не удалось обновить заказ", error);
-    } finally {
+    void paymentStatus; // статус оплаты меняется автоматически, в форме он только для просмотра
+    if (selectedOrder && selectedOrder.status === status) {
       setIsEditModalOpen(false);
+      return;
+    }
+    try {
+      const updatedOrder = await ordersApi.updateOrderStatus(orderId, status);
+      updateSelectedOrder(updatedOrder);
+      setRefreshToken(`${Date.now()}`);
+      showSuccess("Статус заказа обновлён");
+      setIsEditModalOpen(false);
+    } catch (error) {
+      showError(error instanceof Error && error.message ? error.message : "Не удалось обновить заказ");
     }
   };
 
@@ -93,26 +89,20 @@ const OrdersManagement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Статистика */}
+    <div className="space-y-4">
       <OrdersStats />
 
-      {/* Панель инструментов */}
       <OrdersToolbar
         onExport={handleExportOrders}
         onRefresh={handleRefreshOrders}
       />
 
-      {/* Таблица заказов */}
-      <ComponentCard title="Список заказов">
-        <OrdersTable
-          onViewOrder={handleViewOrder}
-          onEditOrder={handleEditOrder}
-          refreshToken={refreshToken}
-        />
-      </ComponentCard>
+      <OrdersTable
+        onViewOrder={handleViewOrder}
+        onEditOrder={handleEditOrder}
+        refreshToken={refreshToken}
+      />
 
-      {/* Модальные окна */}
       <ViewOrderModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}

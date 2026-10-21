@@ -1,58 +1,33 @@
 package autoparts.kz.integration.umapi.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.util.List;
-
 /**
- * Product group DTO from UMAPI
+ * Product (generic article) DTO from UMAPI v2 autocatalog /Products.
+ * UMAPI returns one row per product + supplier pair.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ProductDto {
 
     /**
-     * Product ID
+     * Product type ID (PT_ID), passed as PT_IDS to /Articles
      */
-    @JsonProperty("productId")
+    @JsonAlias("PT_ID")
     private Long id;
 
-    /**
-     * Product name
-     */
-    @JsonProperty("productName")
+    @JsonAlias("PRODUCT")
     private String name;
 
-    /**
-     * Generic articles (OEM numbers)
-     */
-    @JsonProperty("genericArticles")
-    private List<String> genericArticles;
+    @JsonAlias("SUP_ID")
+    private Long supplierId;
 
-    /**
-     * Number of articles
-     */
-    @JsonProperty("articleCount")
-    private Integer articleCount;
-
-    /**
-     * Suppliers for this product
-     */
-    @JsonProperty("suppliers")
-    private List<SupplierInfo> suppliers;
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class SupplierInfo {
-        @JsonProperty("supplierId")
-        private Long id;
-
-        @JsonProperty("supplierName")
-        private String name;
-    }
+    @JsonAlias("BRAND")
+    private String brand;
 }

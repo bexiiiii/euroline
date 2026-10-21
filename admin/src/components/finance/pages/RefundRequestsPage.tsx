@@ -2,7 +2,8 @@
 import React, { useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import FinanceStats from "../FinanceStats";
-import FinanceToolbar from "../FinanceToolbar";
+import Button from "@/components/ui/button/Button";
+import { RefreshIcon } from "@/components/finance/tableUi";
 import RefundRequestsTable from "../RefundRequestsTable";
 import ProcessRefundModal from "../ProcessRefundModal";
 import ViewRefundModal from "../ViewRefundModal";
@@ -13,6 +14,8 @@ const RefundRequestsPage: React.FC = () => {
   const [isViewRefundModalOpen, setIsViewRefundModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<RefundRequest | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = () => setRefreshKey((prev) => prev + 1);
 
   const handleProcessRefund = (data: RefundRequest) => {
     setSelectedItem(data);
@@ -38,15 +41,22 @@ const RefundRequestsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Statistics */}
-      <FinanceStats />
+    <div className="space-y-4">
+      <FinanceStats refreshKey={refreshKey} />
 
-      {/* Toolbar */}
-      <FinanceToolbar />
-
-      {/* Main Content */}
-      <ComponentCard title="Запросы на возврат">
+      <ComponentCard
+        title="Заявки клиентов"
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            startIcon={<RefreshIcon />}
+          >
+            Обновить
+          </Button>
+        }
+      >
         <RefundRequestsTable
           onProcessRefund={handleProcessRefund}
           onViewRefund={handleViewRefund}
@@ -54,7 +64,6 @@ const RefundRequestsPage: React.FC = () => {
         />
       </ComponentCard>
 
-      {/* Modals */}
       <ProcessRefundModal
         isOpen={isProcessRefundModalOpen}
         onClose={() => setIsProcessRefundModalOpen(false)}

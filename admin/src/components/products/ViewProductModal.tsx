@@ -5,6 +5,7 @@ import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
 import { Product } from "@/lib/api/products";
+import { formatKzt } from "@/lib/format";
 
 interface ViewProductModalProps {
   isOpen: boolean;
@@ -25,11 +26,7 @@ const ViewProductModal: React.FC<ViewProductModalProps> = ({
     if (price === undefined || Number.isNaN(price)) {
       return "—";
     }
-    return new Intl.NumberFormat("ru-RU", {
-      style: "currency",
-      currency: "RUB",
-      minimumFractionDigits: 0,
-    }).format(price);
+    return formatKzt(price);
   };
 
   const formatDate = (value?: string) => {
@@ -54,123 +51,79 @@ const ViewProductModal: React.FC<ViewProductModalProps> = ({
     return { label: "В наличии", color: "success" as const };
   })();
 
-  const sourceMeta = product.syncedWith1C
-    ? { label: "1С", color: "primary" as const }
-    : { label: "Ручной", color: "light" as const };
+  const sourceLabel = product.syncedWith1C ? "1С" : "Вручную";
 
-  const properties = product.properties ?? [];
-  const categoryLabel = product.brand || "—";
+  const allProperties = product.properties ?? [];
+  const subcategoryName = allProperties.find((p) => p.propertyName === "subcategoryName")?.propertyValue;
+  const properties = allProperties.filter((p) => !p.propertyName.startsWith("subcategory"));
+
+  const fields: { label: string; value: React.ReactNode }[] = [
+    { label: "Бренд", value: product.brand || "—" },
+    { label: "Цена", value: <span className="font-semibold tabular-nums">{formatPrice(product.price)}</span> },
+    { label: "Остаток", value: product.stock !== undefined ? `${product.stock} шт.` : "—" },
+    { label: "Источник", value: sourceLabel },
+  ];
+  if (subcategoryName) fields.push({ label: "Подкатегория", value: subcategoryName });
+  if (product.weekly) fields.push({ label: "Товар недели до", value: formatDate(product.weeklyEndAt) });
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="lg">
-      <div className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h4 className="text-xl font-semibold text-gray-900 dark:text-white">Информация о товаре</h4>
-        </div>
+      <div className="p-5">
+        <h4 className="mb-4 pr-10 text-lg font-semibold text-gray-800 dark:text-white/90">Товар</h4>
 
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="flex items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800 h-48">
+        <div className="space-y-4">
+          <div className="flex gap-4">
+            <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-100 dark:bg-white/[0.05]">
               {product.imageUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={product.imageUrl}
-                  alt={product.name}
-                  className="h-full w-full object-contain"
-                />
+                <img src={product.imageUrl} alt={product.name} className="h-full w-full object-contain" />
               ) : (
-                <svg
-                  width="64"
-                  height="64"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="text-gray-400"
-                >
-                  <rect
-                    x="3"
-                    y="6"
-                    width="18"
-                    height="12"
-                    rx="2"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  />
-                  <path
-                    d="M7 12H17"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
+                <svg className="size-6 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
                 </svg>
               )}
             </div>
-
-            <div className="space-y-4">
-              <div>
-                <h5 className="text-lg font-medium text-gray-900 dark:text-white">{product.name}</h5>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Код: {product.code}</p>
-                {product.externalCode && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Внешний код: {product.externalCode}
-                  </p>
-                )}
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                <Badge size="sm" color={statusMeta.color}>{statusMeta.label}</Badge>
-                <Badge size="sm" color={sourceMeta.color}>{sourceMeta.label}</Badge>
-              </div>
+            <div className="min-w-0 space-y-1">
+              <p className="text-base font-semibold text-gray-800 dark:text-white/90">{product.name}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Код: {product.code}
+                {product.externalCode && product.externalCode !== product.code ? ` · Внешний код: ${product.externalCode}` : ""}
+              </p>
+              <Badge size="sm" variant="light" color={statusMeta.color}>{statusMeta.label}</Badge>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900/40 rounded-lg">
-            <div>
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Бренд</span>
-              <p className="text-gray-900 dark:text-white">{categoryLabel}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Цена</span>
-              <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                {formatPrice(product.price)}
-              </p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Остаток</span>
-              <p className="text-gray-900 dark:text-white">
-                {product.stock !== undefined ? `${product.stock} шт.` : "—"}
-              </p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Синхронизация</span>
-              <p className="text-gray-900 dark:text-white">{product.syncedWith1C ? "Да" : "Нет"}</p>
-            </div>
-            <div>
-              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Обновлено</span>
-              <p className="text-gray-900 dark:text-white">{formatDate(product.weeklyEndAt)}</p>
-            </div>
-          </div>
+          <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {fields.map((f) => (
+              <div key={f.label}>
+                <dt className="text-xs text-gray-500 dark:text-gray-400">{f.label}</dt>
+                <dd className="text-sm text-gray-800 dark:text-white/90">{f.value}</dd>
+              </div>
+            ))}
+          </dl>
 
           {properties.length > 0 && (
-            <div className="space-y-3">
-              <h6 className="text-sm font-semibold text-gray-700 dark:text-gray-200">Характеристики</h6>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300">Характеристики</h6>
+              <dl className="divide-y divide-gray-100 rounded-lg border border-gray-200 text-sm dark:divide-gray-800 dark:border-gray-800">
                 {properties.map((property) => (
                   <div
                     key={`${property.propertyName}-${property.propertyValue}`}
-                    className="rounded-lg border border-gray-200 bg-white p-3 text-sm dark:border-white/10 dark:bg-white/[0.02]"
+                    className="flex justify-between gap-4 px-3 py-2"
                   >
-                    <p className="text-gray-500 dark:text-gray-400">{property.propertyName}</p>
-                    <p className="font-medium text-gray-900 dark:text-white">{property.propertyValue}</p>
+                    <dt className="text-gray-500 dark:text-gray-400">{property.propertyName}</dt>
+                    <dd className="text-right font-medium text-gray-800 dark:text-white/90">{property.propertyValue}</dd>
                   </div>
                 ))}
-              </div>
+              </dl>
             </div>
           )}
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
-          <Button variant="outline" onClick={onClose}>
+        <div className="mt-5 flex justify-end">
+          <Button size="sm" variant="outline" onClick={onClose}>
             Закрыть
           </Button>
         </div>

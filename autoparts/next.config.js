@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: "standalone",
   images: {
     remotePatterns: [
       {
@@ -33,10 +34,6 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'img.laximo.ru',
-      },
-      {
-        protocol: 'https',
-        hostname: 'alatrade.kz',
       },
     ],
   },

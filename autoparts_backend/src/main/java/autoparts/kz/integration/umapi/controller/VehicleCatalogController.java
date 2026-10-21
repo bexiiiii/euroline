@@ -62,50 +62,66 @@ public class VehicleCatalogController {
     }
 
     @GetMapping("/modifications")
-    @Operation(summary = "Получить список модификаций по модели (только легковые)")
-    public ResponseEntity<List<ModificationDto>> getPassengerModifications(
-            @Parameter(description = "ID модели", required = true)
-            @RequestParam Long modelId
+    @Operation(summary = "Получить список модификаций по модели")
+    public ResponseEntity<List<ModificationDto>> getModifications(
+            @Parameter(description = "ID модели (MS_ID)", required = true)
+            @RequestParam Long modelId,
+            @Parameter(description = "Тип транспорта (P=Passenger, C=Commercial, M=Motorbike)")
+            @RequestParam(defaultValue = "P") String vehicleType
     ) {
-        log.info("GET /api/vehicle-catalog/modifications - modelId={}", modelId);
-        List<ModificationDto> modifications = umapiService.getPassengerModifications(modelId);
+        log.info("GET /api/vehicle-catalog/modifications - modelId={}, vehicleType={}", modelId, vehicleType);
+        List<ModificationDto> modifications = umapiService.getModifications(modelId, vehicleType);
         return ResponseEntity.ok(modifications);
     }
 
     @GetMapping("/categories")
-    @Operation(summary = "Получить список категорий запчастей для модификации")
+    @Operation(summary = "Получить дерево категорий запчастей для модификации")
     public ResponseEntity<List<CategoryDto>> getCategories(
             @Parameter(description = "ID модификации", required = true)
-            @RequestParam Long modificationId
+            @RequestParam Long modificationId,
+            @Parameter(description = "Тип транспорта (P=Passenger, C=Commercial, M=Motorbike)")
+            @RequestParam(defaultValue = "P") String vehicleType
     ) {
-        log.info("GET /api/vehicle-catalog/categories - modificationId={}", modificationId);
-        List<CategoryDto> categories = umapiService.getCategories(modificationId);
+        log.info("GET /api/vehicle-catalog/categories - modificationId={}, vehicleType={}", modificationId, vehicleType);
+        List<CategoryDto> categories = umapiService.getCategories(modificationId, vehicleType);
         return ResponseEntity.ok(categories);
     }
 
     @GetMapping("/products")
-    @Operation(summary = "Получить список продуктовых групп по категории и модификации")
+    @Operation(summary = "Получить список продуктов (с брендами) по категории и модификации")
     public ResponseEntity<List<ProductDto>> getProducts(
             @Parameter(description = "ID категории", required = true)
             @RequestParam Long categoryId,
             @Parameter(description = "ID модификации", required = true)
-            @RequestParam Long modificationId
+            @RequestParam Long modificationId,
+            @Parameter(description = "Тип транспорта (P=Passenger, C=Commercial, M=Motorbike)")
+            @RequestParam(defaultValue = "P") String vehicleType
     ) {
-        log.info("GET /api/vehicle-catalog/products - categoryId={}, modificationId={}", categoryId, modificationId);
-        List<ProductDto> products = umapiService.getProducts(categoryId, modificationId);
+        log.info("GET /api/vehicle-catalog/products - categoryId={}, modificationId={}, vehicleType={}",
+                categoryId, modificationId, vehicleType);
+        List<ProductDto> products = umapiService.getProducts(categoryId, modificationId, vehicleType);
         return ResponseEntity.ok(products);
     }
 
     @GetMapping("/articles")
-    @Operation(summary = "Получить список артикулов по продукту и модификации")
-    public ResponseEntity<List<ArticleDto>> getArticles(
-            @Parameter(description = "ID продукта", required = true)
+    @Operation(summary = "Получить артикулы по продукту и модификации (постранично)")
+    public ResponseEntity<ArticlesPageDto> getArticles(
+            @Parameter(description = "ID продукта (PT_ID)", required = true)
             @RequestParam Long productId,
             @Parameter(description = "ID модификации", required = true)
-            @RequestParam Long modificationId
+            @RequestParam Long modificationId,
+            @Parameter(description = "Тип транспорта (P=Passenger, C=Commercial, M=Motorbike)")
+            @RequestParam(defaultValue = "P") String vehicleType,
+            @Parameter(description = "ID бренда (SUP_ID), опционально")
+            @RequestParam(required = false) Long supplierId,
+            @Parameter(description = "Размер страницы, 1..100")
+            @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Смещение")
+            @RequestParam(defaultValue = "0") long offset
     ) {
-        log.info("GET /api/vehicle-catalog/articles - productId={}, modificationId={}", productId, modificationId);
-        List<ArticleDto> articles = umapiService.getArticles(productId, modificationId);
+        log.info("GET /api/vehicle-catalog/articles - productId={}, modificationId={}, vehicleType={}, supplierId={}",
+                productId, modificationId, vehicleType, supplierId);
+        ArticlesPageDto articles = umapiService.getArticles(productId, modificationId, vehicleType, supplierId, limit, offset);
         return ResponseEntity.ok(articles);
     }
 }

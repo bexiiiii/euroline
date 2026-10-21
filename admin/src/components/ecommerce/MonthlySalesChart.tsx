@@ -1,11 +1,9 @@
 "use client";
 import { ApexOptions } from "apexcharts";
 import dynamic from "next/dynamic";
-import { MoreDotIcon } from "@/icons";
-import { DropdownItem } from "../ui/dropdown/DropdownItem";
-import { useEffect, useState } from "react";
-import { Dropdown } from "../ui/dropdown/Dropdown";
+import { useCallback, useEffect, useState } from "react";
 import { analyticsApi } from "@/lib/api/analytics";
+import WidgetError from "@/components/analytics/WidgetError";
 
 // Dynamically import the ReactApexChart component
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
@@ -16,9 +14,11 @@ export default function MonthlySalesChart() {
   const [salesData, setSalesData] = useState<number[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchSalesData = async () => {
+  const fetchSalesData = useCallback(async () => {
+      setLoading(true);
+      setError(null);
       try {
         const data = await analyticsApi.getMonthlySales();
         
@@ -52,22 +52,22 @@ export default function MonthlySalesChart() {
         setCategories(labels);
       } catch (error) {
         console.error("Failed to fetch sales data:", error);
-        // Fallback на моковые данные при ошибке
-        setCategories(['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек']);
-        setSalesData([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        setError("Не удалось загрузить продажи");
       } finally {
         setLoading(false);
       }
-    };
-    fetchSalesData();
   }, []);
+
+  useEffect(() => {
+    fetchSalesData();
+  }, [fetchSalesData]);
 
   const options: ApexOptions = {
     colors: ["#465fff"],
     chart: {
       fontFamily: "Outfit, sans-serif",
       type: "bar",
-      height: 180,
+      height: 260,
       toolbar: {
         show: false,
       },
@@ -98,10 +98,7 @@ export default function MonthlySalesChart() {
       },
     },
     legend: {
-      show: true,
-      position: "top",
-      horizontalAlign: "left",
-      fontFamily: "Outfit",
+      show: false,
     },
     yaxis: {
       title: {
@@ -136,60 +133,26 @@ export default function MonthlySalesChart() {
     },
   ];
   
-  const [isOpen, setIsOpen] = useState(false);
-
-  function toggleDropdown() {
-    setIsOpen(!isOpen);
-  }
-
-  function closeDropdown() {
-    setIsOpen(false);
-  }
-
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Продажи по месяцам
-        </h3>
-
-        <div className="relative inline-block">
-          <button onClick={toggleDropdown} className="dropdown-toggle">
-            <MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
-          </button>
-          <Dropdown
-            isOpen={isOpen}
-            onClose={closeDropdown}
-            className="w-40 p-2"
-          >
-            <DropdownItem
-              onItemClick={closeDropdown}
-              className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-            >
-              Подробнее
-            </DropdownItem>
-            <DropdownItem
-              onItemClick={closeDropdown}
-              className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-            >
-              Экспорт
-            </DropdownItem>
-          </Dropdown>
-        </div>
-      </div>
+    <div className="h-full overflow-hidden rounded-xl border border-gray-200 bg-white p-4 pb-2 dark:border-gray-800 dark:bg-white/[0.03]">
+      <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+        Продажи по месяцам
+      </h3>
 
       <div className="max-w-full overflow-x-auto custom-scrollbar">
         {loading ? (
-          <div className="flex items-center justify-center h-[180px]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <div className="flex items-center justify-center h-[260px]">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
           </div>
+        ) : error ? (
+          <WidgetError message={error} onRetry={fetchSalesData} className="h-[260px] py-0" />
         ) : (
-          <div className="-ml-5 min-w-[650px] xl:min-w-full pl-2">
+          <div className="min-w-[600px] xl:min-w-0">
             <ReactApexChart
               options={options}
               series={series}
               type="bar"
-              height={180}
+              height={260}
             />
           </div>
         )}

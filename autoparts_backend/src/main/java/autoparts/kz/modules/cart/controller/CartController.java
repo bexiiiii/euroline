@@ -17,6 +17,27 @@ public class CartController {
     
     private final CartService cartService;
 
+    public record OfferRequest(Long productId, String warehouseRefKey, int quantity) {}
+
+    @PostMapping("/offers")
+    public Cart addOffer(@AuthenticationPrincipal SimplePrincipal principal, @RequestBody OfferRequest request) {
+        validateQuantity(request.quantity());
+        if (request.productId() == null) throw new IllegalArgumentException("Выберите товар");
+        return cartService.addOffer(principal.id(), request.productId(), request.warehouseRefKey(), request.quantity());
+    }
+
+    @PatchMapping("/items/{itemId}")
+    public Cart updateItem(@AuthenticationPrincipal SimplePrincipal principal, @PathVariable Long itemId,
+                           @RequestParam int quantity) {
+        if (quantity < 0 || quantity > ValidationConstants.MAX_QUANTITY) throw new InvalidQuantityException(quantity);
+        return cartService.updateItem(principal.id(), itemId, quantity);
+    }
+
+    @DeleteMapping("/items/{itemId}")
+    public Cart removeItem(@AuthenticationPrincipal SimplePrincipal principal, @PathVariable Long itemId) {
+        return cartService.updateItem(principal.id(), itemId, 0);
+    }
+
     @PostMapping("/add")
     public Cart addProductToCart(@AuthenticationPrincipal SimplePrincipal principal,
                                  @RequestParam Long productId,
@@ -61,6 +82,8 @@ public class CartController {
                 req.getBrand(),
                 req.getPrice(),
                 req.getImageUrl(),
+                req.getWarehouseName(),
+                req.getWarehouseRefKey(),
                 req.getQuantity()
         );
     }

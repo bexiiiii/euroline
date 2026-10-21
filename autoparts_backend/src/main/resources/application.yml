@@ -21,9 +21,9 @@ spring:
       max-file-size: 10MB
       max-request-size: 12MB
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/eurolinecloud
-    username: behruz
-    password: 234Bex456
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/eurolinecloud}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
     hikari:
       maximum-pool-size: 60  # Увеличено с 40 до 60 для dev
       minimum-idle: 25  # Увеличено с 20 до 25
@@ -50,9 +50,9 @@ spring:
     show-sql: false
     open-in-view: false
   redis:
-    host: localhost
-    port: 6379
-    password: ""
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:}
   # Kafka integration disabled; using RabbitMQ instead
   # kafka:
   #   bootstrap-servers: localhost:9092
@@ -86,8 +86,8 @@ spring:
   rabbitmq:
     host: ${RABBIT_HOST:localhost}
     port: ${RABBIT_PORT:5672}
-    username: ${RABBIT_USER:cml}
-    password: ${RABBIT_PASSWORD:cml}
+    username: ${RABBIT_USER:guest}
+    password: ${RABBIT_PASSWORD:guest}
     connection-timeout: 30000
     requested-heartbeat: 30  # Heartbeat каждые 30 секунд
     listener:
@@ -121,6 +121,8 @@ spring:
 
 onec:
   base-url: http://onec.local
+  events:
+    token: ${ONEC_EVENTS_TOKEN:}
 
 
 outbox:
@@ -131,8 +133,8 @@ outbox:
 oneC:
   api:
     url: ${ONEC_API_URL:http://localhost:8081/api/1c}
-    username: ${ONEC_USERNAME:admin}
-    password: ${ONEC_PASSWORD:password}
+    username: ${ONEC_USERNAME:}
+    password: ${ONEC_PASSWORD:}
   connection:
     timeout: 10000
 
@@ -144,7 +146,7 @@ app:
 umapi:
   base-url: https://api.umapi.ru
   locale: ru-RU
-  api-key: your-production-api-key-here
+  api-key: ${UMAPI_API_KEY:}
   timeout:
     connect: 5000
     read: 10000
@@ -155,7 +157,7 @@ umapi:
 
 security:
   jwt:
-    secret: ${JWT_SECRET:this-is-a-very-long-and-secure-jwt-secret-key-for-production-use-change-this-in-production-environment}
+    secret: ${JWT_SECRET:development-only-secret-do-not-use-in-production-please-change-me}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 integration:
@@ -166,15 +168,15 @@ integration:
 
 aws:
   s3:
-    endpoint: ${S3_ENDPOINT:https://api.euroline.storage.1edu.kz}
+    endpoint: ${S3_ENDPOINT:http://localhost:9000}
     region: ${S3_REGION:us-east-1}
-    access-key: ${S3_ACCESS_KEY:admin}
-    secret-key: ${S3_SECRET_KEY:admin12345}
+    access-key: ${S3_ACCESS_KEY:}
+    secret-key: ${S3_SECRET_KEY:}
     bucket: ${S3_BUCKET:commerce-ml}
 
 cml:
-  username: ${CML_USERNAME:1c_exchange}
-  password: ${CML_PASSWORD:changeit}
+  username: ${CML_USERNAME:cml-service}
+  password: ${CML_PASSWORD:change-me-in-production}
   allowed-ips: []  # Пустой массив = разрешены все IP
   queue:
     exchange: cml.exchange
@@ -207,15 +209,15 @@ management:
 laximo:
   cat:
     soap-url: "https://ws.laximo.ru/ec.Kito.WebCatalog/services/Catalog.CatalogHttpSoap12Endpoint/"
-    login: "am657904"
-    password: "9z3n_AyzyZ24RAI"
+    login: ${LAXIMO_LOGIN:}
+    password: ${LAXIMO_PASSWORD:}
     locale: "ru_RU"
 
-  telegram:
-    bot:
-      token: ${TELEGRAM_BOT_TOKEN:8250208628:AAEvjencS7ffYxD-KmSIFFqORCLWU0BHI4A}
-      username: ${TELEGRAM_BOT_USERNAME:euroline_autoparts_bot}
-      admin-chat-id: ${TELEGRAM_ADMIN_CHAT_ID:6322824405}
+telegram:
+  bot:
+    token: ${TELEGRAM_BOT_TOKEN:}
+    username: ${TELEGRAM_BOT_USERNAME:}
+    admin-chat-id: ${TELEGRAM_ADMIN_CHAT_ID:}
 
 logging:
   level:
@@ -234,3 +236,13 @@ logging:
 #         order_inserts: true
 #         order_updates: true
 #         jdbc.batch_versioned_data: true
+
+# Kaspi Pay top-ups via kaspi-pos-automation sidecar (docker/kaspi-pos, service "kaspi")
+kaspi:
+  enabled: ${KASPI_ENABLED:true}
+  sidecar-url: ${KASPI_SIDECAR_URL:http://localhost:3010}
+  min-amount: ${KASPI_MIN_AMOUNT:100}
+  max-amount: ${KASPI_MAX_AMOUNT:1000000}
+  max-pending-per-client: ${KASPI_MAX_PENDING_PER_CLIENT:3}
+  invoice-ttl: ${KASPI_INVOICE_TTL:PT24H}
+  poll-interval-ms: ${KASPI_POLL_INTERVAL_MS:5000}

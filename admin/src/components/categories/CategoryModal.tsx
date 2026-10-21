@@ -102,8 +102,6 @@ const CategoryModal: React.FC<CategoryModalProps> = ({
     }
   }, [category, isOpen, mode, parentCategory]);
 
-  const isSubcategoryMode = mode === "create-subcategory" || !!formData.parentId;
-
   const handleChange = <K extends keyof CategoryFormValues>(key: K, value: CategoryFormValues[K]) => {
     setFormData((prev) => ({
       ...prev,
@@ -132,11 +130,11 @@ const CategoryModal: React.FC<CategoryModalProps> = ({
 
   const handleSubmit = async () => {
     if (!formData.name.trim()) {
-      setValidationError("Введите название категории");
+      setValidationError("Укажите название");
       return;
     }
     if (!formData.slug.trim()) {
-      setValidationError("Slug обязателен");
+      setValidationError("Укажите адрес в каталоге");
       return;
     }
 
@@ -163,143 +161,112 @@ const CategoryModal: React.FC<CategoryModalProps> = ({
 
   const activeError = validationError || errorMessage;
 
+  const selectClass =
+    "h-11 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800";
+
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} className="max-w-[640px] p-6">
-      <div className="space-y-6">
-        <h4 className="text-xl font-semibold text-gray-800 dark:text-white/90">
+    <Modal isOpen={isOpen} onClose={handleClose} className="max-w-[600px] p-5">
+      <div className="space-y-4">
+        <h4 className="pr-10 text-lg font-semibold text-gray-800 dark:text-white/90">
           {modalTitle}
         </h4>
 
         {activeError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-900/20 dark:text-red-300">
+          <div className="rounded-lg bg-error-50 px-3 py-2 text-sm text-error-600 dark:bg-error-500/15 dark:text-error-500">
             {activeError}
           </div>
         )}
 
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-          <div className="space-y-5">
-            <div>
-              <Label>Название категории *</Label>
-              <Input
-                value={formData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="Например: Двигатель"
-              />
-            </div>
-
-            <div>
-              <Label>Slug *</Label>
-              <Input
-                value={formData.slug}
-                onChange={(e) => {
-                  setSlugEdited(true);
-                  handleChange("slug", generateSlug(e.target.value));
-                }}
-                placeholder="naprimer-dvigatel"
-              />
-              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                Используется в URL. Допустимы буквы, цифры и дефис.
-              </p>
-            </div>
-
-            <div>
-              <Label>Порядок сортировки</Label>
-              <Input
-                type="number"
-                value={formData.sortOrder}
-                onChange={(e) => handleChange("sortOrder", Number(e.target.value))}
-                placeholder="0"
-              />
-              <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                Чем меньше число, тем выше категория в списке.
-              </p>
-            </div>
-
-            <div>
-              <Label>Статус</Label>
-              <select
-                value={formData.isActive ? "active" : "inactive"}
-                onChange={(e) => handleChange("isActive", e.target.value === "active")}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
-              >
-                <option value="active">Активна</option>
-                <option value="inactive">Неактивна</option>
-              </select>
-            </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <Label>Название *</Label>
+            <Input
+              value={formData.name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              placeholder="Например: Двигатель"
+            />
           </div>
 
-          <div className="space-y-5">
-            <div>
-              <Label>Родительская категория</Label>
-              <select
-                value={formData.parentId ?? ""}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  handleChange("parentId", value ? Number(value) : undefined);
-                }}
-                className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
-                disabled={mode === "create-subcategory" && !!parentCategory}
-              >
-                <option value="">Без родителя (основная категория)</option>
-                {availableParents.map((parent) => (
-                  <option key={parent.id} value={parent.id}>
-                    {parent.name}
-                  </option>
-                ))}
-              </select>
-              {mode === "create-subcategory" && parentCategory && (
-                <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  Подкатегория для: <span className="font-medium">{parentCategory.name}</span>
-                </p>
-              )}
-            </div>
+          <div>
+            <Label>Адрес в каталоге *</Label>
+            <Input
+              value={formData.slug}
+              onChange={(e) => {
+                setSlugEdited(true);
+                handleChange("slug", generateSlug(e.target.value));
+              }}
+              placeholder="dvigatel"
+            />
+          </div>
 
-            <div>
-              <Label>Описание</Label>
-              <textarea
-                value={formData.description ?? ""}
-                onChange={(e) => handleChange("description", e.target.value)}
-                rows={4}
-                placeholder="Краткое описание категории..."
-                className="w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm text-gray-900 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
-              />
-            </div>
+          <div>
+            <Label>Родительская категория</Label>
+            <select
+              value={formData.parentId ?? ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                handleChange("parentId", value ? Number(value) : undefined);
+              }}
+              className={selectClass}
+              disabled={mode === "create-subcategory" && !!parentCategory}
+            >
+              <option value="">Нет (основная)</option>
+              {availableParents.map((parent) => (
+                <option key={parent.id} value={parent.id}>
+                  {parent.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div>
-              <Label>Изображение (URL)</Label>
-              <Input
-                value={formData.imageUrl ?? ""}
-                onChange={(e) => handleChange("imageUrl", e.target.value)}
-                placeholder="https://example.com/images/category.jpg"
-              />
-            </div>
+          <div>
+            <Label>Порядок сортировки</Label>
+            <Input
+              type="number"
+              value={formData.sortOrder}
+              onChange={(e) => handleChange("sortOrder", Number(e.target.value))}
+              placeholder="0"
+            />
+          </div>
 
-            <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 dark:border-blue-900/40 dark:bg-blue-900/10">
-              <p className="text-sm font-medium text-blue-700 dark:text-blue-200">
-                Подсказки
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-blue-700 dark:text-blue-300">
-                <li>Активные категории отображаются в каталоге.</li>
-                <li>При деактивации категории товары становятся недоступными.</li>
-                <li>Slug можно изменить без потери данных.</li>
-                {isSubcategoryMode && <li>Подкатегория наследует доступность родителя.</li>}
-              </ul>
-            </div>
+          <div>
+            <Label>Статус</Label>
+            <select
+              value={formData.isActive ? "active" : "inactive"}
+              onChange={(e) => handleChange("isActive", e.target.value === "active")}
+              className={selectClass}
+            >
+              <option value="active">Активна</option>
+              <option value="inactive">Скрыта</option>
+            </select>
+          </div>
+
+          <div className="sm:col-span-2">
+            <Label>Изображение (ссылка)</Label>
+            <Input
+              value={formData.imageUrl ?? ""}
+              onChange={(e) => handleChange("imageUrl", e.target.value)}
+              placeholder="https://"
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <Label>Описание</Label>
+            <textarea
+              value={formData.description ?? ""}
+              onChange={(e) => handleChange("description", e.target.value)}
+              rows={3}
+              className="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-800 focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-700 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800"
+            />
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-2">
           <Button size="sm" variant="outline" onClick={handleClose} disabled={isSubmitting}>
             Отмена
           </Button>
           <Button size="sm" onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting && (
-              <svg className="mr-2 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <circle cx="12" cy="12" r="10" strokeOpacity="0.25" strokeWidth="4" />
-                <path d="M22 12a10 10 0 00-10-10" strokeWidth="4" strokeLinecap="round" />
-              </svg>
-            )}
-            {mode === "edit" ? "Сохранить изменения" : "Сохранить категорию"}
+            {isSubmitting ? "Сохранение..." : "Сохранить"}
           </Button>
         </div>
       </div>

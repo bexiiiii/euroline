@@ -4,5 +4,6 @@ import lombok.Data; import java.util.List;
 @Data public class WizardStepDto {
     private String ssd;                 // текущий ssd шага
     private List<WizardParamDto> params;
-    private boolean finalStep;          // true если следующий вызов = FindVehicleByWizard2
+    private boolean finalStep;          // true если все параметры определены
+    private boolean allowListVehicles;  // можно вызвать FindVehicleByWizard2 с текущим ssd
 }

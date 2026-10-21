@@ -4,10 +4,11 @@ import CustomersStats from "@/components/customers/CustomersStats";
 import CustomersToolbar from "@/components/customers/CustomersToolbar";
 import CustomersTable from "@/components/customers/CustomersTable";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import Button from "@/components/ui/button/Button";
 import Input from "@/components/form/input/InputField";
 import TextArea from "@/components/form/input/TextArea";
 import { Modal } from "@/components/ui/modal";
-import { customersApi, type Customer } from "@/lib/api/customers";
+import { customersApi } from "@/lib/api/customers";
 
 export default function CustomersPage() {
   const [refreshKey, setRefreshKey] = useState(0);
@@ -75,105 +76,79 @@ export default function CustomersPage() {
     }
   }, [newsletterMessage, newsletterSubject, triggerRefresh]);
 
-  const handleAddCustomer = useCallback(() => {
-    console.log('Add customer modal');
-  }, []);
-
-  const handleExport = useCallback(() => {
-    console.log('Export customers data');
-  }, []);
-
-  const handleViewCustomer = useCallback((customer: Customer) => {
-    console.log("View customer:", customer);
-  }, []);
-
-  const handleEditCustomer = useCallback((customer: Customer) => {
-    console.log("Edit customer:", customer);
-  }, []);
-
-  const handleDeleteCustomer = useCallback((customerId: number) => {
-    console.log("Delete customer:", customerId);
-  }, []);
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <PageBreadcrumb pageTitle="Клиенты" />
 
-      <CustomersStats />
-
-      <CustomersToolbar
-        onAddCustomer={handleAddCustomer}
-        onExport={handleExport}
-        onRefresh={handleRefresh}
-        onSendNewsletter={handleSendNewsletter}
-      />
+      <CustomersStats refreshKey={refreshKey} />
 
       <CustomersTable
         refreshKey={refreshKey}
-        onViewCustomer={handleViewCustomer}
-        onEditCustomer={handleEditCustomer}
-        onDeleteCustomer={handleDeleteCustomer}
+        onDataChanged={triggerRefresh}
+        actions={
+          <CustomersToolbar
+            onRefresh={handleRefresh}
+            onSendNewsletter={handleSendNewsletter}
+          />
+        }
       />
 
       <Modal isOpen={newsletterOpen} onClose={closeNewsletterModal} size="md">
-        <div className="p-6 space-y-5">
-          <div className="space-y-2">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Рассылка клиентам</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Отправьте уведомление всем активным клиентам. Уведомления получат только клиенты, которые не заблокированы.
+        <div className="space-y-4 p-5">
+          <div className="pr-10">
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white/90">Рассылка клиентам</h2>
+            <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Получат все незаблокированные клиенты.
             </p>
           </div>
 
           {newsletterError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-900/20 dark:text-red-200">
+            <div className="rounded-lg bg-error-50 px-3 py-2 text-sm text-error-600 dark:bg-error-500/15 dark:text-error-500">
               {newsletterError}
             </div>
           )}
 
           {newsletterSuccess && (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700 dark:border-green-900/60 dark:bg-green-900/20 dark:text-green-200">
+            <div className="rounded-lg bg-success-50 px-3 py-2 text-sm text-success-600 dark:bg-success-500/15 dark:text-success-500">
               {newsletterSuccess}
             </div>
           )}
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-              Тема сообщения
+          <div>
+            <label htmlFor="newsletter-subject" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+              Тема
             </label>
             <Input
-              placeholder="Например, Новые предложения недели"
+              id="newsletter-subject"
               value={newsletterSubject}
               onChange={(event) => setNewsletterSubject(event.target.value)}
             />
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-              Текст уведомления
+          <div>
+            <label htmlFor="newsletter-message" className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-400">
+              Текст
             </label>
             <TextArea
-              rows={6}
+              id="newsletter-message"
+              rows={5}
               value={newsletterMessage}
               onChange={setNewsletterMessage}
-              placeholder="Расскажите клиентам о новостях, акциях или обновлениях"
             />
           </div>
 
-          <div className="flex justify-end gap-3">
-            <button
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
               onClick={closeNewsletterModal}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
               disabled={newsletterSending}
             >
               Отмена
-            </button>
-            <button
-              onClick={submitNewsletter}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-70"
-              disabled={newsletterSending}
-            >
-              {newsletterSending ? "Отправляем…" : "Отправить"}
-            </button>
+            </Button>
+            <Button size="sm" onClick={submitNewsletter} disabled={newsletterSending}>
+              {newsletterSending ? "Отправка..." : "Отправить"}
+            </Button>
           </div>
         </div>
       </Modal>

@@ -1,514 +1,219 @@
-"use client"
+"use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { ShoppingCart, SlidersHorizontal } from "lucide-react";
-import { useSearchStore } from "@/lib/stores/searchStore";
-import { ActionSearchBar } from "@/components/ui/action-search-bar";
-import FiltersSidebar from "@/components/FiltersSidebar";
-import PaginationButton from "@/components/PaginationWithPrimaryButton";
-import {
-  Drawer,
-  DrawerBody,
-  DrawerClose,
-  DrawerContent,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { type SearchItem } from "@/lib/api/search";
-import AnalogsTable from "@/components/AnalogsTable";
+import { Suspense, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ShoppingCart, ArrowRight, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { ActionSearchBar } from "@/components/ui/action-search-bar";
+import ProductPhoto from "@/components/ProductPhoto";
+import PaginationButton from "@/components/PaginationWithPrimaryButton";
+import { searchKey, useSearchStore } from "@/lib/stores/searchStore";
 import { useCartStore } from "@/lib/stores/cartStore";
+import { SearchItem } from "@/lib/api/search";
+import { availableQuantity, partIdentity, sortParts } from "@/lib/searchResults";
+import { resolveProductImageUrl } from "@/lib/utils";
 
-function normalizeArticle(article?: string | null): string {
-  return (article ?? "").replace(/\s+/g, "").toUpperCase();
+const PAGE_SIZE = 20;
+const fieldClass = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500";
+const partUrl = (item: SearchItem) => `/search?${new URLSearchParams({ q: item.oem, brand: item.brand })}`;
+const quantityLabel = (quantity: number | null) => quantity === null ? "Остаток не получен" : quantity > 0 ? `${quantity} шт` : "Нет в наличии";
+
+function Offers({ item }: { item: SearchItem }) {
+  const { addOffer } = useCartStore();
+  const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const [pending, setPending] = useState<string | null>(null);
+  const warehouses = [...(item.warehouses ?? [])].sort((a, b) => (b.qty ?? -1) - (a.qty ?? -1));
+  const hasPrice = typeof item.price === "number" && item.price > 0;
+  const rows = warehouses.length ? warehouses : [{ code: "", name: "Склад не указан", address: "", qty: null, refKey: undefined }];
+
+  return <div className="overflow-x-auto">
+    <table className="w-full min-w-[650px] text-left text-sm">
+      <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <tr>{["Склад", "Доступно", "Цена", "Количество", "Действие"].map(label => <th key={label} className="px-4 py-3 font-medium">{label}</th>)}</tr>
+      </thead>
+      <tbody className="divide-y divide-slate-100">
+        {rows.map((warehouse, index) => {
+          const key = warehouse.refKey ?? warehouse.code ?? String(index);
+          const stock = typeof warehouse.qty === "number" ? Math.max(0, warehouse.qty) : null;
+          const canOrder = !!item.productId && !!warehouse.refKey && stock !== null && stock > 0 && hasPrice;
+          const quantity = Number(quantities[key] ?? "1");
+          const validQuantity = Number.isInteger(quantity) && quantity > 0 && stock !== null && quantity <= stock;
+          const add = async () => {
+            if (!canOrder || !validQuantity || !item.productId || !warehouse.refKey) return;
+            setPending(key);
+            try {
+              await addOffer(item.productId, warehouse.refKey, quantity);
+              toast.success("Товар добавлен в корзину");
+            } catch (error) {
+              toast.error(error instanceof Error ? error.message : "Не удалось добавить товар");
+            } finally { setPending(null); }
+          };
+          return <tr key={key + index}>
+            <td className="px-4 py-3 text-slate-700">{warehouse.name || warehouse.code || "Склад не указан"}</td>
+            <td className="px-4 py-3"><span className={stock && stock > 0 ? "rounded bg-green-50 px-2 py-1 text-green-700" : "text-slate-500"}>{quantityLabel(stock)}</span></td>
+            <td className="px-4 py-3 whitespace-nowrap">{hasPrice ? `${new Intl.NumberFormat("ru-RU").format(item.price!)} ${item.currency || "₸"}` : "Цена по запросу"}</td>
+            <td className="px-4 py-3"><input aria-label={`Количество ${item.brand} ${item.oem}, ${warehouse.name}`}
+              className="w-20 rounded border border-slate-300 px-2 py-1.5 disabled:bg-slate-50" type="number"
+              min={1} max={stock ?? undefined} step={1} disabled={!canOrder || pending !== null}
+              value={quantities[key] ?? "1"} onChange={e => setQuantities(old => ({ ...old, [key]: e.target.value }))} /></td>
+            <td className="px-4 py-3">{canOrder
+              ? <button type="button" onClick={add} disabled={!validQuantity || pending !== null}
+                  className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-white hover:bg-orange-600 disabled:opacity-50">
+                  <ShoppingCart size={16} />{pending === key ? "Добавляем…" : "В корзину"}
+                </button>
+              : <Link href="/contacts" className="font-medium text-orange-600 hover:underline">{!hasPrice ? "Уточнить цену" : "Уточнить наличие"}</Link>}
+            </td>
+          </tr>;
+        })}
+      </tbody>
+    </table>
+  </div>;
 }
 
-function computeAvailableQuantity(item?: SearchItem): number {
-  if (!item) return 0;
-  if (typeof item.quantity === "number" && !Number.isNaN(item.quantity)) {
-    return Math.max(item.quantity, 0);
-  }
-  if (!item.warehouses || item.warehouses.length === 0) {
-    return 0;
-  }
-  return item.warehouses.reduce((sum, warehouse) => sum + (warehouse.qty ?? 0), 0);
-}
-
-function ensureAbsoluteUrl(url?: string | null): string | undefined {
-  if (!url) return undefined;
-  if (url.startsWith("http://") || url.startsWith("https://")) {
-    return url;
-  }
-  if (url.startsWith("/")) {
-    return `https://api.umapi.ru${url}`;
-  }
-  return url;
+function PartCard({ item, primary = false }: { item: SearchItem; primary?: boolean }) {
+  const stock = availableQuantity(item);
+  return <article className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+    <div className="flex items-start gap-4 px-4 py-4">
+      <ProductPhoto src={resolveProductImageUrl(item.imageUrl)} alt={item.name} />
+      <div className="min-w-0 flex-1">
+        {primary ? <h3 className="font-semibold text-slate-900">{item.brand} <span className="font-mono">{item.oem}</span></h3>
+          : <Link href={partUrl(item)} className="font-semibold text-slate-900 hover:text-orange-600">{item.brand} <span className="font-mono">{item.oem}</span></Link>}
+        <p className="mt-1 text-sm text-slate-600">{item.name}</p>
+        {!primary && <p className="mt-1 text-xs text-slate-500">{item.analogSource === "UMAPI_SHARED_OE"
+          ? `Замена по общему OE: ${(item.oeNumbers ?? []).slice(0, 3).join(", ")}`
+          : `Кросс каталога ${item.analogSource || "поставщика"}`} · применяемость требует проверки</p>}
+      </div>
+      <span className={stock && stock > 0 ? "text-sm font-medium text-green-700" : "text-sm text-slate-500"}>{quantityLabel(stock)}</span>
+    </div>
+    {primary ? <Offers item={item} /> : <details className="border-t border-slate-100">
+      <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-orange-600 hover:bg-orange-50">Склады и цены ({item.warehouses?.length || 0})</summary>
+      <Offers item={item} />
+    </details>}
+  </article>;
 }
 
 function SearchPage() {
-  const [filtersOpen, setFiltersOpen] = useState(false);
-  const [filtersVersion, setFiltersVersion] = useState(0);
-  const [showAllBrands, setShowAllBrands] = useState(false);
-  const [showAllAnalogs, setShowAllAnalogs] = useState(false);
-  const [brandFilter, setBrandFilter] = useState<string>("");
-  const [analogFilter, setAnalogFilter] = useState<string>("");
-  const [quantities, setQuantities] = useState<Record<string, number>>({});
-
-  const searchParams = useSearchParams();
-  const {
-    search,
-    results,
-    query,
-    error,
-    filters,
-    clearResults,
-    resetFilters: resetSearchFilters,
-  } = useSearchStore();
-  const { addByOem } = useCartStore();
-
-  const { brands, photoOnly } = filters;
-  const activeFiltersCount = useMemo(() => {
-    let count = brands.length;
-    if (photoOnly) count += 1;
-    return count;
-  }, [brands, photoOnly]);
+  const params = useSearchParams();
+  const router = useRouter();
+  const q = params.get("q") ?? "";
+  const brand = params.get("brand") || undefined;
+  const { search, clearResults, results, error, isLoading, lastSearchKey, selectionRequired,
+    selectedArticle, selectedBrand, warnings, detectedType, vehicle, analogsLoading, refreshAnalogs } = useSearchStore();
+  const requestKey = searchKey(q, undefined, brand);
+  const loading = isLoading || (!!q && requestKey !== lastSearchKey);
+  const analogBrand = params.get("analogBrand") ?? "";
+  const sort = params.get("sort") === "price" ? "price" : "stock";
+  const photoOnly = params.get("photo") === "1";
 
   useEffect(() => {
-    const queryParam = searchParams?.get("q");
-    if (queryParam) {
-      if (queryParam !== query) {
-        search(queryParam);
-      }
-    } else {
-      clearResults();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+    if (!q.trim()) { clearResults(); return; }
+    if (useSearchStore.getState().lastSearchKey !== requestKey) void search(q, undefined, brand);
+  }, [q, brand, requestKey, search, clearResults]);
 
   useEffect(() => {
-    setBrandFilter("");
-    setAnalogFilter("");
-    setShowAllBrands(false);
-    setShowAllAnalogs(false);
-    setQuantities({});
-  }, [query]);
-
-  const primaryResults = useMemo(
-    () => results.filter((r: SearchItem) => r.catalog !== "UMAPI_ANALOG"),
-    [results]
-  );
-
-  const analogResults = useMemo(
-    () => results.filter((r: SearchItem) => r.catalog === "UMAPI_ANALOG"),
-    [results]
-  );
-
-  const primaryResultByArticle = useMemo(() => {
-    const map = new Map<string, SearchItem>();
-    primaryResults.forEach((item) => {
-      const article = normalizeArticle(item.oem);
-      const brandKey = (item.brand ?? '').trim().toUpperCase();
-      if (article.length === 0) {
+    if (!analogsLoading || loading) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let attempts = 0;
+    const poll = async () => {
+      if (cancelled) return;
+      const pending = await refreshAnalogs(q, brand);
+      if (cancelled || !pending) return;
+      if (++attempts >= 60) {
+        const state = useSearchStore.getState();
+        if (state.lastSearchKey === requestKey) useSearchStore.setState({ analogsLoading: false,
+          warnings: [...state.warnings, 'Подбор OE продолжается на сервере. Повторите поиск немного позже.'] });
         return;
       }
-      const key = `${article}|${brandKey}`;
-      if (!map.has(key)) {
-        map.set(key, item);
-      }
-    });
-    return map;
-  }, [primaryResults]);
+      timer = setTimeout(poll, 2500);
+    };
+    timer = setTimeout(poll, 1500);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [q, brand, requestKey, analogsLoading, loading, refreshAnalogs]);
 
-  const filteredPrimarySearchResults = useMemo(() => {
-    return primaryResults.filter((item) => {
-      if (filters.brands.length > 0) {
-        if (!item.brand) return false;
-        if (!filters.brands.includes(item.brand)) return false;
-      }
-      if (filters.photoOnly && !item.imageUrl) {
-        return false;
-      }
-      return true;
-    });
-  }, [primaryResults, filters.brands, filters.photoOnly]);
+  const setFilter = (name: string, value: string) => {
+    const next = new URLSearchParams(params.toString());
+    if (value) next.set(name, value); else next.delete(name);
+    next.delete("page");
+    router.replace(`/search?${next}`, { scroll: false });
+  };
+  const primary = sortParts(results.filter(item => item.catalog !== "UMAPI_ANALOG"), sort);
+  const analogs = sortParts(results.filter(item => item.catalog === "UMAPI_ANALOG")
+    .filter(item => !analogBrand || item.brand === analogBrand)
+    .filter(item => !photoOnly || !!item.imageUrl), sort);
+  const analogBrands = [...new Set(results.filter(item => item.catalog === "UMAPI_ANALOG").map(item => item.brand))].sort();
+  const paged = selectionRequired ? primary : analogs;
+  const totalPages = Math.max(1, Math.ceil(paged.length / PAGE_SIZE));
+  const requestedPage = Number(params.get("page") ?? "1");
+  const page = Number.isFinite(requestedPage) ? Math.max(0, Math.min(totalPages - 1, Math.floor(requestedPage) - 1)) : 0;
+  const visible = paged.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  const normalizedBrandFilter = brandFilter.trim().toLowerCase();
-  const filteredBrandItems = useMemo(() => {
-    return filteredPrimarySearchResults.filter((item) => {
-      if (!normalizedBrandFilter) return true;
-      return (item.brand || "").toLowerCase().includes(normalizedBrandFilter);
-    });
-  }, [filteredPrimarySearchResults, normalizedBrandFilter]);
-  const displayedBrandItems = showAllBrands ? filteredBrandItems : filteredBrandItems.slice(0, 5);
-
-  const normalizedAnalogFilter = analogFilter.trim().toLowerCase();
-  const filteredAnalogs = useMemo(() => {
-    return analogResults.filter((analog) => {
-      if (filters.brands.length > 0) {
-        if (!analog.brand) return false;
-        if (!filters.brands.includes(analog.brand)) return false;
-      }
-      if (filters.photoOnly && !analog.imageUrl) {
-        return false;
-      }
-      if (!normalizedAnalogFilter) return true;
-      return (analog.brand || "").toLowerCase().includes(normalizedAnalogFilter);
-    });
-  }, [analogResults, filters.brands, filters.photoOnly, normalizedAnalogFilter]);
-  const displayedAnalogs = showAllAnalogs ? filteredAnalogs : filteredAnalogs.slice(0, 5);
-
-  const hasAnyResults = filteredPrimarySearchResults.length > 0 || filteredAnalogs.length > 0;
-
-  return (
-    <div className="bg-white min-h-screen pt-20 md:pt-24">
-      <main className="mx-auto max-w-screen-2xl px-4 md:px-6">
-        <div className="p-3 md:p-6">
-          <h1 className="text-xl md:text-2xl font-bold mb-3 md:mb-4 text-center">Поиск</h1>
-          <p className="text-center text-gray-600 mb-4 md:mb-6 text-sm md:text-base">
-            Найдите нужные автозапчасти с помощью умного поиска.
-          </p>
-
-          <div className="mb-6 md:mb-8">
-            <ActionSearchBar />
-          </div>
-
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-red-800">{error}</p>
-            </div>
-          )}
-
-          <div className="mb-4 lg:hidden">
-            <Drawer open={filtersOpen} onOpenChange={setFiltersOpen}>
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Результаты поиска
-                  {results && results.length > 0 && (
-                    <span className="ml-2 text-sm font-normal text-slate-500">({results.length})</span>
-                  )}
-                </h2>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 rounded-full border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50"
-                  onClick={() => setFiltersOpen(true)}
-                >
-                  <SlidersHorizontal className="h-4 w-4" />
-                  Фильтры
-                  {activeFiltersCount > 0 && (
-                    <Badge className="ml-1 rounded-full bg-orange-500 px-2 py-0 text-xs text-white">
-                      {activeFiltersCount}
-                    </Badge>
-                  )}
-                </Button>
-              </div>
-
-              <DrawerContent>
-                <DrawerHeader className="bg-white">
-                  <DrawerTitle className="text-base font-semibold text-slate-900">
-                    Фильтры поиска
-                  </DrawerTitle>
-                  <p className="text-sm text-slate-500">
-                    Выберите бренды или включите отображение только с фотографиями.
-                  </p>
-                </DrawerHeader>
-                <DrawerBody className="pb-10">
-                  <FiltersSidebar key={filtersVersion} isMobile showApplyButton={false} />
-                </DrawerBody>
-                <DrawerFooter className="bg-white">
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full border-slate-200 text-slate-600 hover:text-slate-900"
-                      onClick={() => {
-                        resetSearchFilters();
-                        setFiltersVersion((prev) => prev + 1);
-                      }}
-                    >
-                      Сбросить
-                    </Button>
-                    <Button
-                      type="button"
-                      className="w-full bg-orange-500 text-white hover:bg-orange-600"
-                      onClick={() => setFiltersOpen(false)}
-                    >
-                      Применить
-                    </Button>
-                  </div>
-                  <DrawerClose asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full text-slate-500 hover:text-slate-800"
-                    >
-                      Закрыть
-                    </Button>
-                  </DrawerClose>
-                </DrawerFooter>
-              </DrawerContent>
-            </Drawer>
-          </div>
-
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
-            <aside className="hidden lg:block lg:w-1/4">
-              <div className="lg:sticky lg:top-24 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto lg:pr-2">
-                <FiltersSidebar key={filtersVersion} />
-              </div>
-            </aside>
-
-            <section className="w-full lg:w-3/4">
-              <div className="rounded-lg border overflow-hidden mt-6">
-                  <div className="px-6 py-4 bg-gray-50 border-b">
-                    <div className="flex items-center justify-between mb-3">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Найденные запчасти ({filteredBrandItems.length})
-                      </h3>
-                      <input
-                        type="text"
-                        placeholder="Фильтр по бренду"
-                        value={brandFilter}
-                        onChange={(e) => setBrandFilter(e.target.value)}
-                        className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                      />
-                    </div>
-                    <p className="text-sm text-gray-600">
-                      Артикул: <span className="font-mono font-medium">{query}</span>
-                    </p>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-100">
-                        <tr>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 uppercase">
-                            Фото
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
-                            Бренд
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
-                            Артикул
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
-                            Наименование
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
-                            Склад
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
-                            Остатки
-                          </th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 uppercase">
-                            Цена
-                          </th>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 uppercase">
-                            Кол-во
-                          </th>
-                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 uppercase">
-                            Действия
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {displayedBrandItems.length > 0 ? (
-                          displayedBrandItems.map((item, idx) => {
-                            const normalizedArticle = normalizeArticle(item.oem);
-                            const mapKey = `${normalizedArticle}|${(item.brand ?? '').trim().toUpperCase()}`;
-                            const searchMatch = primaryResultByArticle.get(mapKey) ?? item;
-                            const stock = computeAvailableQuantity(searchMatch);
-                            const priceValue = typeof searchMatch?.price === "number" ? searchMatch.price : null;
-                            let warehouseName = "Нет данных";
-                            if (searchMatch?.warehouses && searchMatch.warehouses.length > 0) {
-                              const visibleWarehouses = searchMatch.warehouses.slice(0, 2);
-                              const labels = visibleWarehouses.map((warehouse) => {
-                                const name = warehouse.name || warehouse.code || "Склад";
-                                const qty = warehouse.qty ?? 0;
-                                return `${name} (${qty})`;
-                              });
-                              warehouseName = labels.join(", ");
-                              if (searchMatch.warehouses.length > visibleWarehouses.length) {
-                                warehouseName += ` и ещё ${searchMatch.warehouses.length - visibleWarehouses.length}`;
-                              }
-                            }
-                            const formattedPrice =
-                              priceValue !== null
-                                ? `${new Intl.NumberFormat("ru-RU").format(priceValue)} ${
-                                    searchMatch?.currency || "₸"
-                                  }`
-                                : "Цена по запросу";
-                            const defaultQuantity = stock > 0 ? 1 : 0;
-                            const itemKey = `brand-${normalizedArticle}-${searchMatch?.brand || item.brand || "UNKNOWN"}-${idx}`;
-                            const quantity = quantities[itemKey] ?? defaultQuantity;
-                            const hasStock = stock > 0;
-                            const productName = searchMatch?.name || item.name || searchMatch?.oem || "Товар";
-                            const productBrand = searchMatch?.brand || item.brand || "UNKNOWN";
-                            const productArticle = normalizedArticle || searchMatch?.oem || item.oem || productName;
-                            const imageUrl = ensureAbsoluteUrl(searchMatch?.imageUrl || item.imageUrl);
-
-                            const handleAddToCart = async () => {
-                              if (!hasStock) {
-                                toast.error("Товар отсутствует на складах");
-                                return;
-                              }
-                              if (quantity <= 0) {
-                                toast.error("Укажите количество");
-                                return;
-                              }
-                              try {
-                                await addByOem(
-                                  productArticle,
-                                  productName,
-                                  productBrand,
-                                  quantity,
-                                  priceValue ?? undefined,
-                                  imageUrl
-                                );
-                                toast.success("Товар добавлен в корзину");
-                              } catch (error: any) {
-                                console.error("Failed to add brand item to cart", error);
-                                toast.error(error?.message || "Не удалось добавить товар в корзину");
-                              }
-                            };
-
-                            return (
-                              <tr key={itemKey} className="hover:bg-gray-50">
-                                <td className="px-4 py-2 text-center">
-                                  {imageUrl ? (
-                                    <img
-                                      src={imageUrl}
-                                      alt={productName}
-                                      className="w-12 h-12 object-cover rounded mx-auto"
-                                    />
-                                  ) : (
-                                    <div className="w-12 h-12 bg-gray-100 rounded mx-auto flex items-center justify-center">
-                                      <span className="text-gray-400 text-xs">Нет фото</span>
-                                    </div>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2 text-sm font-medium text-gray-900">{productBrand}</td>
-                                <td className="px-4 py-2 text-sm font-mono text-gray-900">{searchMatch?.oem || item.oem}</td>
-                                <td className="px-4 py-2 text-sm text-gray-700">{productName}</td>
-                                <td className="px-4 py-2 text-sm text-gray-600">{warehouseName}</td>
-                                <td className="px-4 py-2 text-sm">
-                                  <span
-                                    className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${
-                                      stock > 5
-                                        ? "bg-green-100 text-green-700"
-                                        : stock > 0
-                                        ? "bg-yellow-100 text-yellow-700"
-                                        : "bg-red-100 text-red-700"
-                                    }`}
-                                  >
-                                    {stock > 0 ? `${stock} шт` : "Нет в наличии"}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2 text-sm text-gray-900">{formattedPrice}</td>
-                                <td className="px-4 py-2 text-center">
-                                  <input
-                                    type="number"
-                                    min={hasStock ? 1 : 0}
-                                    max={stock}
-                                    value={quantity}
-                                    onChange={(e) => {
-                                      const val = parseInt(e.target.value, 10) || 1;
-                                      setQuantities((prev) => ({
-                                        ...prev,
-                                        [itemKey]: hasStock ? Math.min(Math.max(1, val), stock) : 0,
-                                      }));
-                                    }}
-                                    disabled={!hasStock}
-                                    className="w-14 px-2 py-0.5 text-center text-sm border border-gray-300 rounded disabled:bg-gray-100 disabled:text-gray-400"
-                                  />
-                                </td>
-                                <td className="px-4 py-2 text-center">
-                                  <button
-                                    onClick={handleAddToCart}
-                                    disabled={!hasStock}
-                                    className="inline-flex items-center justify-center w-9 h-9 rounded border border-transparent bg-orange-500 text-white hover:bg-orange-600 transition disabled:bg-gray-300 disabled:cursor-not-allowed"
-                                    aria-label="Добавить в корзину"
-                                  >
-                                    <ShoppingCart className="w-4 h-4" />
-                                  </button>
-                                </td>
-                              </tr>
-                            );
-                          })
-                        ) : (
-                          <tr>
-                            <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-500">
-                              Запчасти не найдены
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  {filteredBrandItems.length > 5 && (
-                    <div className="px-6 py-3 bg-gray-50 border-t flex justify-center">
-                      <button
-                        onClick={() => setShowAllBrands(!showAllBrands)}
-                        className="px-4 py-2 text-sm font-medium text-orange-600 hover:text-orange-700 hover:underline"
-                      >
-                        {showAllBrands ? "Свернуть" : `Показать все (${filteredBrandItems.length})`}
-                      </button>
-                    </div>
-                  )}
+  return <div className="min-h-screen bg-white pt-24">
+    <main id="main-content" className="mx-auto max-w-screen-2xl px-4 py-6 md:px-8">
+      <h1 className="mb-2 text-center text-2xl font-bold text-slate-900">Поиск запчастей</h1>
+      <p className="mb-6 text-center text-sm text-slate-500">Артикул или бренд и артикул — затем выберите нужную деталь.</p>
+      <ActionSearchBar />
+      <div className="mt-8">
+        {loading ? <div role="status" className="rounded-xl border bg-slate-50 p-12 text-center text-slate-500">Ищем детали и предложения…</div>
+        : error ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5">
+          <p>{error}</p><button className="mt-3 text-orange-700 underline" onClick={() => search(q, undefined, brand)}>Повторить поиск</button>
+        </div> : <>
+          {warnings.map(message => <p role="status" key={message} className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{message}</p>)}
+          {detectedType === "VIN" && <div className="rounded-xl border p-6">{vehicle
+            ? <Link href={`/catalogs/${vehicle.vehicleId}?${new URLSearchParams({ ssd: vehicle.ssd, catalog: vehicle.catalog, brand: vehicle.brand, name: vehicle.name })}`} className="text-orange-600">Открыть каталог {vehicle.brand} {vehicle.name}</Link>
+            : <p>Автомобиль с VIN {q} не найден. Проверьте номер или выберите автомобиль в каталоге.</p>}</div>}
+          {selectionRequired ? <section className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="border-b bg-slate-50 p-5"><h2 className="text-xl font-semibold">Уточните деталь ({primary.length})</h2>
+              <p className="mt-2 text-sm text-slate-600">Номер {q} встречается у разных производителей. Выберите бренд — покажем только его предложения и возможные замены.</p></div>
+            <div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm">
+              <thead className="bg-slate-100 text-xs uppercase text-slate-500"><tr>{["Фото", "Бренд", "Артикул", "Наименование", "Наличие", ""].map((label, i) => <th key={i} className="px-4 py-3">{label}</th>)}</tr></thead>
+              <tbody className="divide-y">{visible.map(item => <tr key={partIdentity(item)} className="hover:bg-slate-50">
+                <td className="px-4 py-3"><ProductPhoto src={resolveProductImageUrl(item.imageUrl)} alt={item.name} /></td>
+                <td className="px-4 py-3 font-semibold">{item.brand}</td><td className="px-4 py-3 font-mono">{item.oem}</td>
+                <td className="px-4 py-3">{item.name}</td><td className="px-4 py-3">{quantityLabel(availableQuantity(item))}</td>
+                <td className="px-4 py-3"><Link href={partUrl(item)} className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-orange-500 px-3 py-2 text-white hover:bg-orange-600">Цены и аналоги <ArrowRight size={16} /></Link></td>
+              </tr>)}</tbody>
+            </table></div>
+          </section> : <>
+            {selectedBrand && <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-xl font-semibold">{selectedBrand} <span className="font-mono">{selectedArticle}</span></h2>
+              <Link href={`/search?q=${encodeURIComponent(selectedArticle || q)}`} className="inline-flex items-center gap-2 text-sm text-orange-600"><ArrowLeft size={16} />Выбрать другую деталь</Link>
+            </div>}
+            {!!primary.length && <section aria-label="Этот товар" className="space-y-3">
+              <h2 className="text-lg font-semibold">{selectedBrand ? "Этот товар" : "Найденные товары"}</h2>
+              {primary.map(item => <PartCard key={partIdentity(item)} item={item} primary />)}
+            </section>}
+            {selectedBrand && <section className="mt-8">
+              <div className="rounded-xl border border-orange-200 bg-orange-50 p-5">
+                <h2 className="text-lg font-semibold">Возможные замены ({analogs.length})</h2>
+                {analogsLoading && <p role="status" className="mt-2 text-sm text-orange-700">Автоматически подбираем дополнительные замены по OE…</p>}
+                <p className="mt-2 text-sm text-slate-600">Для {selectedBrand} {selectedArticle}. Проверьте применяемость и комплектацию перед заказом. Грузовая применяемость пока не подтверждена для всех позиций.</p>
+                <div className="mt-4 flex flex-wrap items-end gap-4">
+                  <label className="grid gap-1 text-xs text-slate-600">Бренд замены<select className={fieldClass} value={analogBrand} onChange={e => setFilter("analogBrand", e.target.value)}>
+                    <option value="">Все бренды</option>{analogBrands.map(value => <option key={value}>{value}</option>)}
+                  </select></label>
+                  <label className="grid gap-1 text-xs text-slate-600">Порядок<select className={fieldClass} value={sort} onChange={e => setFilter("sort", e.target.value)}>
+                    <option value="stock">Сначала больше в наличии</option><option value="price">Сначала дешевле</option>
+                  </select></label>
+                  <label className="flex items-center gap-2 py-2 text-sm"><input type="checkbox" checked={photoOnly} onChange={e => setFilter("photo", e.target.checked ? "1" : "")} />С фотографиями</label>
                 </div>
-
-              <div className="rounded-lg border overflow-hidden mt-6">
-                <div className="px-6 py-4 bg-orange-50 border-b border-orange-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      Аналоги и заменители ({filteredAnalogs.length})
-                    </h3>
-                    <input
-                      type="text"
-                      placeholder="Фильтр по бренду"
-                      value={analogFilter}
-                      onChange={(e) => setAnalogFilter(e.target.value)}
-                      className="px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    />
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Альтернативные запчасти для артикула{" "}
-                    <span className="font-mono font-medium">{query}</span>
-                  </p>
-                </div>
-                <AnalogsTable analogs={displayedAnalogs} />
-                {filteredAnalogs.length > 5 && (
-                  <div className="px-6 py-3 bg-orange-50 border-t flex justify-center">
-                    <button
-                      onClick={() => setShowAllAnalogs(!showAllAnalogs)}
-                      className="px-4 py-2 text-sm font-medium text-orange-600 hover:text-orange-700 hover:underline"
-                    >
-                      {showAllAnalogs ? "Свернуть" : `Показать все (${filteredAnalogs.length})`}
-                    </button>
-                  </div>
-                )}
               </div>
-
-              {hasAnyResults && (
-                <div className="flex justify-center mt-6 md:mt-8 p-4">
-                  <PaginationButton />
-                </div>
-              )}
-            </section>
-          </div>
-        </div>
-      </main>
-    </div>
-  );
+              <div className="mt-4 space-y-3">{visible.map(item => <PartCard key={partIdentity(item)} item={item} />)}</div>
+              {!analogs.length && <p className="py-8 text-center text-slate-500">{analogBrand || photoOnly ? "Нет замен с выбранными фильтрами." : "В загруженных данных замены не найдены. Можно уточнить подбор у менеджера."}</p>}
+            </section>}
+          </>}
+          {!results.length && detectedType !== "VIN" && <p className="py-12 text-center text-slate-500">{q ? "Ничего не найдено. Проверьте артикул или попробуйте поиск по названию." : "Введите артикул для поиска."}</p>}
+          {totalPages > 1 && <div className="mt-6"><PaginationButton page={page} totalPages={totalPages} onPageChange={nextPage => {
+            const next = new URLSearchParams(params.toString()); next.set("page", String(nextPage + 1));
+            router.push(`/search?${next}`, { scroll: false });
+          }} /></div>}
+        </>}
+      </div>
+    </main>
+  </div>;
 }
 
 export default function SearchPageWrapper() {
-  return (
-    <Suspense fallback={<div className="py-16 text-center text-gray-500">Загрузка...</div>}>
-      <SearchPage />
-    </Suspense>
-  );
+  return <Suspense fallback={<div className="py-16 text-center text-slate-500">Загрузка…</div>}><SearchPage /></Suspense>;
 }

@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { SyntheticEvent, useEffect, useMemo, useState } from "react"
 import { Carousel, CarouselContent, CarouselItem } from "./ui/carousel";
 import Autoplay from "embla-carousel-autoplay"
@@ -35,9 +36,12 @@ const CarouselComponent = () => {
           {slides.length === 0 && !loading && (
             <CarouselItem>
               <div className="flex items-center justify-center p-4 sm:p-6">
-                <div className="w-full max-w-5xl sm:max-w-6xl bg-white h-56 sm:h-80 rounded-xl border border-gray-200 flex items-center justify-center text-gray-500">
-                  Баннеры отсутствуют
-                </div>
+                <Link href="/categories" className="block w-full max-w-5xl sm:max-w-6xl" aria-label="Запчасти для грузовиков — каталоги Euroline">
+                  <div className="relative w-full h-56 sm:h-80 rounded-xl overflow-hidden border border-gray-200 bg-gray-900">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/images/site/home-hero.jpg" alt="Запчасти для грузовиков" className="h-full w-full object-cover" />
+                  </div>
+                </Link>
               </div>
             </CarouselItem>
           )}

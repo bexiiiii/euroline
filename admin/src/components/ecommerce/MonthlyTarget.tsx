@@ -1,8 +1,10 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ApexOptions } from "apexcharts";
 import { analyticsApi, MonthlyTargetSummary } from "@/lib/api/analytics";
+import { formatKzt } from "@/lib/format";
+import WidgetError from "@/components/analytics/WidgetError";
 
 const ApexChart = dynamic(() => import("react-apexcharts"), { ssr: false });
 
@@ -11,34 +13,32 @@ export default function MonthlyTarget() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchTargetData = async () => {
-      try {
-        const data = await analyticsApi.getMonthlyTarget();
-        setTargetData(data);
-        setError(null);
-      } catch (error) {
-        console.error("Failed to fetch monthly target:", error);
-        setError("Не удалось загрузить данные");
-        // Set fallback data
-        setTargetData({
-          target: 5000000,
-          currentRevenue: 0,
-          todayRevenue: 0,
-          progressPercent: 0,
-          growthPercent: 0,
-          isGrowthPositive: true
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchTargetData();
+  const fetchTargetData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await analyticsApi.getMonthlyTarget();
+      setTargetData(data);
+    } catch (error) {
+      console.error("Failed to fetch monthly target:", error);
+      setTargetData(null);
+      setError("Не удалось загрузить данные");
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchTargetData();
+  }, [fetchTargetData]);
+
+  const hasTarget = Number(targetData?.target ?? 0) > 0;
+  const formatAmount = (value: number | string | null | undefined) =>
+    value === null || value === undefined || value === "" ? "—" : formatKzt(value);
 
   const options: ApexOptions = {
     chart: {
-      height: 350,
+      height: 220,
       type: "radialBar",
     },
     plotOptions: {
@@ -53,7 +53,7 @@ export default function MonthlyTarget() {
             fontWeight: 500,
           },
           value: {
-            fontSize: "28px",
+            fontSize: "22px",
             fontWeight: 600,
             color: "#111827",
             formatter: function (val: number) {
@@ -69,14 +69,14 @@ export default function MonthlyTarget() {
     labels: ["Цель"],
   };
 
-  const series = targetData ? [Math.round(targetData.progressPercent)] : [0];
+  const series = [Math.round(targetData?.progressPercent ?? 0)];
 
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+      <div className="h-full rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="animate-pulse">
-          <div className="h-6 w-32 bg-gray-200 rounded dark:bg-gray-800 mb-4"></div>
-          <div className="h-64 bg-gray-200 rounded dark:bg-gray-800"></div>
+          <div className="mb-4 h-5 w-32 rounded bg-gray-200 dark:bg-gray-800"></div>
+          <div className="h-56 rounded bg-gray-200 dark:bg-gray-800"></div>
         </div>
       </div>
     );
@@ -84,52 +84,52 @@ export default function MonthlyTarget() {
 
   if (error) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-        <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            Месячная цель
-          </h3>
-        </div>
-        <div className="flex items-center justify-center py-12 text-gray-500 dark:text-gray-400">
-          {error}
-        </div>
+      <div className="h-full rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+          Месячная цель
+        </h3>
+        <WidgetError message={error} onRetry={fetchTargetData} className="py-12" />
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-3 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-          Месячная цель
-        </h3>
-      </div>
-      <div>
-        <ApexChart options={options} series={series} type="radialBar" height={300} />
-      </div>
-      <div className="mt-4 space-y-3">
+    <div className="h-full rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+      <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+        Месячная цель
+      </h3>
+      {hasTarget ? (
+        <div>
+          <ApexChart options={options} series={series} type="radialBar" height={220} />
+        </div>
+      ) : (
+        <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          Цель на месяц не задана
+        </p>
+      )}
+      <div className="mt-2 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-gray-500 text-theme-sm dark:text-gray-400">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
             Цель
           </span>
-          <span className="font-semibold text-gray-800 text-theme-sm dark:text-white/90">
-            {targetData?.target ? Number(targetData.target).toLocaleString() : '0'} ₸
+          <span className="text-sm font-medium tabular-nums text-gray-800 dark:text-white/90">
+            {hasTarget ? formatAmount(targetData?.target) : "—"}
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-gray-500 text-theme-sm dark:text-gray-400">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
             Текущий доход
           </span>
-          <span className="font-semibold text-gray-800 text-theme-sm dark:text-white/90">
-            {targetData?.currentRevenue ? Number(targetData.currentRevenue).toLocaleString() : '0'} ₸
+          <span className="text-sm font-medium tabular-nums text-gray-800 dark:text-white/90">
+            {formatAmount(targetData?.currentRevenue)}
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-gray-500 text-theme-sm dark:text-gray-400">
+          <span className="text-sm text-gray-500 dark:text-gray-400">
             Сегодняшний доход
           </span>
-          <span className="font-semibold text-blue-600 text-theme-sm dark:text-blue-400">
-            +{targetData?.todayRevenue ? Number(targetData.todayRevenue).toLocaleString() : '0'} ₸
+          <span className="text-sm font-medium tabular-nums text-gray-800 dark:text-white/90">
+            {formatAmount(targetData?.todayRevenue)}
           </span>
         </div>
       </div>

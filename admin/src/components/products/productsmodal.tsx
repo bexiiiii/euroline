@@ -8,6 +8,7 @@ import Button from "../ui/button/Button";
 import { Modal } from "../ui/modal";
 import { productApi } from "@/lib/api/products";
 import { categoriesApi, type Category } from "@/lib/api/categories";
+import { useToast } from "@/context/ToastContext";
 
 type SubcatOption = { id: number; name: string; slug: string };
 
@@ -17,6 +18,7 @@ interface ProductsModalProps {
 
 export default function ProductsModal({ onCreated }: ProductsModalProps) {
   const { isOpen, openModal, closeModal } = useModal();
+  const { success: showSuccess } = useToast();
   const [formData, setFormData] = useState({
     name: "",
     sku: "",
@@ -118,7 +120,7 @@ export default function ProductsModal({ onCreated }: ProductsModalProps) {
         properties,
       });
 
-      alert("Товар успешно добавлен и будет синхронизирован с 1С по артикулу.");
+      showSuccess("Товар добавлен");
       closeModal();
       resetForm();
       onCreated?.();
@@ -133,27 +135,27 @@ export default function ProductsModal({ onCreated }: ProductsModalProps) {
 
   return (
   <>
-      <Button size="sm" onClick={openModal}>
-        <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+      <Button size="sm" className="h-10 py-0" onClick={openModal}>
+        <svg className="size-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" viewBox="0 0 24 24">
+          <path d="M12 5v14m7-7H5" />
         </svg>
         Добавить товар
       </Button>
       <Modal
         isOpen={isOpen}
         onClose={closeModal}
-        className="max-w-[800px] p-5 lg:p-8"
+        className="max-w-[720px] p-5"
       >
         <form className="">
-          <h4 className="mb-6 text-xl font-semibold text-gray-800 dark:text-white/90">
-            Добавить новый товар
+          <h4 className="mb-4 text-lg font-semibold text-gray-800 dark:text-white/90">
+            Новый товар
           </h4>
 
           {error && (
-            <div className="mb-4 text-sm text-red-600">{error}</div>
+            <div className="mb-4 text-sm text-error-600 dark:text-error-500">{error}</div>
           )}
 
-          <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="col-span-1 sm:col-span-2">
               <Label>Название товара *</Label>
               <Input 
@@ -217,14 +219,14 @@ export default function ProductsModal({ onCreated }: ProductsModalProps) {
             {/* Image upload */}
             <div className="col-span-1 sm:col-span-2">
               <Label>Изображение товара</Label>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <Input type="file" onChange={(e) => {
                   const f = e.target.files?.[0] || null;
                   setImageFile(f);
                   if (f) setImagePreview(URL.createObjectURL(f)); else setImagePreview("");
                 }} />
                 {imagePreview && (
-                  <img src={imagePreview} alt="preview" className="h-16 w-16 rounded object-cover border" />
+                  <img src={imagePreview} alt="Предпросмотр изображения" className="size-12 rounded-lg border border-gray-200 object-cover dark:border-gray-800" />
                 )}
               </div>
             </div>
@@ -232,24 +234,21 @@ export default function ProductsModal({ onCreated }: ProductsModalProps) {
             <div className="col-span-1 sm:col-span-2">
               <Label>Описание</Label>
               <textarea
-                placeholder="Подробное описание товара..."
+                placeholder="Описание товара"
                 value={formData.description}
                 onChange={(e) => handleInputChange("description", e.target.value)}
-                rows={4}
+                rows={3}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-white text-gray-900 text-sm focus:border-brand-300 focus:outline-none focus:ring-3 focus:ring-brand-500/10 dark:border-gray-800 dark:bg-gray-900 dark:text-white/90 dark:focus:border-brand-800 resize-none"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end w-full gap-3 mt-8">
+          <div className="flex items-center justify-end w-full gap-2 mt-5">
             <Button size="sm" variant="outline" onClick={closeModal}>
               Отмена
             </Button>
             <Button size="sm" onClick={handleSave} disabled={saving || !formData.name.trim() || !formData.sku.trim()}>
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              {saving ? 'Сохранение...' : 'Сохранить товар'}
+              {saving ? "Сохранение..." : "Сохранить"}
             </Button>
           </div>
         </form>

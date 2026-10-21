@@ -103,7 +103,7 @@ const NotificationComposerWidget: React.FC<NotificationComposerWidgetProps> = ({
   };
 
   const containerClassName = [
-    "rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900",
+    "rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]",
     className,
   ]
     .filter(Boolean)
@@ -111,12 +111,9 @@ const NotificationComposerWidget: React.FC<NotificationComposerWidgetProps> = ({
 
   return (
     <div className={containerClassName}>
-      <div className="mb-4 space-y-1">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Отправка уведомления</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Разошлите системное сообщение выбранной аудитории</p>
-      </div>
+      <h3 className="mb-4 text-base font-semibold text-gray-800 dark:text-white/90">Новое уведомление</h3>
       <div className="space-y-4">
-        <div className="space-y-2">
+        <div className="space-y-1.5">
           <Label>Получатели</Label>
           <Select
             options={audienceOptions}
@@ -126,9 +123,10 @@ const NotificationComposerWidget: React.FC<NotificationComposerWidgetProps> = ({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Тема</Label>
+        <div className="space-y-1.5">
+          <Label htmlFor="notification-title">Тема</Label>
           <Input
+            id="notification-title"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="Например, Обновление сервиса"
@@ -136,36 +134,31 @@ const NotificationComposerWidget: React.FC<NotificationComposerWidgetProps> = ({
           />
         </div>
 
-        <div className="space-y-2">
-          <Label>Текст уведомления</Label>
+        <div className="space-y-1.5">
+          <Label>Текст</Label>
           <TextArea
             value={message}
             onChange={(value) => setMessage(value)}
-            placeholder="Кратко опишите суть сообщения"
+            placeholder="Текст сообщения"
             rows={4}
             maxLength={500}
           />
         </div>
 
-        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-gray-900/40">
-          <div>
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Подсветка уведомления</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Отметьте, если сообщение важно</p>
-          </div>
-          <Checkbox
-            checked={highlight}
-            onChange={(value) => setHighlight(value)}
-          />
-        </div>
+        <Checkbox
+          label="Важное"
+          checked={highlight}
+          onChange={(value) => setHighlight(value)}
+        />
 
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label className="mb-0">Изображение (опционально)</Label>
+            <Label className="mb-0">Изображение</Label>
             {imageUrl && (
               <button
                 type="button"
                 onClick={() => setImageUrl(null)}
-                className="text-xs text-gray-500 hover:text-red-500"
+                className="text-xs text-gray-500 hover:text-error-600 dark:text-gray-400"
               >
                 Удалить
               </button>
@@ -186,7 +179,7 @@ const NotificationComposerWidget: React.FC<NotificationComposerWidgetProps> = ({
               onClick={handleUploadClick}
               disabled={uploading}
             >
-              {uploading ? "Загрузка..." : imageUrl ? "Заменить изображение" : "Загрузить изображение"}
+              {uploading ? "Загрузка..." : imageUrl ? "Заменить" : "Загрузить"}
             </Button>
             {imageUrl && (
               <div className="relative h-12 w-12 overflow-hidden rounded-md border border-gray-200 dark:border-gray-700">
@@ -206,7 +199,7 @@ const NotificationComposerWidget: React.FC<NotificationComposerWidgetProps> = ({
           onClick={handleSend}
           disabled={sending || uploading}
         >
-          {sending ? "Отправка..." : "Отправить уведомление"}
+          {sending ? "Отправка..." : "Отправить"}
         </Button>
       </div>
     </div>

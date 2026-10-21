@@ -17,7 +17,7 @@ export default function OrderReturnsPage() {
         </Link>
         <p className="text-2xl font-bold pt-2 text-center text-red-600 mt-20 ">ВНИМАНИЕ</p>
         <h1 className="text-lg font-semibold pt-2">Уважаемый партнёр! При выявлении расхождений при приеме товара по количеству и качеству, ассортименту и комплектности необходимо оформить заявку на возврат в личном кабинете, а также незамедлительно известить отдел рекламаций Поставщика способами:
-          <br />1. Электронная почта service@alatrade.com.kz
+          <br />1. Электронная почта service@euroline.kz
           <br />2. Представителя Поставщика (курирующего менеджера).</h1>
 
         <section className="mt-6">

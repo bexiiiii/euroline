@@ -6,7 +6,7 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"
 import { CountrySelect } from "@/components/CountrySelect"
-import { ActivitySelect } from "@/components/ActivitySelect"
+import { ActivitySelect, activityLabel } from "@/components/ActivitySelect"
 import { PhoneInputComponent } from "@/components/PhoneInputWithCountry"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -82,7 +82,7 @@ export default function SignupPage() {
         state: data.region,
         city: data.location,
         officeAddress: data.officeAddress,
-        type: data.activity,
+        type: activityLabel(data.activity),
         surname: data.surname,
         name: data.firstName,
         fathername: data.fathersName,
@@ -153,12 +153,12 @@ export default function SignupPage() {
 
                 <div>
                 <Label htmlFor="region">Территориальная единица</Label>
-                <Input id="region" {...register("region")} disabled={isLoading} />
+                <Input id="region" {...register("region")} disabled={isLoading} autoComplete="off" placeholder="Например: Туркестанская область" />
                 {errors.region && <p className="text-red-500 text-sm">{errors.region.message}</p>}
                 </div>
                 <div>
                 <Label htmlFor="location">Местоположение офиса</Label>
-                <Input id="location" {...register("location")} disabled={isLoading} />
+                <Input id="location" {...register("location")} disabled={isLoading} autoComplete="off" placeholder="Например: Шымкент" />
                 {errors.location && <p className="text-red-500 text-sm">{errors.location.message}</p>}
                 </div>
                 

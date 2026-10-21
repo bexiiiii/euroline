@@ -125,30 +125,32 @@ export const ordersApi = {
    * Get order by ID
    */
   getOrder: async (id: number): Promise<Order> => {
-    const response = await apiFetch<OrderApiResponse>(`/api/orders/${id}`);
+    const response = await apiFetch<OrderApiResponse>(`/api/admin/orders/${id}`);
     return normalizeOrder(response);
   },
 
   /**
    * Update order status
    */
-  updateOrderStatus: async (id: number, status: string, notes?: string): Promise<Order> => {
-    const response = await apiFetch<OrderApiResponse>(`/api/orders/${id}/status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status, notes }),
-    });
-    return normalizeOrder(response);
+  // На бэкенде есть только подтверждение и отмена заказа (/api/admin/orders/{id}/confirm|cancel).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  updateOrderStatus: async (id: number, status: string, _notes?: string): Promise<Order> => {
+    if (status === 'CONFIRMED' || status === 'CANCELLED') {
+      const action = status === 'CONFIRMED' ? 'confirm' : 'cancel';
+      await apiFetch<void>(`/api/admin/orders/${id}/${action}`, { method: 'POST', parseAs: 'text' });
+      const response = await apiFetch<OrderApiResponse>(`/api/admin/orders/${id}`);
+      return normalizeOrder(response);
+    }
+    throw new Error('Заказ можно только подтвердить или отменить');
   },
 
   /**
    * Update payment status
    */
-  updatePaymentStatus: async (id: number, paymentStatus: string): Promise<Order> => {
-    const response = await apiFetch<OrderApiResponse>(`/api/orders/${id}/payment-status`, {
-      method: 'PATCH',
-      body: JSON.stringify({ paymentStatus }),
-    });
-    return normalizeOrder(response);
+  // Эндпоинта для ручной смены статуса оплаты на бэкенде нет: статус приходит из оплаты/1С.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  updatePaymentStatus: async (_id: number, _paymentStatus: string): Promise<Order> => {
+    throw new Error('Статус оплаты меняется автоматически');
   },
 
   /**

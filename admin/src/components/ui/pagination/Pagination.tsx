@@ -16,6 +16,9 @@ const Pagination: React.FC<PaginationProps> = ({
   totalItems,
   itemsPerPage,
 }) => {
+  // Пустой список: пагинация не нужна
+  if (totalItems <= 0) return null;
+
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
@@ -65,6 +68,8 @@ const Pagination: React.FC<PaginationProps> = ({
       <div className="flex items-center gap-2">
         {/* Previous Button */}
         <button
+          type="button"
+          aria-label="Предыдущая страница"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
           className="flex items-center justify-center w-9 h-9 text-sm text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"
@@ -79,10 +84,13 @@ const Pagination: React.FC<PaginationProps> = ({
           <React.Fragment key={index}>
             {page === '...' ? (
               <span className="flex items-center justify-center w-9 h-9 text-sm text-gray-500 dark:text-gray-400">
-                ...
+                …
               </span>
             ) : (
               <button
+                type="button"
+                aria-label={`Страница ${page}`}
+                aria-current={currentPage === page ? "page" : undefined}
                 onClick={() => onPageChange(page as number)}
                 className={`flex items-center justify-center w-9 h-9 text-sm rounded-lg ${
                   currentPage === page
@@ -98,6 +106,8 @@ const Pagination: React.FC<PaginationProps> = ({
 
         {/* Next Button */}
         <button
+          type="button"
+          aria-label="Следующая страница"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
           className="flex items-center justify-center w-9 h-9 text-sm text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-300"

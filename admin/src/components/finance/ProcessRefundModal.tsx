@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Modal } from "../ui/modal";
 import Button from "../ui/button/Button";
 import Badge from "../ui/badge/Badge";
 import { RefundRequest } from "@/lib/api/finance";
+import { formatDateTime, formatKzt } from "@/lib/format";
+import { controlClass, fieldLabelClass } from "./tableUi";
 
 interface ProcessRefundModalProps {
   isOpen: boolean;
@@ -70,23 +72,6 @@ const ProcessRefundModal: React.FC<ProcessRefundModalProps> = ({
     }
   }, [refundData]);
 
-  const formatCurrency = useMemo(
-    () =>
-      (amount?: number | null) =>
-        new Intl.NumberFormat("kk-KZ", {
-          style: "currency",
-          currency: "KZT",
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 2,
-        }).format(amount ?? 0),
-    []
-  );
-
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return "—";
-    return new Date(dateString).toLocaleString("ru-RU");
-  };
-
   if (!isOpen || !refundData) {
     return null;
   }
@@ -108,76 +93,78 @@ const ProcessRefundModal: React.FC<ProcessRefundModalProps> = ({
     }
   };
 
-  const showApprovedNotice = status === "APPROVED";
-  const showRejectedNotice = status === "REJECTED";
+  const statusHint =
+    status === "APPROVED"
+      ? "Средства вернутся на баланс клиента."
+      : status === "REJECTED"
+        ? "Укажите причину отказа в комментарии."
+        : null;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg">
-      <div className="p-6 space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Обработка возврата</h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Заявка #{refundData.id} · Текущий статус: {currentStatusLabel}
-            </p>
-          </div>
+    <Modal isOpen={isOpen} onClose={onClose} size="md" className="p-0">
+      <div className="space-y-4 p-5">
+        <div className="flex items-center gap-2 pr-12">
+          <h2 className="text-base font-semibold text-gray-800 dark:text-white/90">Возврат #{refundData.id}</h2>
           <Badge color={statusMetaColor(refundData.status)} size="sm">
             {currentStatusLabel}
           </Badge>
         </div>
 
         {error && (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-900/20 dark:text-red-200">
+          <div role="alert" className="rounded-lg border border-error-200 bg-error-50 px-3 py-2 text-sm text-error-700 dark:border-error-500/30 dark:bg-error-500/10 dark:text-error-400">
             {error}
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 dark:bg-gray-900/40 rounded-lg">
-          <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Клиент</p>
-            <p className="text-sm text-gray-900 dark:text-white">
+        <dl className="grid grid-cols-2 gap-3 text-sm">
+          <div className="col-span-2">
+            <dt className="text-gray-500 dark:text-gray-400">Клиент</dt>
+            <dd className="text-gray-800 dark:text-white/90">
               {refundData.clientName || `Клиент #${refundData.clientId ?? refundData.userId ?? "—"}`}
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              {[refundData.clientEmail, refundData.clientPhone].filter(Boolean).join(" • ") || "—"}
-            </p>
+              {(refundData.clientEmail || refundData.clientPhone) && (
+                <span className="text-gray-500 dark:text-gray-400">
+                  {", "}
+                  {[refundData.clientEmail, refundData.clientPhone].filter(Boolean).join(", ")}
+                </span>
+              )}
+            </dd>
           </div>
           <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Заказ</p>
-            <p className="text-sm text-gray-900 dark:text-white">{refundData.orderId ? `#${refundData.orderId}` : "—"}</p>
+            <dt className="text-gray-500 dark:text-gray-400">Сумма</dt>
+            <dd className="font-medium tabular-nums text-gray-800 dark:text-white/90">{formatKzt(refundData.amount ?? 0)}</dd>
           </div>
           <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Сумма возврата</p>
-            <p className="text-sm font-semibold text-gray-900 dark:text-white">{formatCurrency(refundData.amount)}</p>
+            <dt className="text-gray-500 dark:text-gray-400">Заказ</dt>
+            <dd className="text-gray-800 dark:text-white/90">{refundData.orderId ? `#${refundData.orderId}` : "—"}</dd>
           </div>
           <div>
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Дата запроса</p>
-            <p className="text-sm text-gray-900 dark:text-white">{formatDate(refundData.createdAt)}</p>
+            <dt className="text-gray-500 dark:text-gray-400">Создана</dt>
+            <dd className="tabular-nums text-gray-800 dark:text-white/90">{formatDateTime(refundData.createdAt)}</dd>
           </div>
           {refundData.paymentMethod && (
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Способ возврата</p>
-              <p className="text-sm text-gray-900 dark:text-white">{refundData.paymentMethod}</p>
+              <dt className="text-gray-500 dark:text-gray-400">Способ возврата</dt>
+              <dd className="text-gray-800 dark:text-white/90">{refundData.paymentMethod}</dd>
             </div>
           )}
-        </div>
+          {refundData.reason && (
+            <div className="col-span-2">
+              <dt className="text-gray-500 dark:text-gray-400">Причина</dt>
+              <dd className="text-gray-800 dark:text-white/90">{refundData.reason}</dd>
+            </div>
+          )}
+        </dl>
 
-        {refundData.reason && (
-          <div className="p-4 bg-white dark:bg-white/5 border border-gray-200 dark:border-gray-700 rounded-lg">
-            <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide">Причина возврата</p>
-            <p className="mt-1 text-sm text-gray-900 dark:text-white">{refundData.reason}</p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 border-t border-gray-200 pt-4 dark:border-gray-800">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="refund-status" className={fieldLabelClass}>
               Новый статус
             </label>
             <select
+              id="refund-status"
               value={status}
               onChange={(event) => setStatus(event.target.value as RefundRequest["status"])}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className={`${controlClass} w-full`}
             >
               {statusOptions.map((option) => (
                 <option key={option.value} value={option.value} disabled={option.disabled}>
@@ -185,43 +172,28 @@ const ProcessRefundModal: React.FC<ProcessRefundModalProps> = ({
                 </option>
               ))}
             </select>
+            {statusHint && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{statusHint}</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Комментарий администратора
+            <label htmlFor="refund-notes" className={fieldLabelClass}>
+              Комментарий
             </label>
             <textarea
+              id="refund-notes"
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-              placeholder="Опишите принятое решение..."
+              className={`${controlClass} h-auto w-full py-2`}
             />
           </div>
 
-          {showApprovedNotice && (
-            <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm text-green-800 dark:text-green-200">
-              После принятия средства автоматически вернутся на баланс клиента.
-            </div>
-          )}
-
-          {showRejectedNotice && (
-            <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm text-yellow-800 dark:text-yellow-200">
-              Укажите причину отказа в комментарии.
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700"
-            >
-              Отменить
-            </button>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onClose}>
+              Отмена
+            </Button>
             <Button type="submit" variant="primary" size="sm" disabled={loading}>
-              {loading ? "Сохраняем…" : "Сохранить"}
+              {loading ? "Сохранение…" : "Сохранить"}
             </Button>
           </div>
         </form>

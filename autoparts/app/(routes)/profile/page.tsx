@@ -10,6 +10,7 @@ import { useAuthStore } from "@/lib/stores/authStore";
 import { useProfileStore } from "@/lib/stores/profileStore";
 import { useEffect } from "react";
 import { toast } from "sonner";
+import { activityLabel } from "@/components/ActivitySelect";
 
 const profileSchema = z.object({
   lastName: z.string().min(1, "Введите фамилию"),
@@ -76,7 +77,7 @@ export default function Profile() {
         phone: profile.phone || '',
         region: profile.state || '',
         location: profile.city || '',
-        occupation: profile.type || '',
+        occupation: activityLabel(profile.type),
         clientName: profile.clientName || '',
       });
     }
@@ -322,7 +323,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
-      <Label className="text-lg whitespace-nowrap min-w-[200px]">{label}</Label>
+      <Label className="text-lg md:w-64 md:shrink-0">{label}</Label>
       <div className="flex flex-col gap-1">
         {children}
         {error && <span className="text-sm text-red-500 w-xs">{error}</span>}

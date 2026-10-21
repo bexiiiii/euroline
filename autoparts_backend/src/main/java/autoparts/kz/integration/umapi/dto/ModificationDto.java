@@ -1,99 +1,76 @@
 package autoparts.kz.integration.umapi.dto;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Vehicle Modification DTO from UMAPI (Passenger cars, Commercial vehicles, Motorbikes)
+ * Vehicle modification DTO from UMAPI v2 autocatalog:
+ * /Passangers (PC_ID), /CommercialVehicles (CV_ID), /Motorbikes (MTB_ID).
+ * Numeric technical values come as strings like "150.0000" for passenger cars.
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ModificationDto {
 
-    /**
-     * Modification ID
-     */
-    @JsonProperty("carId")
+    @JsonAlias({"PC_ID", "CV_ID", "MTB_ID"})
     private Long id;
 
-    /**
-     * Modification name/description
-     */
-    @JsonProperty("carName")
+    @JsonAlias({"PASSENGER_CAR", "COMMERCIAL_VEHICLE", "MOTORBIKE"})
     private String name;
 
-    /**
-     * Model ID
-     */
-    @JsonProperty("modelId")
+    @JsonAlias("MS_ID")
     private Long modelId;
 
-    /**
-     * Manufacturer ID
-     */
-    @JsonProperty("manuId")
+    @JsonAlias("MODEL_SERIES")
+    private String modelName;
+
+    @JsonAlias("MFA_ID")
     private Long manufacturerId;
 
-    /**
-     * Manufacturer name
-     */
-    @JsonProperty("manuName")
+    @JsonAlias("MANUFACTURER")
     private String manufacturerName;
 
-    /**
-     * Year from
-     */
-    @JsonProperty("yearOfConstrFrom")
-    private Integer yearFrom;
+    @JsonAlias("CI_FROM")
+    private String dateFrom;
+
+    @JsonAlias("CI_TO")
+    private String dateTo;
 
     /**
-     * Year to
+     * Engine capacity, cc
      */
-    @JsonProperty("yearOfConstrTo")
-    private Integer yearTo;
+    @JsonAlias("CAPACITY_TECH")
+    private String capacityCc;
 
     /**
-     * Engine capacity (cc)
+     * Engine capacity, liters
      */
-    @JsonProperty("capacityCC")
-    private Integer engineCapacity;
+    @JsonAlias("CAPACITY_LT")
+    private String capacityLt;
 
-    /**
-     * Engine power (kW)
-     */
-    @JsonProperty("powerKW")
-    private Integer powerKw;
+    @JsonAlias({"POWER_KW", "POWER_KW_START"})
+    private String powerKw;
 
-    /**
-     * Engine power (HP)
-     */
-    @JsonProperty("powerHP")
-    private Integer powerHp;
+    @JsonAlias({"POWER_PS", "POWER_PS_START"})
+    private String powerHp;
 
-    /**
-     * Fuel type
-     */
-    @JsonProperty("fuelType")
+    @JsonAlias("FUEL_TYPE")
     private String fuelType;
 
-    /**
-     * Engine code
-     */
-    @JsonProperty("engineCode")
-    private String engineCode;
+    @JsonAlias("ENGINE_TYPE")
+    private String engineType;
 
-    /**
-     * Body type
-     */
-    @JsonProperty("bodyType")
+    @JsonAlias("BODY_TYPE")
     private String bodyType;
 
-    /**
-     * Drive type (FWD, RWD, AWD)
-     */
-    @JsonProperty("driveType")
+    @JsonAlias({"DRIVE_TYPE", "FUEL_DRIVE_TYPE"})
     private String driveType;
+
+    @JsonAlias("TYPE")
+    private String types;
 }

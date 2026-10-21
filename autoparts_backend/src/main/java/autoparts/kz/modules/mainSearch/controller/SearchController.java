@@ -23,11 +23,13 @@ public class SearchController {
     @GetMapping
     public SearchResponse search(@AuthenticationPrincipal(errorOnInvalidType = false) SimplePrincipal principal,
                                  @RequestParam("q") String q,
-                                 @RequestParam(value = "catalog", required = false) String catalog) {
+                                 @RequestParam(value = "catalog", required = false) String catalog,
+                                 @RequestParam(value = "brand", required = false) String brand,
+                                 @RequestParam(value = "refresh", defaultValue = "false") boolean refresh) {
         Long userId = principal != null ? principal.id() : null;
-        if (userId != null) {
+        if (userId != null && !refresh) {
             try { customerService.saveSearch(userId, q); } catch (Exception ignored) {}
         }
-        return searchService.search(q, catalog);
+        return searchService.search(q, catalog, brand);
     }
 }

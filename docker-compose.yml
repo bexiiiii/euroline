@@ -1,0 +1,141 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: euroline
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    restart: unless-stopped
+    command: /data
+    environment:
+      RUSTFS_ACCESS_KEY: ${S3_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${S3_SECRET_KEY}
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
+      RUSTFS_CONSOLE_ENABLE: "true"
+    volumes:
+      - rustfs_data:/data
+    ports:
+      - "127.0.0.1:9000:9000"
+
+  backend:
+    build: ./autoparts_backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/euroline
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      REDIS_HOST: redis
+      RABBIT_HOST: rabbitmq
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      KASPI_SIDECAR_URL: http://kaspi:3000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  # Kaspi Pay signer (tapter-dev/kaspi-pos-automation). Internal network only — never publish its port.
+  kaspi:
+    build: ./docker/kaspi-pos
+    restart: unless-stopped
+    environment:
+      TOKEN_SECRET_KEY: ${KASPI_TOKEN_SECRET_KEY}
+      APP_VERSION: ${KASPI_APP_VERSION:-26.0921}
+      APP_BUILD: ${KASPI_APP_BUILD:-1115}
+    volumes:
+      - kaspi_data:/app/data
+    logging:
+      driver: local
+      options:
+        max-size: 10m
+        max-file: "3"
+
+  storefront:
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 768m
+    cpus: 1.5
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=1000,gid=1000
+      - /app/.next/cache:rw,noexec,nosuid,size=128m,uid=1000,gid=1000
+    build:
+      context: ./autoparts
+      args:
+        NEXT_PUBLIC_API_URL: ${PUBLIC_ORIGIN}
+        NEXT_PUBLIC_SITE_URL: ${PUBLIC_ORIGIN}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  admin:
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+    mem_limit: 768m
+    cpus: 1.5
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=1000,gid=1000
+      - /app/.next/cache:rw,noexec,nosuid,size=128m,uid=1000,gid=1000
+    build:
+      context: ./admin
+      args:
+        NEXT_PUBLIC_API_URL: ${ADMIN_PUBLIC_ORIGIN:-${PUBLIC_ORIGIN}}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+  rabbitmq_data:
+  rustfs_data:
+  kaspi_data:

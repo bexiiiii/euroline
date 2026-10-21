@@ -5,6 +5,7 @@ import { LazyTreeItem } from "@/components/ui/lazy-tree-item"
 import { useVehicle } from "@/context/VehicleContext"
 import { vehicleApi } from "@/lib/api/vehicle"
 import { CategoryNodeDto, UnitDto, DetailDto, QuickGroupDto } from "@/lib/api/vehicle"
+import { catalogTreeState, treeStateKey } from "@/lib/catalogTreeState"
 
 // Конвертируем данные API в формат для FilesystemItem
 type TreeNode = {
@@ -28,6 +29,8 @@ export default function FileTree({ className, onQuickGroupSelected, onQuickGroup
   const [loading, setLoading] = useState(false)
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
   const [showOnlyTO, setShowOnlyTO] = useState(true) // По умолчанию показываем только ТО
+  const stateKey = treeStateKey(session?.catalog, session?.vehicleId)
+  const scrollRef = React.useRef<HTMLDivElement>(null)
 
   // Отладочная информация
   console.log('FileTree: Текущая сессия:', {
@@ -65,10 +68,10 @@ export default function FileTree({ className, onQuickGroupSelected, onQuickGroup
         })
       }
       const result = updateNodeRecursive(prevData)
-      console.log('FileTree: Дерево обновлено')
+      catalogTreeState.setTree(stateKey, result)
       return result
     })
-  }, [])
+  }, [stateKey])
 
   // Преобразуем CategoryNodeDto в TreeNode, с фильтрацией ТО групп
   const convertCategoryTree = useCallback((categories: CategoryNodeDto[], filterTO: boolean = true): TreeNode[] => {
@@ -180,6 +183,13 @@ export default function FileTree({ className, onQuickGroupSelected, onQuickGroup
       showOnlyTO
     })
 
+    // Дерево уже загружалось для этого авто — берём из sessionStorage без запросов
+    const savedTree = catalogTreeState.getTree<TreeNode[]>(stateKey)
+    if (savedTree && savedTree.length > 0) {
+      setTreeData(savedTree)
+      return
+    }
+
     setLoading(true)
     try {
       if (showOnlyTO) {
@@ -196,6 +206,7 @@ export default function FileTree({ className, onQuickGroupSelected, onQuickGroup
           if (quickGroups.length > 0) {
             const treeNodes = convertQuickGroupsToTree(quickGroups)
             setTreeData(treeNodes)
+            catalogTreeState.setTree(stateKey, treeNodes)
             console.log('FileTree: Установлены Quick Groups узлы:', treeNodes.length, treeNodes.map(s => s.name))
             return
           } else {
@@ -216,18 +227,27 @@ export default function FileTree({ className, onQuickGroupSelected, onQuickGroup
       console.log('FileTree: Получено категорий:', categories.length)
       const treeNodes = convertCategoryTree(categories, showOnlyTO)
       setTreeData(treeNodes)
+      catalogTreeState.setTree(stateKey, treeNodes)
       
     } catch (error) {
       console.error('FileTree: Ошибка загрузки дерева категорий:', error)
     } finally {
       setLoading(false)
     }
-  }, [session, convertCategoryTree, showOnlyTO])
+  }, [session, convertCategoryTree, convertQuickGroupsToTree, showOnlyTO, stateKey])
 
   // Загружаем дерево при монтировании компонента или изменении session
   React.useEffect(() => {
     loadCategoryTree()
   }, [loadCategoryTree])
+
+  // Восстанавливаем прокрутку дерева после возврата на страницу
+  const hasTree = treeData.length > 0
+  React.useEffect(() => {
+    if (hasTree && scrollRef.current) {
+      scrollRef.current.scrollTop = catalogTreeState.getScrollTop(stateKey)
+    }
+  }, [hasTree, stateKey])
 
   if (loading) {
     return (
@@ -258,7 +278,11 @@ export default function FileTree({ className, onQuickGroupSelected, onQuickGroup
   }
 
   return (
-    <div className={`p-4 h-[600px] overflow-y-auto ${className}`}>
+    <div
+      ref={scrollRef}
+      onScroll={(e) => catalogTreeState.setScrollTop(stateKey, e.currentTarget.scrollTop)}
+      className={`p-4 h-[600px] overflow-y-auto ${className}`}
+    >
       <div className="flex justify-between items-center mb-4">
         <h3 className="font-semibold text-lg text-gray-900">
           Категории запчастей
@@ -287,6 +311,7 @@ export default function FileTree({ className, onQuickGroupSelected, onQuickGroup
             onNodeUpdate={handleNodeUpdate}
             onQuickGroupSelected={onQuickGroupSelected}
             onQuickGroupLoading={onQuickGroupLoading}
+            stateKey={stateKey}
           />
         ))}
       </ul>

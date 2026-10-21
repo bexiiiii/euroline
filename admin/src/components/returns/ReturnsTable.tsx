@@ -11,6 +11,14 @@ import {
 import Badge from "../ui/badge/Badge";
 import Pagination from "../ui/pagination/Pagination";
 import { ReturnStatus } from "@/lib/api/returns";
+import { formatKzt } from "@/lib/format";
+
+type BadgeColor = "primary" | "success" | "error" | "warning" | "info" | "light" | "dark";
+
+const TH = "px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400";
+const TD = "px-4 py-3 text-sm text-gray-700 dark:text-gray-300";
+const ICON_BTN =
+  "inline-flex size-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-200";
 
 export type ReturnStatusLabel =
   | "Запрос на возврат"
@@ -31,7 +39,6 @@ export interface ReturnTableItem {
   totalRefund: number;
   status: ReturnStatusLabel;
   statusCode: ReturnStatus;
-  returnType: string;
   requestDate: string;
   reason: string;
 }
@@ -48,25 +55,18 @@ interface ReturnsTableProps {
   onProcessReturn: (returnData: ReturnTableItem) => void;
 }
 
-const statusColors: Record<ReturnStatus, string> = {
+const statusColors: Record<ReturnStatus, BadgeColor> = {
   NEW: "warning",
   PROCESSED: "info",
   APPROVED: "success",
   REJECTED: "error",
-  REFUNDED: "dark",
+  REFUNDED: "light",
 };
 
 const PROCESSABLE_STATUSES: ReturnStatus[] = ["NEW", "PROCESSED"];
 
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("ru-RU", {
-    style: "currency",
-    currency: "KZT",
-    minimumFractionDigits: 0,
-  }).format(amount);
-
 const formatDate = (dateString: string) =>
-  new Date(dateString).toLocaleDateString("ru-RU");
+  dateString ? new Date(dateString).toLocaleDateString("ru-RU") : "—";
 
 const ReturnsTable: React.FC<ReturnsTableProps> = ({
   data,
@@ -82,183 +82,111 @@ const ReturnsTable: React.FC<ReturnsTableProps> = ({
   const isInitialLoading = loading && data.length === 0;
   const isRefreshing = loading && data.length > 0;
 
+  const svgProps = {
+    className: "size-4",
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.75,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+
   return (
-    <div className="space-y-4">
-      <div className="relative overflow-x-auto bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800">
-        {isInitialLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="flex items-center gap-3 text-gray-500 dark:text-gray-300">
-              <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-brand-500" />
-              <span>Загрузка возвратов...</span>
+    <div className="relative overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+      {isInitialLoading ? (
+        <div className="flex h-48 items-center justify-center">
+          <div className="size-6 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500" />
+        </div>
+      ) : data.length === 0 ? (
+        <div className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+          Возвратов пока нет
+        </div>
+      ) : (
+        <>
+          {isRefreshing && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-gray-900/60">
+              <div className="size-6 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500" />
             </div>
-          </div>
-        ) : data.length === 0 ? (
-          <div className="p-10 text-center text-sm text-gray-500 dark:text-gray-400">
-            Возвраты не найдены
-          </div>
-        ) : (
-          <>
-            {isRefreshing && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/70 dark:bg-gray-900/70">
-                <div className="flex items-center gap-3 text-gray-500 dark:text-gray-300">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-300 border-t-brand-500" />
-                  <span>Обновление...</span>
-                </div>
-              </div>
-            )}
-            <Table>
-              <TableHeader className="bg-gray-50 dark:bg-gray-800">
-                <TableRow>
-                  <TableCell
-                    isHeader
-                    className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                  >
-                    Возврат
-                  </TableCell>
-                  <TableCell
-                    isHeader
-                    className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                  >
-                    Клиент
-                  </TableCell>
-                  <TableCell
-                    isHeader
-                    className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                  >
-                    Сумма возврата
-                  </TableCell>
-                  <TableCell
-                    isHeader
-                    className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                  >
-                    Статус
-                  </TableCell>
-                  <TableCell
-                    isHeader
-                    className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                  >
-                    Тип
-                  </TableCell>
-                  <TableCell
-                    isHeader
-                    className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                  >
-                    Дата запроса
-                  </TableCell>
-                  <TableCell
-                    isHeader
-                    className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400"
-                  >
-                    Действия
-                  </TableCell>
-                </TableRow>
-              </TableHeader>
-              <TableBody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {data.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800"
-                  >
-                    <TableCell className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {item.returnNumber}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          Заказ: {item.originalOrderNumber}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {item.customer.name}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {item.customer.email || "—"}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">
-                        {item.statusCode === "REJECTED"
-                          ? "—"
-                          : formatCurrency(item.totalRefund)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="px-6 py-4 whitespace-nowrap">
-                      <Badge
-                        size="sm"
-                        color={statusColors[item.statusCode] as any}
-                      >
-                        {item.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="px-6 py-4 whitespace-nowrap">
-                      <Badge size="sm" color="info">
-                        {item.returnType}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {formatDate(item.requestDate)}
-                    </TableCell>
-                    <TableCell className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => onViewReturn(item)}
-                          className="text-blue-600 transition-colors hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
-                          title="Просмотр"
-                        >
-                          <svg
-                            className="h-5 w-5"
-                            fill="none"
-                            stroke="currentColor"
-                            viewBox="0 0 24 24"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                            />
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                            />
-                          </svg>
-                        </button>
-                        {PROCESSABLE_STATUSES.includes(item.statusCode) && (
-                          <button
-                            onClick={() => onProcessReturn(item)}
-                            className="text-green-600 transition-colors hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
-                            title="Обработать"
-                          >
-                            <svg
-                              className="h-5 w-5"
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                              />
-                            </svg>
-                          </button>
-                        )}
-                      </div>
+          )}
+          <div className="max-w-full overflow-x-auto">
+            <div className="min-w-[720px]">
+              <Table>
+                <TableHeader className="border-b border-gray-100 dark:border-gray-800">
+                  <TableRow>
+                    <TableCell isHeader className={TH}>Возврат</TableCell>
+                    <TableCell isHeader className={TH}>Клиент</TableCell>
+                    <TableCell isHeader className={TH}>Сумма</TableCell>
+                    <TableCell isHeader className={TH}>Статус</TableCell>
+                    <TableCell isHeader className={TH}>Дата</TableCell>
+                    <TableCell isHeader className={`${TH} text-right`}>
+                      <span className="sr-only">Действия</span>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </>
-        )}
-      </div>
+                </TableHeader>
+                <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
+                  {data.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className={TD}>
+                        <span className="block font-medium text-gray-800 dark:text-white/90">{item.returnNumber}</span>
+                        <span className="block text-xs text-gray-500 dark:text-gray-400">
+                          Заказ {item.originalOrderNumber}
+                        </span>
+                      </TableCell>
+                      <TableCell className={TD}>
+                        <span className="block text-gray-800 dark:text-white/90">{item.customer.name}</span>
+                        {item.customer.email && (
+                          <span className="block text-xs text-gray-500 dark:text-gray-400">{item.customer.email}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className={`${TD} whitespace-nowrap font-medium tabular-nums`}>
+                        {item.statusCode === "REJECTED" ? "—" : formatKzt(item.totalRefund)}
+                      </TableCell>
+                      <TableCell className={TD}>
+                        <Badge size="sm" variant="light" color={statusColors[item.statusCode] ?? "light"}>
+                          {item.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className={`${TD} whitespace-nowrap text-gray-500 dark:text-gray-400`}>
+                        {formatDate(item.requestDate)}
+                      </TableCell>
+                      <TableCell className={TD}>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={() => onViewReturn(item)}
+                            className={ICON_BTN}
+                            title="Просмотр"
+                            aria-label={`Просмотр возврата ${item.returnNumber}`}
+                          >
+                            <svg {...svgProps}>
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+                              <circle cx="12" cy="12" r="3" />
+                            </svg>
+                          </button>
+                          {PROCESSABLE_STATUSES.includes(item.statusCode) && (
+                            <button
+                              type="button"
+                              onClick={() => onProcessReturn(item)}
+                              className={ICON_BTN}
+                              title="Обработать"
+                              aria-label={`Обработать возврат ${item.returnNumber}`}
+                            >
+                              <svg {...svgProps}>
+                                <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        </>
+      )}
 
       {totalPages > 1 && (
         <Pagination

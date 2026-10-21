@@ -38,6 +38,11 @@ public class Product {
     @NotBlank
     private String externalCode; // Код для 1С
 
+    // Стабильный идентификатор номенклатуры из новой событийной интеграции 1С.
+    // В отличие от code, этот ключ не меняется пользователем в 1С.
+    @Column(name = "onec_ref_key", unique = true, length = 64)
+    private String oneCRefKey;
+
     private String imageUrl; // Картинка (если загружали)
 
 

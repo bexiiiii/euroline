@@ -1,7 +1,7 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import CountryMap from "./CountryMap";
-import { analyticsApi, CustomerDemographic } from "@/lib/api/analytics";
+import React, { useCallback, useEffect, useState } from "react";
+import { analyticsApi } from "@/lib/api/analytics";
+import WidgetError from "@/components/analytics/WidgetError";
 
 interface CountryData {
   country: string;
@@ -14,24 +14,37 @@ interface DemographicData {
   totalVisitors: number;
 }
 
+const COUNTRY_LABELS: Record<string, string> = {
+  kazakhstan: "Казахстан",
+  kz: "Казахстан",
+  russia: "Россия",
+  "russian federation": "Россия",
+  ru: "Россия",
+  kyrgyzstan: "Кыргызстан",
+  uzbekistan: "Узбекистан",
+  belarus: "Беларусь",
+  china: "Китай",
+};
+
+const countryLabel = (country: string | null | undefined): string => {
+  const value = country?.trim();
+  if (!value || value.toLowerCase() === "unknown") return "Не указано";
+  return COUNTRY_LABELS[value.toLowerCase()] ?? value;
+};
+
 const DemographicCard = () => {
   const [data, setData] = useState<DemographicData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchDemographicData = async () => {
+  const fetchDemographicData = useCallback(async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const fallback: CustomerDemographic[] = [
-          { country: "Казахстан", customers: 2450, percentage: 45.5 },
-          { country: "Россия", customers: 1580, percentage: 29.3 },
-        ];
+        const raw = await analyticsApi.getCustomerDemographics();
 
-        const raw = await analyticsApi
-          .getCustomerDemographics()
-          .catch(() => fallback);
-
-        const countries: CountryData[] = raw.map((item) => ({
-          country: item.country ?? "Unknown",
+        const countries: CountryData[] = (raw ?? []).map((item) => ({
+          country: countryLabel(item.country),
           visitors: item.visitors ?? item.customers ?? 0,
           percentage: item.percentage ?? 0,
         }));
@@ -41,26 +54,22 @@ const DemographicCard = () => {
         setData({ countries, totalVisitors });
       } catch (error) {
         console.error("Failed to fetch demographic data:", error);
-        // Set fallback data on error
-        setData({
-          countries: [
-            { country: "Казахстан", visitors: 0, percentage: 100 }
-          ],
-          totalVisitors: 0
-        });
+        setData(null);
+        setError("Не удалось загрузить географию клиентов");
       } finally {
         setLoading(false);
       }
-    };
-    fetchDemographicData();
   }, []);
+
+  useEffect(() => {
+    fetchDemographicData();
+  }, [fetchDemographicData]);
 
   if (loading) {
     return (
-      <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-6 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
+      <div className="overflow-hidden h-full rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
         <div className="animate-pulse">
-          <div className="h-6 w-32 bg-gray-200 rounded dark:bg-gray-800 mb-4"></div>
-          <div className="h-64 bg-gray-200 rounded dark:bg-gray-800 mb-4"></div>
+          <div className="mb-4 h-5 w-32 rounded bg-gray-200 dark:bg-gray-800"></div>
           <div className="space-y-3">
             <div className="h-12 bg-gray-200 rounded dark:bg-gray-800"></div>
             <div className="h-12 bg-gray-200 rounded dark:bg-gray-800"></div>
@@ -72,57 +81,51 @@ const DemographicCard = () => {
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white px-4 pb-6 pt-4 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6">
-      <div className="mb-4">
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
+    <div className="overflow-hidden h-full rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
           География клиентов
         </h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-          Всего посетителей: {data?.totalVisitors.toLocaleString()}
+        {data && (
+          <span className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+            {data.totalVisitors.toLocaleString("ru-RU")} клиентов
+          </span>
+        )}
+      </div>
+
+      {error ? (
+        <WidgetError message="Не удалось загрузить данные" onRetry={fetchDemographicData} />
+      ) : !data || data.countries.length === 0 ? (
+        <p className="py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+          Данных пока нет
         </p>
-      </div>
-
-      <div className="mb-6">
-        <div className="h-64">
-          <CountryMap />
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        {data?.countries.map((country, index) => (
-          <div
-            key={index}
-            className="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0 dark:border-gray-800"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-800">
-                <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  {index + 1}
-                </span>
-              </div>
-              <div>
-                <p className="font-medium text-gray-800 dark:text-white/90">
-                  {country.country}
-                </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {country.visitors.toLocaleString()} посетителей
-                </p>
-              </div>
+      ) : (
+      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+        {data.countries.map((country, index) => (
+          <li key={index} className="flex items-center justify-between gap-3 py-2.5">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-gray-800 dark:text-white/90">
+                {country.country}
+              </p>
+              <p className="text-xs tabular-nums text-gray-500 dark:text-gray-400">
+                {country.visitors.toLocaleString("ru-RU")} клиентов
+              </p>
             </div>
-            <div className="flex flex-col items-end">
-              <span className="font-semibold text-gray-800 dark:text-white/90">
-                {country.percentage}%
-              </span>
-              <div className="mt-1 h-1.5 w-16 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+            <div className="flex shrink-0 items-center gap-2">
+              <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                 <div
-                  className="h-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${country.percentage}%` }}
+                  className="h-full bg-brand-500"
+                  style={{ width: `${Math.min(Math.max(country.percentage, 0), 100)}%` }}
                 ></div>
               </div>
+              <span className="w-10 text-right text-sm tabular-nums text-gray-700 dark:text-gray-300">
+                {country.percentage}%
+              </span>
             </div>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
+      )}
     </div>
   );
 };

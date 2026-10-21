@@ -7,6 +7,7 @@ import CatalogCardComponent from "@/components/CatalogCardComponent";
 import FileTree from "@/components/FileTree";
 import { DetailDto } from "@/lib/api/vehicle";
 import { useVehicle } from "@/context/VehicleContext";
+import { catalogTreeState, treeStateKey } from "@/lib/catalogTreeState";
 
 interface VehicleInfo {
   vin?: string;
@@ -89,6 +90,20 @@ function Catalogs() {
     }
   }, [params, searchParams, setSession]);
 
+  // Ключ состояния дерева для этого авто (из URL, чтобы работало сразу при «Назад»)
+  const stateKey = treeStateKey(
+    searchParams?.get('catalog') || session?.catalog || undefined,
+    (params?.id as string) || undefined
+  );
+
+  // Восстанавливаем выбранную группу без запроса к API
+  useEffect(() => {
+    const saved = catalogTreeState.getSelected(stateKey);
+    if (saved) {
+      setSelectedQuickGroup({ ...saved, isLoading: false });
+    }
+  }, [stateKey]);
+
   // Обработчик выбора группы в FileTree
   const handleQuickGroupSelected = (groupId: number, groupName: string, details: DetailDto[]) => {
     setSelectedQuickGroup({
@@ -97,6 +112,7 @@ function Catalogs() {
       details,
       isLoading: false
     });
+    catalogTreeState.setSelected(stateKey, { groupId, groupName, details });
   };
 
   // Обработчик начала загрузки группы
@@ -149,7 +165,7 @@ function Catalogs() {
         </h1>
 
         {vehicleInfo.brand && vehicleInfo.name && (
-          <section className="pb-6">
+          <section className="pb-2">
             <h2 className="text-xl font-semibold px-2 pt-4">{vehicleInfo.brand} {vehicleInfo.name}</h2>
             {vehicleInfo.vin && (
               <p className="px-2 font-semibold text-xl">VIN: {vehicleInfo.vin}</p>
@@ -159,7 +175,7 @@ function Catalogs() {
         )}
 
         {/* Два столбца — левый дерево, правый карточки */}
-        <section className="bg-gray-100 mt-30 py-10">
+        <section className="bg-gray-100 mt-6 py-10">
           <div className="container mx-auto px-6">
             <div className="flex gap-6">
               

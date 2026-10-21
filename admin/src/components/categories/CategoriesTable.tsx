@@ -11,6 +11,13 @@ import {
 import Badge from "../ui/badge/Badge";
 import { categoriesApi, Category } from "@/lib/api/categories";
 
+const TH = "px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400";
+const TD = "px-4 py-3 text-sm text-gray-700 dark:text-gray-300";
+const ICON_BTN =
+  "inline-flex size-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/[0.06] dark:hover:text-gray-200";
+const ICON_BTN_DANGER =
+  "inline-flex size-8 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-error-50 hover:text-error-600 dark:text-gray-400 dark:hover:bg-error-500/15 dark:hover:text-error-500";
+
 interface CategoriesTableProps {
   refreshKey: number;
   parentNameById?: Record<number, string>;
@@ -27,7 +34,6 @@ interface TreeRow {
 
 const CategoriesTable: React.FC<CategoriesTableProps> = ({
   refreshKey,
-  parentNameById,
   onEdit,
   onAddSubcategory,
   onToggleStatus,
@@ -37,6 +43,7 @@ const CategoriesTable: React.FC<CategoriesTableProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const loadTree = async () => {
@@ -68,7 +75,7 @@ const CategoriesTable: React.FC<CategoriesTableProps> = ({
     };
 
     loadTree();
-  }, [refreshKey]);
+  }, [refreshKey, reloadKey]);
 
   const rows = useMemo<TreeRow[]>(() => {
     const result: TreeRow[] = [];
@@ -107,256 +114,165 @@ const CategoriesTable: React.FC<CategoriesTableProps> = ({
     return new Date(dateString).toLocaleDateString("ru-RU");
   };
 
-  const getStatusColor = (isActive: boolean): "success" | "error" => {
-    return isActive ? "success" : "error";
-  };
-
-  const getStatusText = (isActive: boolean) => {
-    return isActive ? "Активна" : "Неактивна";
-  };
-
-  const renderCategoryTag = (category: Category, depth: number) => {
-    if (depth === 0) {
-      return (
-        <Badge size="sm" variant="light" color="info">
-          Основная категория
-        </Badge>
-      );
-    }
-
-    const parentName = category.parentId ? parentNameById?.[category.parentId] : undefined;
-
-    return (
-      <div className="flex flex-col gap-1">
-        <Badge size="sm" variant="solid" color="dark">
-          Подкатегория
-        </Badge>
-        <span className="text-xs text-gray-500 dark:text-gray-400">
-          {parentName ? `Входит в: ${parentName}` : `ID родителя: ${category.parentId}`}
-        </span>
-      </div>
-    );
+  const iconSvg = "size-4";
+  const svgProps = {
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.75,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
       <div className="max-w-full overflow-x-auto">
-        <div className="min-w-[1100px]">
+        <div className="min-w-[760px]">
           <Table>
-            <TableHeader className="border-b border-gray-100 dark:border-white/[0.05]">
+            <TableHeader className="border-b border-gray-100 dark:border-gray-800">
               <TableRow>
-                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
-                  Категория
-                </TableCell>
-                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
-                  Тип
-                </TableCell>
-                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
-                  Описание
-                </TableCell>
-                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
-                  Товары
-                </TableCell>
-                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
-                  Статус
-                </TableCell>
-                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
-                  Создана
-                </TableCell>
-                <TableCell isHeader className="px-5 py-3 font-medium text-gray-500 text-start text-theme-xs dark:text-gray-400">
-                  Действия
+                <TableCell isHeader className={TH}>Категория</TableCell>
+                <TableCell isHeader className={TH}>Товары</TableCell>
+                <TableCell isHeader className={TH}>Статус</TableCell>
+                <TableCell isHeader className={TH}>Создана</TableCell>
+                <TableCell isHeader className={`${TH} text-right`}>
+                  <span className="sr-only">Действия</span>
                 </TableCell>
               </TableRow>
             </TableHeader>
 
-            <TableBody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
+            <TableBody className="divide-y divide-gray-100 dark:divide-gray-800">
               {loading ? (
                 <TableRow>
-                  <TableCell className="px-5 py-6 text-center" colSpan={7}>
-                    <div className="flex items-center justify-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-                      <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-                      Загрузка категорий...
+                  <TableCell className="px-4 py-6 text-center" colSpan={5}>
+                    <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <span className="inline-flex size-4 animate-spin rounded-full border-2 border-gray-200 border-t-brand-500" />
+                      Загрузка...
                     </div>
                   </TableCell>
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell className="px-5 py-6 text-center text-red-600" colSpan={7}>
-                    Ошибка: {error}
+                  <TableCell className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400" colSpan={5}>
+                    Не удалось загрузить данные.{" "}
+                    <button
+                      type="button"
+                      onClick={() => setReloadKey((k) => k + 1)}
+                      className="font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400"
+                    >
+                      Повторить
+                    </button>
                   </TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell className="px-5 py-6 text-center" colSpan={7}>
-                    Категории пока не созданы
+                  <TableCell className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400" colSpan={5}>
+                    Категорий пока нет
                   </TableCell>
                 </TableRow>
               ) : (
                 rows.map(({ category, depth }) => {
                   const hasChildren = category.subcategories && category.subcategories.length > 0;
                   const isExpanded = hasChildren && expandedIds.has(category.id);
-                  const rowClasses = depth > 0 ? "bg-blue-50/60 dark:bg-blue-900/10" : "";
 
                   return (
-                    <TableRow key={category.id} className={rowClasses}>
-                      <TableCell className="px-5 py-4 text-start">
-                        <div className="flex items-center gap-3" style={{ paddingLeft: depth * 24 }}>
+                    <TableRow key={category.id}>
+                      <TableCell className={TD}>
+                        <div className="flex items-center gap-2" style={{ paddingLeft: depth * 28 }}>
                           {hasChildren ? (
                             <button
+                              type="button"
                               onClick={() => toggleExpand(category.id)}
-                              className="flex h-7 w-7 items-center justify-center rounded-md border border-gray-200 text-gray-500 transition hover:border-brand-300 hover:text-brand-500 dark:border-white/10 dark:text-gray-300"
+                              className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-white/[0.06]"
                               aria-label={isExpanded ? "Свернуть" : "Развернуть"}
                             >
-                              <svg
-                                width="14"
-                                height="14"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                                className={`transition-transform ${isExpanded ? "rotate-90" : ""}`}
-                              >
-                                <path
-                                  d="M8 5l8 7-8 7"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
+                              <svg {...svgProps} className={`size-3.5 transition-transform ${isExpanded ? "rotate-90" : ""}`}>
+                                <path d="M9 6l6 6-6 6" />
                               </svg>
                             </button>
                           ) : (
-                            <span className="inline-flex h-7 w-7 items-center justify-center text-gray-300 dark:text-gray-600">
-                              •
-                            </span>
+                            <span className="size-6 shrink-0" />
                           )}
 
                           {category.imageUrl ? (
                             <img
                               src={category.imageUrl}
                               alt={category.name}
-                              className="h-10 w-10 rounded-lg object-cover"
+                              className="size-8 shrink-0 rounded-lg object-cover"
                             />
                           ) : (
-                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 dark:bg-white/10">
-                              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                                {category.name.slice(0, 2).toUpperCase()}
-                              </span>
+                            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-xs font-medium text-gray-500 dark:bg-white/[0.06] dark:text-gray-400">
+                              {category.name.slice(0, 1).toUpperCase()}
                             </div>
                           )}
 
-                          <div>
-                            <span className="block font-medium text-gray-800 text-theme-sm dark:text-white/90">
-                              {category.name}
-                            </span>
-                            <span className="block text-gray-500 text-theme-xs dark:text-gray-400">
-                              ID: {category.id} • Slug: {category.slug}
-                            </span>
-                          </div>
+                          <span className={depth === 0 ? "font-medium text-gray-800 dark:text-white/90" : "text-gray-700 dark:text-gray-300"}>
+                            {category.name}
+                          </span>
                         </div>
                       </TableCell>
-                      <TableCell className="px-5 py-4 text-start">
-                        {renderCategoryTag(category, depth)}
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-start text-theme-sm text-gray-700 dark:text-gray-300 max-w-xs">
-                        <span className="line-clamp-2">
-                          {category.description || "—"}
-                        </span>
-                      </TableCell>
-                      <TableCell className="px-4 py-3 text-start text-theme-sm text-gray-700 dark:text-gray-300">
+                      <TableCell className={`${TD} tabular-nums`}>
                         {category.productCount || 0}
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-start text-theme-sm">
-                        <Badge size="sm" color={getStatusColor(category.isActive)}>
-                          {getStatusText(category.isActive)}
+                      <TableCell className={TD}>
+                        <Badge size="sm" variant="light" color={category.isActive ? "success" : "light"}>
+                          {category.isActive ? "Активна" : "Скрыта"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-start text-theme-sm text-gray-500 dark:text-gray-400">
+                      <TableCell className={`${TD} whitespace-nowrap text-gray-500 dark:text-gray-400`}>
                         {formatDate(category.createdAt)}
                       </TableCell>
-                      <TableCell className="px-4 py-3 text-start">
-                        <div className="flex flex-wrap items-center gap-2">
+                      <TableCell className={TD}>
+                        <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => onEdit?.(category)}
-                            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-green-50 hover:text-green-600 dark:hover:bg-green-900/20 dark:hover:text-green-300"
-                            title="Редактировать"
-                          >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          </button>
-                          <button
+                            type="button"
                             onClick={() => onAddSubcategory?.(category)}
-                            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-300"
+                            className={ICON_BTN}
                             title="Добавить подкатегорию"
+                            aria-label={`Добавить подкатегорию в ${category.name}`}
                           >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2" />
-                              <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2" />
+                            <svg {...svgProps} className={iconSvg}>
+                              <path d="M12 5v14m7-7H5" />
                             </svg>
                           </button>
                           <button
+                            type="button"
                             onClick={() => onToggleStatus?.(category)}
-                            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/20 dark:hover:text-amber-300"
-                            title={category.isActive ? "Деактивировать" : "Активировать"}
+                            className={ICON_BTN}
+                            title={category.isActive ? "Скрыть" : "Активировать"}
+                            aria-label={`${category.isActive ? "Скрыть" : "Активировать"} категорию ${category.name}`}
                           >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path
-                                d="M5 12s2-7 7-7 7 7 7 7-2 7-7 7-7-7-7-7z"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+                            {category.isActive ? (
+                              <svg {...svgProps} className={iconSvg}>
+                                <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22" />
+                              </svg>
+                            ) : (
+                              <svg {...svgProps} className={iconSvg}>
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
+                                <circle cx="12" cy="12" r="3" />
+                              </svg>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onEdit?.(category)}
+                            className={ICON_BTN}
+                            title="Редактировать"
+                            aria-label={`Редактировать категорию ${category.name}`}
+                          >
+                            <svg {...svgProps} className={iconSvg}>
+                              <path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
                             </svg>
                           </button>
                           <button
+                            type="button"
                             onClick={() => onDelete?.(category)}
-                            className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 dark:hover:text-red-300"
+                            className={ICON_BTN_DANGER}
                             title="Удалить"
+                            aria-label={`Удалить категорию ${category.name}`}
                           >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                              <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                              <path
-                                d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                              <path d="M10 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                              <path d="M14 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                            <svg {...svgProps} className={iconSvg}>
+                              <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2M10 11v6M14 11v6" />
                             </svg>
                           </button>
                         </div>

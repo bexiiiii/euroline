@@ -13,56 +13,34 @@ const OrdersToolbar: React.FC<OrdersToolbarProps> = ({
   onRefresh,
 }) => {
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-800 p-4">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white">
-            Управление заказами
-          </h3>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Просмотр и обработка заказов клиентов
-          </p>
-        </div>
-        
-        <div className="flex flex-wrap gap-3">
-          {/* Refresh Button */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onRefresh}
-            startIcon={
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            }
-          >
-            Обновить
-          </Button>
-
-          {/* Export Button */}
-          <ExportWithDateRange
-            onConfirm={onExport}
-            icon={
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-            }
-          />
-
-          {/* Sync with 1C */}
-          <Button
-            size="sm"
-            onClick={() => alert("Синхронизация с 1С...")}
-            startIcon={
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            }
-          >
-            Синхронизация 1С
-          </Button>
-        </div>
-      </div>
+    <div className="flex flex-wrap items-center justify-end gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-10 py-0"
+        onClick={onRefresh}
+        startIcon={
+          <svg className="size-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        }
+      >
+        Обновить
+      </Button>
+      <ExportWithDateRange
+        triggerLabel="Экспорт CSV"
+        variant="outline"
+        size="sm"
+        className="h-10 py-0"
+        onConfirm={onExport}
+        title="Экспорт заказов"
+        description="Укажите период выгрузки."
+        icon={
+          <svg className="size-4" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+            <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4" />
+          </svg>
+        }
+      />
     </div>
   );
 };

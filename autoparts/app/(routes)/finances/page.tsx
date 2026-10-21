@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react"
 import Breadcrumbs from "@/components/Breadcrumb"
 import { FileUploader } from "@/components/FileUploader"
+import { KaspiTopUpCard } from "@/components/KaspiTopUpCard"
 import { Stats } from "@/components/ui/stats-section"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -141,6 +142,7 @@ export default function FinancePage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Левая колонка: Пополнение */}
             <div className="lg:col-span-1 space-y-6">
+              <KaspiTopUpCard onPaid={loadAll} />
               <div className="rounded-2xl border bg-white p-5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="font-semibold">Пополнение баланса</div>

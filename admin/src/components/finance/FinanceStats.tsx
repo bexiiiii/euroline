@@ -1,9 +1,18 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import { financeApi } from "@/lib/api/finance";
+import { formatKzt } from "@/lib/format";
+import FinanceLoadError from "./FinanceLoadError";
+import StatCard, { StatGrid } from "@/components/common/StatCard";
 
-const FinanceStats: React.FC = () => {
+interface FinanceStatsProps {
+  /** Изменение значения перезагружает статистику. */
+  refreshKey?: number;
+}
+
+const FinanceStats: React.FC<FinanceStatsProps> = ({ refreshKey = 0 }) => {
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statsData, setStatsData] = useState<{
     totalBalance: number;
     monthlyTopUps: number;
@@ -13,11 +22,13 @@ const FinanceStats: React.FC = () => {
 
   useEffect(() => {
     loadStats();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey]);
 
   const loadStats = async () => {
     try {
       setLoading(true);
+      setError(null);
 
       const statsResponse = await financeApi.getStats();
 
@@ -30,6 +41,7 @@ const FinanceStats: React.FC = () => {
     } catch (error) {
       console.error("Не удалось загрузить финансовую статистику:", error);
       setStatsData(null);
+      setError("Не удалось загрузить данные");
     } finally {
       setLoading(false);
     }
@@ -37,12 +49,7 @@ const FinanceStats: React.FC = () => {
 
   const formatCurrency = (amount?: number | null) => {
     if (amount === undefined || amount === null || Number.isNaN(amount)) return "—";
-    return new Intl.NumberFormat("kk-KZ", {
-      style: "currency",
-      currency: "KZT",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }).format(amount);
+    return formatKzt(amount);
   };
 
   const formatNumber = (value?: number | null) => {
@@ -52,96 +59,54 @@ const FinanceStats: React.FC = () => {
     }).format(value);
   };
 
-  const stats = [
-    {
-      title: "Общий баланс",
-      value: loading ? "—" : formatCurrency(statsData?.totalBalance),
-      change: "за всё время",
-      changeType: "increase" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-        </svg>
-      ),
-      bgColor: "bg-blue-500",
-    },
-    {
-      title: "Пополнения за месяц",
-      value: loading ? "—" : formatCurrency(statsData?.monthlyTopUps),
-      change: "за текущий месяц",
-      changeType: "increase" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
-        </svg>
-      ),
-      bgColor: "bg-green-500",
-    },
-    {
-      title: "Возвраты за месяц",
-      value: loading ? "—" : formatCurrency(statsData?.monthlyRefunds),
-      change: "за текущий месяц",
-      changeType: "decrease" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
-        </svg>
-      ),
-      bgColor: "bg-red-500",
-    },
-    {
-      title: "Ожидают обработки",
-      value: loading ? "—" : formatNumber(statsData?.pendingOperations ?? 0),
-      change: loading ? "—" : "операций",
-      changeType: "increase" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      bgColor: "bg-yellow-500",
-    },
-  ];
+  const show = (value: string) => (loading ? "—" : value);
+
+  if (error) {
+    return <FinanceLoadError message={error} onRetry={loadStats} />;
+  }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      {stats.map((stat, index) => (
-        <div
-          key={index}
-          className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-gray-200 dark:border-gray-800 hover:shadow-lg transition-shadow duration-200"
-        >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">
-                {stat.title}
-              </p>
-              <div className="flex items-baseline space-x-1">
-              <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                {loading ? "—" : stat.value}
-              </p>
-              </div>
-              <div className="flex items-center mt-2">
-                <span
-                  className={`text-sm font-medium ${
-                    stat.changeType === "increase"
-                      ? "text-green-600 dark:text-green-400"
-                      : "text-red-600 dark:text-red-400"
-                  }`}
-                >
-                  {stat.change}
-                </span>
-                <span className="text-sm text-gray-500 dark:text-gray-400 ml-1">
-                  {stat.title === "Ожидают обработки" ? "" : "за месяц"}
-                </span>
-              </div>
-            </div>
-            <div className={`${stat.bgColor} p-3 rounded-lg text-white`}>
-              {stat.icon}
-            </div>
-          </div>
-        </div>
-      ))}
-    </div>
+    <StatGrid>
+      <StatCard
+        label="Общий баланс"
+        value={show(formatCurrency(statsData?.totalBalance))}
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="6" width="18" height="13" rx="2" />
+            <path d="M3 10h18M16 15h2" />
+          </svg>
+        }
+      />
+      <StatCard
+        label="Пополнения за месяц"
+        value={show(formatCurrency(statsData?.monthlyTopUps))}
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 19V5M6 11l6-6 6 6" />
+          </svg>
+        }
+      />
+      <StatCard
+        label="Возвраты за месяц"
+        value={show(formatCurrency(statsData?.monthlyRefunds))}
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M6 13l6 6 6-6" />
+          </svg>
+        }
+      />
+      <StatCard
+        label="Ожидают обработки"
+        value={show(formatNumber(statsData?.pendingOperations))}
+        tone={!loading && (statsData?.pendingOperations ?? 0) > 0 ? "warning" : "default"}
+        icon={
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 7v5l3 3" />
+          </svg>
+        }
+      />
+    </StatGrid>
   );
 };
 

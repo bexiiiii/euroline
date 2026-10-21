@@ -5,17 +5,26 @@ import ComponentCard from "@/components/common/ComponentCard";
 import Button from "@/components/ui/button/Button";
 import Pagination from "@/components/ui/pagination/Pagination";
 import CreditProfileModal from "../CreditProfileModal";
+import FinanceLoadError from "../FinanceLoadError";
+import {
+  EditIcon,
+  RefreshIcon,
+  RowAction,
+  controlClass,
+  rowClass,
+  tableWrapClass,
+  tbodyClass,
+  tdClass,
+  thClass,
+  theadClass,
+} from "../tableUi";
 import {
   ClientBalance,
   financeApi,
 } from "@/lib/api/finance";
+import { formatKzt } from "@/lib/format";
 
-const formatCurrency = (value: number) =>
-  new Intl.NumberFormat("kk-KZ", {
-    style: "currency",
-    currency: "KZT",
-    maximumFractionDigits: 0,
-  }).format(value || 0);
+const formatCurrency = (value: number) => formatKzt(value || 0);
 
 const CreditSettingsPage: React.FC = () => {
   const [items, setItems] = useState<ClientBalance[]>([]);
@@ -47,7 +56,7 @@ const CreditSettingsPage: React.FC = () => {
       setTotalElements(response.totalElements ?? 0);
     } catch (err) {
       console.error("Не удалось загрузить балансы", err);
-      setError(err instanceof Error ? err.message : "Не удалось загрузить данные");
+      setError("Не удалось загрузить данные");
       setItems([]);
       setTotalPages(1);
       setTotalElements(0);
@@ -133,146 +142,120 @@ const CreditSettingsPage: React.FC = () => {
   const availableBalance = (item: ClientBalance) =>
     Math.max((item.creditLimit ?? 0) - (item.creditUsed ?? 0), 0);
 
+  const stateRow = (text: string) => (
+    <tr>
+      <td colSpan={7} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+        {text}
+      </td>
+    </tr>
+  );
+
   return (
-    <div className="space-y-6">
-      <ComponentCard title="Кредитные лимиты клиентов">
-        <div className="space-y-4">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex-1">
-              <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Поиск клиента
-              </label>
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(event) => {
-                  setSearchTerm(event.target.value);
-                  setPage(1);
-                }}
-                placeholder="Название компании, email или ID клиента"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-              />
-            </div>
-            <div className="flex items-end gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setRefreshKey((prev) => prev + 1)}
-                className="whitespace-nowrap"
-              >
-                Обновить данные
-              </Button>
-            </div>
-          </div>
+    <div className="space-y-4">
+      <ComponentCard title="Клиенты">
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(event) => {
+              setSearchTerm(event.target.value);
+              setPage(1);
+            }}
+            placeholder="Компания, email или ID"
+            aria-label="Поиск клиента по компании, email или ID"
+            className={`${controlClass} min-w-[220px] flex-1`}
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setRefreshKey((prev) => prev + 1)}
+            startIcon={<RefreshIcon />}
+          >
+            Обновить
+          </Button>
+        </div>
 
-          {error && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
+        {error && (
+          <FinanceLoadError
+            message={error}
+            onRetry={() => setRefreshKey((prev) => prev + 1)}
+          />
+        )}
 
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-            <div className="max-w-full overflow-x-auto">
-              <table className="w-full min-w-[960px]">
-                <thead className="border-b border-gray-100 bg-gray-50/70 text-xs font-semibold uppercase tracking-wider text-gray-500 dark:border-white/[0.05] dark:bg-white/[0.03] dark:text-gray-400">
-                  <tr>
-                    <th className="px-5 py-3 text-left">Клиент</th>
-                    <th className="px-5 py-3 text-left">Контакты</th>
-                    <th className="px-5 py-3 text-left">Баланс</th>
-                    <th className="px-5 py-3 text-left">Лимит</th>
-                    <th className="px-5 py-3 text-left">Использовано</th>
-                    <th className="px-5 py-3 text-left">Доступно</th>
-                    <th className="px-5 py-3 text-left">QR</th>
-                    <th className="px-5 py-3 text-right">Действия</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={8} className="px-5 py-6 text-center text-gray-500">
-                        Загрузка данных…
-                      </td>
-                    </tr>
-                  ) : filteredItems.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-5 py-6 text-center text-gray-500">
-                        Клиенты не найдены
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredItems.map((item) => {
-                      const available = availableBalance(item);
-                      return (
-                        <tr
-                          key={item.clientId}
-                          className="hover:bg-gray-50 dark:hover:bg-white/[0.02]"
-                        >
-                          <td className="px-5 py-4 align-top">
-                            <div className="font-semibold text-gray-900 dark:text-white">
-                              #{item.clientId}
+        <div className={tableWrapClass}>
+          <table className="w-full min-w-[820px]">
+            <thead className={theadClass}>
+              <tr>
+                <th className={thClass}>Клиент</th>
+                <th className={thClass}>Баланс</th>
+                <th className={thClass}>Лимит</th>
+                <th className={thClass}>Использовано</th>
+                <th className={thClass}>Доступно</th>
+                <th className={thClass}>QR</th>
+                <th className={`${thClass} text-right`}>Действия</th>
+              </tr>
+            </thead>
+            <tbody className={tbodyClass}>
+              {loading
+                ? stateRow("Загрузка…")
+                : error
+                  ? stateRow("Данные недоступны")
+                  : filteredItems.length === 0
+                    ? stateRow("Клиенты не найдены")
+                    : filteredItems.map((item) => (
+                        <tr key={item.clientId} className={rowClass}>
+                          <td className={tdClass}>
+                            <div className="font-medium text-gray-800 dark:text-white/90">
+                              {item.establishmentName || `Клиент #${item.clientId}`}
                             </div>
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              {item.establishmentName || "—"}
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {[item.email, item.phone].filter(Boolean).join(", ") || `ID ${item.clientId}`}
                             </div>
                           </td>
-                          <td className="px-5 py-4 align-top text-sm text-gray-600 dark:text-gray-400">
-                            <div>{item.email || "—"}</div>
-                            <div>{item.phone || ""}</div>
-                          </td>
-                          <td className="px-5 py-4 align-top text-sm font-medium text-gray-900 dark:text-white">
+                          <td className={`${tdClass} font-medium tabular-nums text-gray-800 dark:text-white/90`}>
                             {formatCurrency(item.balance ?? 0)}
                           </td>
-                          <td className="px-5 py-4 align-top text-sm text-gray-900 dark:text-white">
-                            {formatCurrency(item.creditLimit ?? 0)}
-                          </td>
-                          <td className="px-5 py-4 align-top text-sm text-orange-600">
-                            {formatCurrency(item.creditUsed ?? 0)}
-                          </td>
-                          <td className="px-5 py-4 align-top text-sm text-emerald-600">
-                            {formatCurrency(available)}
-                          </td>
-                          <td className="px-5 py-4 align-top text-sm">
+                          <td className={`${tdClass} tabular-nums`}>{formatCurrency(item.creditLimit ?? 0)}</td>
+                          <td className={`${tdClass} tabular-nums`}>{formatCurrency(item.creditUsed ?? 0)}</td>
+                          <td className={`${tdClass} tabular-nums`}>{formatCurrency(availableBalance(item))}</td>
+                          <td className={tdClass}>
                             {item.qrCodeUrl ? (
                               <a
                                 href={item.qrCodeUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-blue-600 hover:text-blue-500"
+                                className="text-brand-500 hover:text-brand-600 dark:text-brand-400"
                               >
-                                Посмотреть
+                                Открыть
                               </a>
                             ) : (
-                              <span className="text-gray-400">Нет</span>
+                              <span className="text-gray-400 dark:text-gray-500">Нет</span>
                             )}
                           </td>
-                          <td className="px-5 py-4 align-top text-right">
-                            <Button
-                              variant="outline"
-                              onClick={() => openModal(item)}
-                              className="whitespace-nowrap"
-                            >
-                              Настроить
-                            </Button>
+                          <td className={`${tdClass} text-right`}>
+                            <RowAction label={`Настроить лимит клиента #${item.clientId}`} onClick={() => openModal(item)}>
+                              <EditIcon />
+                            </RowAction>
                           </td>
                         </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              totalItems={totalElements}
-              itemsPerPage={pageSize}
-              onPageChange={(next) => {
-                if (next >= 1 && next <= totalPages) {
-                  setPage(next);
-                }
-              }}
-            />
-          </div>
+                      ))}
+            </tbody>
+          </table>
         </div>
+
+        {totalPages > 1 && (
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={totalElements}
+            itemsPerPage={pageSize}
+            onPageChange={(next) => {
+              if (next >= 1 && next <= totalPages) {
+                setPage(next);
+              }
+            }}
+          />
+        )}
       </ComponentCard>
 
       <CreditProfileModal

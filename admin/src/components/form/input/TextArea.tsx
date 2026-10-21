@@ -15,7 +15,7 @@ interface TextareaProps {
 
 const TextArea: React.FC<TextareaProps> = ({
   id,
-  placeholder = "Enter your message", // Default placeholder
+  placeholder = "", // Default placeholder
   rows = 3, // Default number of rows
   value = "", // Default value
   onChange, // Callback for changes

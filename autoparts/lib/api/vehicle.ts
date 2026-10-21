@@ -10,6 +10,16 @@ export interface VehicleDto {
   attributes?: VehicleAttrDto[];
 }
 
+export interface StockByOem {
+  productId: number;
+  stock: number;
+  price: number | null;
+}
+
+export function normalizeOem(oem?: string | null): string {
+  return (oem || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
 export interface VehicleAttrDto {
   name: string;
   value: string;
@@ -103,15 +113,19 @@ export interface DetailAttrDto {
 }
 
 export interface WizardStepDto {
-  ssd: string;        // ⚠️ ВАЖНО: может обновиться на каждом шаге!
+  ssd: string | null;        // ⚠️ ВАЖНО: может обновиться на каждом шаге!
   params: WizardParamDto[];
-  finalStep: boolean;
+  finalStep: boolean;        // все параметры определены
+  allowListVehicles?: boolean; // можно запросить список авто (FindVehicleByWizard2)
 }
 
 export interface WizardParamDto {
   code: string;
   label: string;
-  values: WizardValueDto[];
+  values: WizardValueDto[];  // value.code — ssd для следующего шага
+  determined?: boolean;      // параметр уже выбран
+  value?: string | null;     // выбранное значение
+  removeKey?: string | null; // ssd для сброса параметра
 }
 
 export interface WizardValueDto {
@@ -263,6 +277,20 @@ class VehicleApi {
     return this.request<VehicleDto>(`/v1/cat/vehicle/by-plate/${encodeURIComponent(plate)}`);
   }
 
+  // ===== ОСТАТКИ 1С =====
+
+  /**
+   * Остатки и цены из 1С по списку OEM. Ключ ответа — OEM в нижнем регистре без
+   * пробелов/дефисов/точек (см. normalizeOem). OEM без товара в ответе отсутствуют.
+   */
+  async getStockByOem(oems: string[]): Promise<Record<string, StockByOem>> {
+    const unique = Array.from(new Set(oems.map(normalizeOem).filter(Boolean)));
+    if (unique.length === 0) return {};
+    const params = new URLSearchParams();
+    unique.forEach((o) => params.append('oems', o));
+    return this.request<Record<string, StockByOem>>(`/products/stock-by-oem?${params.toString()}`);
+  }
+
   // ===== WIZARD (мастер подбора автомобиля) =====
 
   /**
@@ -271,6 +299,23 @@ class VehicleApi {
    */
   async wizardStart(catalog: string): Promise<WizardStepDto> {
     return this.request<WizardStepDto>(`/v1/cat/${encodeURIComponent(catalog)}/wizard/start`);
+  }
+
+  /**
+   * Шаг мастера по ssd (GetWizard2). Без ssd — стартовый шаг.
+   * ssd = code выбранного значения или removeKey параметра.
+   */
+  async wizardStep(catalog: string, ssd?: string | null): Promise<WizardStepDto> {
+    const query = ssd ? `?${new URLSearchParams({ ssd }).toString()}` : '';
+    return this.request<WizardStepDto>(`/v1/cat/${encodeURIComponent(catalog)}/wizard/step${query}`);
+  }
+
+  /**
+   * Автомобили, подходящие под выбранные параметры (FindVehicleByWizard2)
+   */
+  async wizardVehicles(catalog: string, ssd: string): Promise<VehicleDto[]> {
+    const params = new URLSearchParams({ ssd });
+    return this.request<VehicleDto[]>(`/v1/cat/${encodeURIComponent(catalog)}/wizard/vehicles?${params.toString()}`);
   }
 
   /**

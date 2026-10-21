@@ -1,14 +1,20 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import ComponentCard from "@/components/common/ComponentCard";
+import StatCard, { StatGrid } from "@/components/common/StatCard";
+import {
+  ClockIcon,
+  DiskIcon,
+  RefreshIcon,
+  ServerIcon,
+  toolbarIconButtonClass,
+} from "@/components/analytics/StatIcons";
 import Button from "@/components/ui/button/Button";
 import Badge from "@/components/ui/badge/Badge";
 import { systemApi, ActuatorComponent, ActuatorHealth, DiagnosticsResult, OneCStatus } from "@/lib/api/system";
 import { useToast } from "@/context/ToastContext";
 
 type ServiceState = "online" | "offline" | "warning" | "maintenance";
-type Trend = "up" | "down" | "stable";
 
 interface SystemService {
   id: string;
@@ -18,34 +24,23 @@ interface SystemService {
   details?: Record<string, unknown>;
 }
 
-interface SystemMetric {
-  id: string;
-  name: string;
-  value: number;
-  unit: string;
-  threshold: {
-    warning: number;
-    critical: number;
-  };
-  trend: Trend;
-  lastUpdated: string;
-}
-
 const SERVICE_LABELS: Record<string, string> = {
-  db: "База данных (PostgreSQL)",
+  db: "База данных",
   database: "База данных",
-  redis: "Кэш сервер (Redis)",
-  diskSpace: "Дисковое пространство",
-  ping: "Сетевое подключение",
-  mail: "Почтовый сервис",
+  redis: "Кэш",
+  diskSpace: "Диск",
+  mail: "Почта",
+  ssl: "SSL-сертификаты",
 };
 
-const METRIC_CONFIG: Record<string, { unit: string; warning: number; critical: number }> = {
-  "system.cpu.usage": { unit: "%", warning: 70, critical: 90 },
-  "jvm.memory.used": { unit: "MB", warning: 1024, critical: 2048 },
-  "process.uptime": { unit: "мин", warning: 1440, critical: 0 },
-  "disk.free": { unit: "GB", warning: 10, critical: 4 },
-  "system.load.average.1m": { unit: "", warning: 6, critical: 10 },
+/** Служебные проверки, которые не нужны оператору в списке (но учитываются в общем статусе). */
+const HIDDEN_SERVICES = new Set(["ping", "livenessState", "readinessState", "discoveryComposite", "refreshScope"]);
+
+const SERVICE_STATUS_LABELS: Record<ServiceState, string> = {
+  online: "Работает",
+  offline: "Недоступен",
+  maintenance: "Обслуживание",
+  warning: "Проверить",
 };
 
 const mapComponentStatus = (status: string | undefined): ServiceState => {
@@ -76,37 +71,18 @@ const normalizeComponents = (components?: Record<string, ActuatorComponent>): Sy
   }));
 };
 
-const determineTrend = (metricId: string, value: number, thresholds: { warning: number; critical: number }): Trend => {
-  if (metricId === "disk.free") {
-    return value <= thresholds.warning ? "down" : "stable";
-  }
-  if (value >= thresholds.critical) return "up";
-  if (value >= thresholds.warning) return "up";
-  return "stable";
-};
+const formatGb = (bytes: number) =>
+  `${(bytes / 1024 ** 3).toLocaleString("ru-RU", { maximumFractionDigits: 1 })} ГБ`;
 
-const buildMetrics = (names: string[]): SystemMetric[] => {
-  const now = new Date().toISOString();
-  return names.map<SystemMetric>((name) => {
-    const config = METRIC_CONFIG[name] ?? { unit: "", warning: 80, critical: 95 };
-    const baseValue = Math.random();
-    const value =
-      name === "disk.free"
-        ? Math.round((50 + Math.random() * 50) * 10) / 10
-        : name === "process.uptime"
-        ? Math.round((Math.random() * 720) * 10) / 10
-        : Math.round((baseValue * 100) * 10) / 10;
-
-    return {
-      id: name,
-      name,
-      value,
-      unit: config.unit,
-      threshold: config,
-      trend: determineTrend(name, value, config),
-      lastUpdated: now,
-    };
-  });
+// Spring Actuator diskSpace: total/free/threshold в байтах.
+const extractDisk = (health: ActuatorHealth | null) => {
+  const details = health?.components?.diskSpace?.details;
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  return {
+    free: num(details?.free),
+    total: num(details?.total),
+    threshold: num(details?.threshold),
+  };
 };
 
 const computeOverallStatus = (health: ActuatorHealth | null, services: SystemService[]): ServiceState => {
@@ -131,22 +107,10 @@ const statusBadgeColor = (status: ServiceState): React.ComponentProps<typeof Bad
   }
 };
 
-const metricStatus = (metric: SystemMetric): "normal" | "warning" | "critical" => {
-  if (metric.id === "disk.free") {
-    if (metric.value <= metric.threshold.critical) return "critical";
-    if (metric.value <= metric.threshold.warning) return "warning";
-    return "normal";
-  }
-  if (metric.value >= metric.threshold.critical) return "critical";
-  if (metric.value >= metric.threshold.warning) return "warning";
-  return "normal";
-};
-
 const SystemStatusPage: React.FC = () => {
   const { success: showSuccess, error: showError } = useToast();
   const [health, setHealth] = useState<ActuatorHealth | null>(null);
   const [services, setServices] = useState<SystemService[]>([]);
-  const [metrics, setMetrics] = useState<SystemMetric[]>([]);
   const [oneCStatus, setOneCStatus] = useState<OneCStatus | null>(null);
   const [isMaintenanceMode, setIsMaintenanceMode] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
@@ -162,9 +126,9 @@ const SystemStatusPage: React.FC = () => {
       }
       const mapped: SystemService = {
         id: "onec",
-        name: "Интеграция 1С",
+        name: "1С",
         status: status.connected ? "online" : "offline",
-        description: status.message ?? "Состояние интеграции с 1С",
+        description: status.message ?? undefined,
         details: {
           lastChecked: status.timestamp,
         },
@@ -176,9 +140,8 @@ const SystemStatusPage: React.FC = () => {
 
   const loadStatus = useCallback(async () => {
     try {
-      const [statusHealth, metricNames, maintenance, onec] = await Promise.all([
+      const [statusHealth, maintenance, onec] = await Promise.all([
         systemApi.getSystemStatus(),
-        systemApi.getMetrics(),
         systemApi.getMaintenanceStatus(),
         systemApi.checkOneCConnection().catch(() => null),
       ]);
@@ -186,7 +149,6 @@ const SystemStatusPage: React.FC = () => {
       setHealth(statusHealth);
       setOneCStatus(onec);
       setServices(mergeOneCService(serviceList, onec));
-      setMetrics(buildMetrics(metricNames));
       setIsMaintenanceMode(Boolean(maintenance.enabled));
       setError(null);
       setLastUpdated(new Date());
@@ -209,8 +171,7 @@ const SystemStatusPage: React.FC = () => {
     try {
       const result: DiagnosticsResult = await systemApi.runDiagnostics();
       setHealth(result.health);
-      setServices(normalizeComponents(result.health.components));
-      setMetrics(buildMetrics(result.metrics));
+      setServices(mergeOneCService(normalizeComponents(result.health.components), oneCStatus));
       setLastUpdated(new Date());
       showSuccess("Диагностика завершена");
     } catch (err) {
@@ -225,10 +186,7 @@ const SystemStatusPage: React.FC = () => {
     setActionLoading("backup");
     try {
       const response = await systemApi.createBackup();
-      const message = response.backupId
-        ? `Резервное копирование запущено (ID: ${response.backupId})`
-        : "Создание резервной копии инициировано";
-      showSuccess(message);
+      showSuccess("Резервное копирование запущено");
     } catch (err) {
       console.error("Backup failed", err);
       showError("Не удалось создать резервную копию");
@@ -238,7 +196,7 @@ const SystemStatusPage: React.FC = () => {
   };
 
   const handleRestart = async () => {
-    if (!confirm("Перезапустить приложение? Во время перезапуска сервисы будут временно недоступны.")) {
+    if (!confirm("Перезапустить приложение? Сайт будет недоступен на время перезапуска.")) {
       return;
     }
     setActionLoading("restart");
@@ -258,7 +216,7 @@ const SystemStatusPage: React.FC = () => {
     const confirmed = confirm(
       next
         ? "Включить режим обслуживания? Пользователи увидят страницу обслуживания."
-        : "Выключить режим обслуживания и вернуть систему в работу?"
+        : "Выключить режим обслуживания?"
     );
     if (!confirmed) return;
     setActionLoading("maintenance");
@@ -290,6 +248,12 @@ const SystemStatusPage: React.FC = () => {
     }
   };
 
+  const disk = useMemo(() => extractDisk(health), [health]);
+  const visibleServices = useMemo(
+    () => services.filter((service) => !HIDDEN_SERVICES.has(service.id)),
+    [services]
+  );
+
   const overallStatus = useMemo(
     () => computeOverallStatus(health, services),
     [health, services]
@@ -305,243 +269,155 @@ const SystemStatusPage: React.FC = () => {
         return "Обслуживание";
       case "warning":
       default:
-        return "Предупреждения";
+        return "Есть проблемы";
     }
   }, [overallStatus]);
 
   if (loading) {
-    return (
-      <ComponentCard title="Состояние системы">
-        <div className="flex h-48 items-center justify-center text-sm text-gray-500">
-          <div className="flex items-center gap-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-300 border-t-brand-500" />
-            <span>Загрузка информации...</span>
-          </div>
-        </div>
-      </ComponentCard>
-    );
+    return <div className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">Загрузка...</div>;
   }
 
   if (error) {
     return (
-      <ComponentCard title="Состояние системы">
-        <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-red-200 bg-red-50 p-6 text-sm text-red-600 dark:border-red-900/40 dark:bg-red-900/10 dark:text-red-300">
-          <p>{error}</p>
-          <Button size="sm" onClick={loadStatus}>
-            Повторить попытку
-          </Button>
-        </div>
-      </ComponentCard>
+      <div className="rounded-xl border border-gray-200 bg-white p-4 text-center dark:border-gray-800 dark:bg-white/[0.03]">
+        <p className="text-sm text-error-600 dark:text-error-400">Не удалось загрузить данные</p>
+        <Button size="xs" variant="outline" className="mt-3" onClick={loadStatus}>
+          Повторить
+        </Button>
+      </div>
     );
   }
 
+  const toneFor = (status: ServiceState) =>
+    status === "online" ? "success" : status === "offline" ? "error" : "warning";
+
+  const diskTone =
+    health?.components?.diskSpace?.status === "DOWN"
+      ? "error"
+      : disk.free != null && disk.threshold != null && disk.free < disk.threshold * 2
+      ? "warning"
+      : "default";
+
   return (
-    <div className="space-y-6">
-       <h1>Общее состояние</h1>
-          <div className="flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleToggleMaintenance}
-              disabled={actionLoading === "maintenance"}
-            >
-              {isMaintenanceMode ? "Выключить обслуживание" : "Включить обслуживание"}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={loadStatus}
-            >
-              Обновить
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleCheckOneC}
-              disabled={actionLoading === "onec"}
-            >
-              {actionLoading === "onec" ? "Проверка 1С..." : "Проверить 1С"}
-            </Button>
-          </div>
-      
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-            <p className="text-sm text-gray-500">Статус системы</p>
-            <div className="mt-2 flex items-center gap-3">
-              <Badge color={statusBadgeColor(overallStatus)}>{statusLabel}</Badge>
-              {lastUpdated && (
-                <span className="text-xs text-gray-500">
-                  Обновлено: {lastUpdated.toLocaleTimeString("ru-RU")}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-            <p className="text-sm text-gray-500">Количество сервисов</p>
-            <p className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{services.length}</p>
-            <p className="text-xs text-gray-500">
-              В работе: {services.filter((s) => s.status === "online").length}
-            </p>
-          </div>
-          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-            <p className="text-sm text-gray-500">Режим обслуживания</p>
-            <p className="mt-2 text-lg font-medium text-gray-900 dark:text-white">
-              {isMaintenanceMode ? "Включен" : "Выключен"}
-            </p>
-            <p className="text-xs text-gray-500">
-              Пользователи {isMaintenanceMode ? "видят страницу обслуживания" : "могут работать в системе"}
-            </p>
-          </div>
-        </div>
+    <div className="space-y-4">
+      <StatGrid>
+        <StatCard
+          label="Система"
+          value={statusLabel}
+          icon={<ServerIcon />}
+          tone={toneFor(overallStatus)}
+          hint={lastUpdated ? `Обновлено ${lastUpdated.toLocaleTimeString("ru-RU")}` : undefined}
+        />
+        <StatCard
+          label="1С"
+          value={oneCStatus == null ? "—" : oneCStatus.connected ? "Подключена" : "Нет связи"}
+          icon={<RefreshIcon />}
+          tone={oneCStatus == null ? "default" : oneCStatus.connected ? "success" : "error"}
+          hint={
+            oneCStatus?.timestamp
+              ? `Проверено ${new Date(oneCStatus.timestamp).toLocaleTimeString("ru-RU")}`
+              : undefined
+          }
+        />
+        <StatCard
+          label="Свободно на диске"
+          value={disk.free != null ? formatGb(disk.free) : "—"}
+          icon={<DiskIcon />}
+          tone={diskTone}
+          hint={disk.total != null ? `из ${formatGb(disk.total)}` : undefined}
+        />
+        <StatCard
+          label="Режим обслуживания"
+          value={isMaintenanceMode ? "Включен" : "Выключен"}
+          icon={<ClockIcon />}
+          tone={isMaintenanceMode ? "warning" : "default"}
+        />
+      </StatGrid>
 
+      {oneCStatus && !oneCStatus.connected && oneCStatus.message && (
+        <p className="rounded-lg bg-error-50 px-4 py-3 text-sm text-error-700 dark:bg-error-500/15 dark:text-error-400">
+          {/^1С/.test(oneCStatus.message) ? oneCStatus.message : `1С: ${oneCStatus.message}`}
+        </p>
+      )}
 
-          <h1>Действия</h1>
-        <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={loadStatus}
+          className={toolbarIconButtonClass}
+          aria-label="Обновить"
+          title="Обновить"
+        >
+          <RefreshIcon />
+        </button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-10! py-0!"
+          onClick={handleCheckOneC}
+          disabled={actionLoading === "onec"}
+        >
+          {actionLoading === "onec" ? "Проверка..." : "Проверить 1С"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-10! py-0!"
+          onClick={handleDiagnostics}
+          disabled={actionLoading === "diagnostics"}
+        >
+          {actionLoading === "diagnostics" ? "Диагностика..." : "Диагностика"}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-10! py-0!"
+          onClick={handleCreateBackup}
+          disabled={actionLoading === "backup"}
+        >
+          {actionLoading === "backup" ? "Запуск..." : "Резервная копия"}
+        </Button>
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           <Button
             size="sm"
-            onClick={handleDiagnostics}
-            disabled={actionLoading === "diagnostics"}
+            variant="outline"
+            className="h-10! py-0!"
+            onClick={handleToggleMaintenance}
+            disabled={actionLoading === "maintenance"}
           >
-            {actionLoading === "diagnostics" ? "Диагностика..." : "Полная диагностика"}
+            {isMaintenanceMode ? "Выключить обслуживание" : "Включить обслуживание"}
           </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={handleCreateBackup}
-            disabled={actionLoading === "backup"}
-          >
-            {actionLoading === "backup" ? "Создание бэкапа..." : "Создать бэкап"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
+            className="h-10! py-0! text-error-600! dark:text-error-400!"
             onClick={handleRestart}
             disabled={actionLoading === "restart"}
           >
-            {actionLoading === "restart" ? "Перезапуск..." : "Перезапуск сервисов"}
+            {actionLoading === "restart" ? "Перезапуск..." : "Перезапустить"}
           </Button>
         </div>
+      </div>
 
-
-      <h1>Интеграция с 1С</h1>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleCheckOneC}
-            disabled={actionLoading === "onec"}
-          >
-            {actionLoading === "onec" ? "Проверка..." : "Повторить проверку"}
-          </Button>
-       
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-            <p className="text-sm text-gray-500">Статус соединения</p>
-            <div className="mt-2 flex items-center gap-3">
-              <Badge color={statusBadgeColor(oneCStatus?.connected ? "online" : "offline")}>
-                {oneCStatus?.connected ? "Онлайн" : "Недоступно"}
-              </Badge>
-              {oneCStatus?.timestamp && (
-                <span className="text-xs text-gray-500">
-                  Проверено: {new Date(oneCStatus.timestamp).toLocaleTimeString("ru-RU")}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800 md:col-span-2">
-            <p className="text-sm text-gray-500">Комментарий</p>
-            <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
-              {oneCStatus?.message ?? "Данные о проверке отсутствуют"}
-            </p>
-          </div>
-        </div>
-      
-
-      <h1>Сервисы</h1>
-        <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
-            <thead className="bg-gray-50 dark:bg-gray-800/40">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Сервис
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Статус
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  Описание
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 bg-white dark:divide-gray-800 dark:bg-gray-900">
-              {services.map((service) => (
-                <tr key={service.id}>
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
-                    {service.name}
-                  </td>
-                  <td className="px-4 py-3">
-                    <Badge color={statusBadgeColor(service.status)}>
-                      {service.status === "online"
-                        ? "Онлайн"
-                        : service.status === "offline"
-                        ? "Офлайн"
-                        : service.status === "maintenance"
-                        ? "Обслуживание"
-                        : "Проверить"}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
-                    {service.description ?? "—"}
-                  </td>
-                </tr>
-              ))}
-              {services.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-6 text-center text-sm text-gray-500">
-                    Нет данных о сервисах
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      
-
-            <h1>Серверные метрики</h1>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {metrics.map((metric) => {
-            const status = metricStatus(metric);
-            const statusLabel =
-              status === "critical" ? "Критично" : status === "warning" ? "Повышено" : "Норма";
-            const statusColor =
-              status === "critical" ? "text-red-600 dark:text-red-400" : status === "warning" ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400";
-
-            return (
-              <div
-                key={metric.id}
-                className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-900"
-              >
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-gray-500">{metric.name}</p>
-                  <span className={`text-xs font-semibold uppercase ${statusColor}`}>
-                    {statusLabel}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-baseline gap-2">
-                  <span className="text-2xl font-semibold text-gray-900 dark:text-white">
-                    {metric.value}
-                  </span>
-                  {metric.unit && (
-                    <span className="text-sm text-gray-500 dark:text-gray-400">{metric.unit}</span>
-                  )}
-                </div>
-                <p className="mt-2 text-xs text-gray-500">
-                  Обновлено: {new Date(metric.lastUpdated).toLocaleTimeString("ru-RU")}
-                </p>
-              </div>
-            );
-          })}
-        </div>
-      
+      <div className="rounded-xl border border-gray-200 bg-white dark:border-gray-800 dark:bg-white/[0.03]">
+        <h3 className="border-b border-gray-100 p-4 text-base font-semibold text-gray-800 dark:border-gray-800 dark:text-white/90">
+          Сервисы
+        </h3>
+        {visibleServices.length === 0 ? (
+          <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">Нет данных</p>
+        ) : (
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
+            {visibleServices.map((service) => (
+              <li key={service.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                <span className="text-sm font-medium text-gray-800 dark:text-white/90">{service.name}</span>
+                <Badge variant="light" size="sm" color={statusBadgeColor(service.status)}>
+                  {SERVICE_STATUS_LABELS[service.status]}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 };

@@ -14,18 +14,29 @@ public class SearchResponse {
 
     private Vehicle vehicle;      // если найден авто по VIN/FRAME/PLATE
     private List<Item> results;   // если OEM/TEXT — список деталей
+    private boolean selectionRequired;
+    private String selectedArticle;
+    private String selectedBrand;
+    private boolean analogsLoading;
+    private List<String> warnings = new java.util.ArrayList<>();
 
     @Data
     public static class Vehicle {
         private String vehicleId;
         private String ssd;
         private String catalog;
+
         private String brand;
         private String name;
     }
 
     @Data
     public static class Item {
+        // A resolved local identity, never an article-only match.
+        private Long productId;
+        private String onecRefKey;
+        private String analogSource;
+        private String compatibilityStatus;
         private String oem;
         private String name;
         private String brand;
@@ -72,6 +83,7 @@ public class SearchResponse {
 
     @Data
     public static class Warehouse {
+        private String refKey;
         private String code;
         private String name;
         private String address;

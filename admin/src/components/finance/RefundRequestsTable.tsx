@@ -3,6 +3,22 @@ import React, { useEffect, useMemo, useState } from "react";
 import Badge from "../ui/badge/Badge";
 import Pagination from "../ui/pagination/Pagination";
 import { financeApi, RefundRequest } from "@/lib/api/finance";
+import { formatDateTime, formatKzt } from "@/lib/format";
+import { useToast } from "@/context/ToastContext";
+import FinanceLoadError from "./FinanceLoadError";
+import {
+  EditIcon,
+  RejectIcon,
+  RowAction,
+  ViewIcon,
+  controlClass,
+  rowClass,
+  tableWrapClass,
+  tbodyClass,
+  tdClass,
+  thClass,
+  theadClass,
+} from "./tableUi";
 
 interface RefundRequestsTableProps {
   onProcessRefund: (data: RefundRequest) => void;
@@ -27,23 +43,6 @@ const statusOptions = [
   { value: "DONE", label: "Выплачен" },
 ];
 
-const formatCurrency = (amount?: number | null) =>
-  new Intl.NumberFormat("kk-KZ", {
-    style: "currency",
-    currency: "KZT",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(amount ?? 0);
-
-const formatDateTime = (value: string) =>
-  new Date(value).toLocaleString("ru-RU", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
 const resolveStatusMeta = (status?: string) => {
   if (!status) return { label: "—", color: "light" as const };
   return statusMeta[status] ?? { label: status, color: "light" as const };
@@ -61,6 +60,8 @@ const RefundRequestsTable: React.FC<RefundRequestsTableProps> = ({
   const [totalElements, setTotalElements] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   const itemsPerPage = 10;
 
@@ -72,6 +73,7 @@ const RefundRequestsTable: React.FC<RefundRequestsTableProps> = ({
   const loadRefunds = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await financeApi.getRefundRequests(
         statusFilter || undefined,
         currentPage - 1,
@@ -86,6 +88,7 @@ const RefundRequestsTable: React.FC<RefundRequestsTableProps> = ({
       setRefunds([]);
       setTotalPages(1);
       setTotalElements(0);
+      setError("Не удалось загрузить данные");
     } finally {
       setLoading(false);
     }
@@ -96,12 +99,17 @@ const RefundRequestsTable: React.FC<RefundRequestsTableProps> = ({
   };
 
   const handleReject = async (refund: RefundRequest) => {
+    if (!window.confirm(`Отклонить заявку на возврат #${refund.id}?`)) {
+      return;
+    }
     try {
       setLoading(true);
       await financeApi.updateRefundStatus(refund.id, { status: "REJECTED" });
+      toast.success(`Заявка #${refund.id} отклонена`);
       await loadRefunds();
     } catch (error) {
       console.error("Не удалось обновить статус возврата", error);
+      toast.error("Не удалось отклонить заявку на возврат");
     } finally {
       setLoading(false);
     }
@@ -118,161 +126,117 @@ const RefundRequestsTable: React.FC<RefundRequestsTableProps> = ({
     });
   }, [refunds, searchTerm]);
 
+  const stateRow = (text: string) => (
+    <tr>
+      <td colSpan={6} className="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
+        {text}
+      </td>
+    </tr>
+  );
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Запросы на возврат</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Управляйте заявками клиентов на возврат средств
-          </p>
-        </div>
-        <div className="text-sm text-gray-500 dark:text-gray-400">
-          Всего заявок: {totalElements}
-        </div>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="text"
+          placeholder="ID возврата, клиента или заказа"
+          aria-label="Поиск по ID возврата, клиента или заказа"
+          value={searchTerm}
+          onChange={(event) => {
+            setSearchTerm(event.target.value);
+            setCurrentPage(1);
+          }}
+          className={`${controlClass} min-w-[220px] flex-1`}
+        />
+        <select
+          aria-label="Фильтр по статусу"
+          value={statusFilter}
+          onChange={(event) => {
+            setStatusFilter(event.target.value);
+            setCurrentPage(1);
+          }}
+          className={`${controlClass} w-full sm:w-48`}
+        >
+          {statusOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <span className="text-sm tabular-nums text-gray-500 dark:text-gray-400">Всего: {totalElements}</span>
       </div>
 
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Поиск
-          </label>
-          <input
-            type="text"
-            placeholder="ID возврата, клиента или заказа"
-            value={searchTerm}
-            onChange={(event) => {
-              setSearchTerm(event.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-          />
-        </div>
-        <div className="w-full sm:w-52">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Статус
-          </label>
-          <select
-            value={statusFilter}
-            onChange={(event) => {
-              setStatusFilter(event.target.value);
-              setCurrentPage(1);
-            }}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-          >
-            {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
+      {error && <FinanceLoadError message={error} onRetry={loadRefunds} />}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
-        <div className="max-w-full overflow-x-auto">
-          <div className="min-w-[960px]">
-            <table className="w-full">
-              <thead className="border-b border-gray-100 dark:border-white/[0.05] bg-gray-50/70 dark:bg-white/[0.03]">
-                <tr className="text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  <th className="px-5 py-3">Заявка</th>
-                  <th className="px-5 py-3">Клиент</th>
-                  <th className="px-5 py-3">Заказ</th>
-                  <th className="px-5 py-3">Сумма</th>
-                  <th className="px-5 py-3">Статус</th>
-                  <th className="px-5 py-3">Создана</th>
-                  <th className="px-5 py-3 text-right">Действия</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 dark:divide-white/[0.05]">
-                {loading ? (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-6 text-center text-gray-500 dark:text-gray-400">
-                      Загрузка данных…
-                    </td>
-                  </tr>
-                ) : visibleRefunds.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-5 py-6 text-center text-gray-500 dark:text-gray-400">
-                      Запросов не найдено
-                    </td>
-                  </tr>
-                ) : (
-                  visibleRefunds.map((refund) => {
-                    const status = resolveStatusMeta(refund.status);
-                    return (
-                      <tr key={refund.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.02]">
-                        <td className="px-5 py-4 align-top">
-                          <div className="font-semibold text-gray-900 dark:text-white">#{refund.id}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">Client ID: {refund.clientId ?? refund.userId}</div>
-                        </td>
-                        <td className="px-5 py-4 align-top text-sm text-gray-600 dark:text-gray-300">
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {refund.clientName || `Клиент #${refund.clientId ?? refund.userId ?? "—"}`}
-                          </div>
-                          {(refund.clientEmail || refund.clientPhone) && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              {[refund.clientEmail, refund.clientPhone].filter(Boolean).join(" • ") || "—"}
+      <div className={tableWrapClass}>
+        <table className="w-full min-w-[800px]">
+          <thead className={theadClass}>
+            <tr>
+              <th className={thClass}>Заявка</th>
+              <th className={thClass}>Клиент</th>
+              <th className={thClass}>Сумма</th>
+              <th className={thClass}>Статус</th>
+              <th className={thClass}>Создана</th>
+              <th className={`${thClass} text-right`}>Действия</th>
+            </tr>
+          </thead>
+          <tbody className={tbodyClass}>
+            {loading
+              ? stateRow("Загрузка…")
+              : error
+                ? stateRow("Данные недоступны")
+                : visibleRefunds.length === 0
+                  ? stateRow("Запросов нет")
+                  : visibleRefunds.map((refund) => {
+                      const status = resolveStatusMeta(refund.status);
+                      const canProcess = refund.status === "NEW" || refund.status === "IN_REVIEW";
+                      return (
+                        <tr key={refund.id} className={rowClass}>
+                          <td className={tdClass}>
+                            <div className="font-medium text-gray-800 dark:text-white/90">#{refund.id}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {refund.orderId ? `Заказ #${refund.orderId}` : "Без заказа"}
                             </div>
-                          )}
-                          {refund.reason && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2" title={refund.reason}>
-                              {refund.reason}
+                          </td>
+                          <td className={tdClass}>
+                            <div className="font-medium text-gray-800 dark:text-white/90">
+                              {refund.clientName || `Клиент #${refund.clientId ?? refund.userId ?? "—"}`}
                             </div>
-                          )}
-                        </td>
-                        <td className="px-5 py-4 align-top text-sm text-gray-600 dark:text-gray-300">
-                          {refund.orderId ? `#${refund.orderId}` : "—"}
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <div className="font-semibold text-gray-900 dark:text-white">
-                            {formatCurrency(refund.amount)}
-                          </div>
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <Badge color={status.color}>{status.label}</Badge>
-                        </td>
-                        <td className="px-5 py-4 align-top text-sm text-gray-600 dark:text-gray-300">
-                          {formatDateTime(refund.createdAt)}
-                        </td>
-                        <td className="px-5 py-4 align-top">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => onViewRefund(refund)}
-                              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors dark:hover:bg-blue-900/20 dark:hover:text-blue-400"
-                              title="Просмотр"
-                            >
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2"/>
-                                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-                              </svg>
-                            </button>
-                            {(refund.status === "NEW" || refund.status === "IN_REVIEW") && (
-                              <>
-                                <button
-                                  onClick={() => handleProcess(refund)}
-                                  className="px-3 py-2 text-xs font-semibold text-green-600 bg-green-50 rounded-lg hover:bg-green-100 transition-colors dark:bg-green-900/20 dark:hover:bg-green-900/30 dark:text-green-300"
-                                >
-                                  Изменить статус
-                                </button>
-                                <button
-                                  onClick={() => handleReject(refund)}
-                                  className="px-3 py-2 text-xs font-semibold text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors dark:bg-red-900/20 dark:hover:bg-red-900/30 dark:text-red-300"
-                                >
-                                  Отклонить
-                                </button>
-                              </>
+                            {refund.reason && (
+                              <div className="line-clamp-1 max-w-xs text-xs text-gray-500 dark:text-gray-400" title={refund.reason}>
+                                {refund.reason}
+                              </div>
                             )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                          </td>
+                          <td className={`${tdClass} font-medium tabular-nums text-gray-800 dark:text-white/90`}>
+                            {formatKzt(refund.amount)}
+                          </td>
+                          <td className={tdClass}>
+                            <Badge size="sm" color={status.color}>{status.label}</Badge>
+                          </td>
+                          <td className={`${tdClass} whitespace-nowrap tabular-nums`}>{formatDateTime(refund.createdAt)}</td>
+                          <td className={tdClass}>
+                            <div className="flex items-center justify-end gap-1">
+                              <RowAction label={`Просмотреть заявку #${refund.id}`} onClick={() => onViewRefund(refund)}>
+                                <ViewIcon />
+                              </RowAction>
+                              {canProcess && (
+                                <>
+                                  <RowAction label={`Изменить статус заявки #${refund.id}`} onClick={() => handleProcess(refund)}>
+                                    <EditIcon />
+                                  </RowAction>
+                                  <RowAction label={`Отклонить заявку #${refund.id}`} onClick={() => handleReject(refund)} destructive>
+                                    <RejectIcon />
+                                  </RowAction>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+          </tbody>
+        </table>
       </div>
 
       {totalPages > 1 && (

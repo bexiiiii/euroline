@@ -17,8 +17,9 @@ import type { RangeValue } from "@react-types/shared"
 import type { DateValue } from "@react-types/datepicker"
 import { getLocalTimeZone } from "@internationalized/date"
 import { CalendarComponent } from "../CalendarComponent"
-import { getMyOrders, type OrderResponse } from "@/lib/api/orders"
+import { getMyOrders, getWarehouses, type OrderResponse, type WarehouseDTO } from "@/lib/api/orders"
 import { useNotificationsStore } from "@/lib/stores/notificationsStore"
+import { COMPANY, customerAddressLine, routeUrl } from "@/lib/company"
 
 
 
@@ -27,49 +28,79 @@ type UiOrder = {
   displayNumber: string
   date: string
   warehouse: string
+  warehouseRefKey: string | null
   brand: string
   partCode: string
   description: string
   quantity: number
   price: number
   comment: string
-  route: string
-  pdfUrl: string
+  routeLabel: string
+  routeUrl: string | null
+  invoiceUrl: string
   status: string
 }
 
+export const ORDER_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Ожидает подтверждения',
+  CONFIRMED: 'Подтверждён',
+  CANCELLED: 'Отменён',
+}
+
 function mapStatus(s: string): string {
-  switch (s) {
-    case 'PENDING': return 'Оформлен'
-    case 'CONFIRMED': return 'В пути'
-    case 'CANCELLED': return 'Отменён'
-    default: return s
-  }
+  return ORDER_STATUS_LABELS[s] ?? s
+}
+
+const STATUS_STYLES: Record<string, string> = {
+  'Ожидает подтверждения': 'bg-amber-100 text-amber-800',
+  'Подтверждён': 'bg-blue-100 text-blue-800',
+  'Отменён': 'bg-red-100 text-red-800',
+}
+
+// Уникальные непустые значения через запятую, иначе прочерк
+const joinUnique = (values: (string | null | undefined)[]) => {
+  const unique = Array.from(new Set(values.map((v) => v?.trim()).filter(Boolean) as string[]))
+  return unique.length ? unique.join(', ') : '—'
+}
+
+// Старые заказы хранили комментарий внутри адреса: "Самовывоз. Комментарий: ..."
+const legacyComment = (address?: string) => {
+  const marker = 'Комментарий:'
+  const idx = address?.indexOf(marker) ?? -1
+  return idx >= 0 ? address!.slice(idx + marker.length).trim() : ''
 }
 
 function mapOrder(o: OrderResponse): UiOrder {
-  const total = (o.items || []).reduce((sum, it) => sum + (it.price ?? 0) * it.quantity, 0)
-  const first = o.items?.[0]
-  const desc = first ? (o.items.length > 1 ? `${first.productName} и ещё ${o.items.length - 1}` : first.productName) : '-'
+  const items = o.items || []
+  const total = items.reduce((sum, it) => sum + (it.price ?? 0) * it.quantity, 0)
+  const first = items[0]
+  const desc = first ? (items.length > 1 ? `${first.productName} и ещё ${items.length - 1}` : first.productName) : '-'
+  const destination = customerAddressLine(o.customerCity, o.customerAddress)
   return {
     id: String(o.id),
     displayNumber: (o.code || '').toUpperCase() || String(o.id),
     date: new Date(o.createdAt).toISOString().slice(0,10),
-    warehouse: '—',
-    brand: '—',
-    partCode: '—',
+    warehouse: joinUnique(items.map((it) => it.warehouseName)),
+    warehouseRefKey: o.warehouseRefKey ?? items.find((it) => it.warehouseRefKey)?.warehouseRefKey ?? null,
+    brand: joinUnique(items.map((it) => it.brand)),
+    partCode: joinUnique(items.map((it) => it.productCode || it.sku)),
     description: desc,
-    quantity: (o.items || []).reduce((q, it) => q + it.quantity, 0),
+    quantity: items.reduce((q, it) => q + it.quantity, 0),
     price: total,
-    comment: '—',
-    route: '—',
-    pdfUrl: '#',
+    comment: o.comment || o.oneCComment || legacyComment(o.deliveryAddress) || '—',
+    routeLabel: destination ? `${COMPANY.city} → ${o.customerCity?.trim() || destination}` : '—',
+    routeUrl: destination ? routeUrl(destination) : null,
+    invoiceUrl: `/orders/${o.id}/invoice`,
     status: mapStatus(o.status),
   }
 }
 
+// Пока 1С не прислала название склада, показываем короткий код вместо полного GUID
+const warehouseLabel = (w: WarehouseDTO) => w.name || w.code || `Склад ${w.refKey.slice(0, 8)}`
+
 export default function OrdersTable() {
-  const [orders, setOrders] = useState<UiOrder[]>([])
+  const [rawOrders, setOrders] = useState<UiOrder[]>([])
+  const [warehouses, setWarehouses] = useState<WarehouseDTO[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -89,9 +120,19 @@ export default function OrdersTable() {
       }
     }
     load()
+    getWarehouses()
+      .then(setWarehouses)
+      .catch(() => setWarehouses([]))
     subscribe()
     return () => unsubscribe()
   }, [subscribe, unsubscribe])
+
+  const orders = useMemo(() => {
+    const names = new Map(warehouses.map((w) => [w.refKey, warehouseLabel(w)]))
+    return rawOrders.map((o) =>
+      o.warehouse === '—' && o.warehouseRefKey ? { ...o, warehouse: names.get(o.warehouseRefKey) ?? `Склад ${o.warehouseRefKey.slice(0, 8)}` } : o
+    )
+  }, [rawOrders, warehouses])
 
   const totalSum = orders.reduce((acc, order) => acc + order.price, 0)
 
@@ -122,7 +163,7 @@ const filteredOrders = useMemo(() => {
       statusFilter === "Все" || order.status === statusFilter
 
     const matchesWarehouse =
-      warehouseFilter === "Все" || order.warehouse === warehouseFilter
+      warehouseFilter === "Все" || order.warehouseRefKey === warehouseFilter
 
     const matchesDate =
       !startDate || !endDate
@@ -155,11 +196,9 @@ const filteredOrders = useMemo(() => {
     className="px-4 py-2 border rounded-md"
   >
     <option value="Все">Все статусы</option>
-    <option value="Оформлен">Оформлен</option>
-    <option value="В пути">В пути</option>
-    <option value="Ожидается">Ожидается</option>
-    <option value="Доставлен">Доставлен</option>
-    <option value="Отменён">Отменён</option>
+    {Object.values(ORDER_STATUS_LABELS).map((label) => (
+      <option key={label} value={label}>{label}</option>
+    ))}
   </select>
 
   <select
@@ -168,8 +207,8 @@ const filteredOrders = useMemo(() => {
     className="px-4 py-2 border rounded-md"
   >
     <option value="Все">Все склады</option>
-    {[...new Set(orders.map((o) => o.warehouse))].map((wh) => (
-      <option key={wh} value={wh}>{wh}</option>
+    {warehouses.map((wh) => (
+      <option key={wh.refKey} value={wh.refKey}>{warehouseLabel(wh)}</option>
     ))}
   </select>
 
@@ -225,30 +264,38 @@ const filteredOrders = useMemo(() => {
       <TableCell>{order.description}</TableCell>
       <TableCell>{order.quantity}</TableCell>
       <TableCell>{order.price.toLocaleString()} ₸</TableCell>
-      <TableCell>{order.comment}</TableCell>
+      <TableCell className="max-w-[220px] whitespace-pre-wrap break-words">{order.comment}</TableCell>
       <TableCell>
         <span
-          className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-            order.status === "Доставлен"
-              ? "bg-green-100 text-green-800"
-              : order.status === "В пути"
-              ? "bg-blue-100 text-blue-800"
-              : order.status === "Ожидается"
-              ? "bg-yellow-100 text-yellow-800"
-              : "bg-red-100 text-red-800"
+          className={`inline-block whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${
+            STATUS_STYLES[order.status] ?? "bg-gray-100 text-gray-700"
           }`}
         >
           {order.status}
         </span>
       </TableCell>
-      <TableCell>{order.route}</TableCell>
+      <TableCell>
+        {order.routeUrl ? (
+          <a
+            href={order.routeUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="whitespace-nowrap text-blue-600 hover:underline"
+            title="Открыть маршрут в Яндекс.Картах"
+          >
+            {order.routeLabel}
+          </a>
+        ) : (
+          <span title="Укажите город и адрес в личном кабинете">{order.routeLabel}</span>
+        )}
+      </TableCell>
       <TableCell>
         <a
-          href={order.pdfUrl}
+          href={order.invoiceUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center justify-center text-red-600 hover:text-red-800"
-          title="Скачать PDF"
+          title="Накладная"
         >
           <FileText size={18} />
         </a>

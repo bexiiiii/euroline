@@ -53,7 +53,7 @@ export default function AdminLayout({
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-16 h-16 border-4 border-gray-300 border-t-brand-500 rounded-full animate-spin"></div>
-        <p className="ml-4 text-lg text-gray-600">Checking authentication...</p>
+        <p className="ml-4 text-lg text-gray-600 dark:text-gray-400">Проверяем доступ…</p>
       </div>
     );
   }
@@ -64,7 +64,7 @@ export default function AdminLayout({
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-16 h-16 border-4 border-gray-300 border-t-brand-500 rounded-full animate-spin"></div>
-        <p className="ml-4 text-lg text-gray-600">Redirecting to login page...</p>
+        <p className="ml-4 text-lg text-gray-600 dark:text-gray-400">Перенаправляем на страницу входа…</p>
       </div>
     );
   }

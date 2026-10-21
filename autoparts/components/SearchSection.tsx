@@ -1,7 +1,7 @@
 "use client";
 
 import SearchIcon from "@/shared/icons /SearchIcon";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchStore } from "@/lib/stores/searchStore";
 import { useVehicle } from "@/context/VehicleContext";
@@ -15,37 +15,7 @@ const SearchSection = () => {
   // Ref for debounced search
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Professional debounced search - triggers only after user stops typing
-  useEffect(() => {
-    // Clear any existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current);
-    }
-    
-    const trimmed = query.trim();
-    
-    // Don't search if empty
-    if (trimmed.length === 0) {
-      return;
-    }
-    
-    // Don't search if too short (minimum 3 characters for auto-search)
-    if (trimmed.length < 3) {
-      return;
-    }
-    
-    // Set timeout for debounced search (800ms for main page)
-    searchTimeoutRef.current = setTimeout(() => {
-      performSearch(trimmed);
-    }, 800);
-    
-    // Cleanup on unmount or when query changes
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, [query]); // Only depend on query
+  // Поиск только по Enter/кнопке: авто-поиск при наборе тратил лимит запросов Laximo
 
   const performSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -96,17 +66,6 @@ const SearchSection = () => {
     await performSearch(query.trim());
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      // Cancel debounced search and perform immediate search on Enter
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-        searchTimeoutRef.current = null;
-      }
-      
-      handleSearch(e as any);
-    }
-  };
 
   return (
     <section className="pt-32 pb-8 bg-gray-100">
@@ -117,7 +76,6 @@ const SearchSection = () => {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyPress={handleKeyPress}
               placeholder="Введите VIN, код или название запчасти"
               className="w-full h-16 pl-6 pr-20 text-lg rounded-full border border-gray-900/20 bg-white/60 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
               disabled={isLoading}

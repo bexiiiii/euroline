@@ -53,21 +53,15 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleCancel} className="max-w-xl p-6">
-      <div className="space-y-6">
+    <Modal isOpen={isOpen} onClose={handleCancel} className="max-w-xl p-5">
+      <div className="space-y-4">
         <div>
-          <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Редактирование товара</h4>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-            Управление статусом и доступностью каталога
-          </p>
+          <h4 className="text-lg font-semibold text-gray-800 dark:text-white/90">Редактирование товара</h4>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
-          <h5 className="text-base font-medium text-gray-900 dark:text-white">{product.name}</h5>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Код: {product.code}</p>
-          {product.externalCode && (
-            <p className="text-sm text-gray-500 dark:text-gray-400">Внешний код: {product.externalCode}</p>
-          )}
+        <div>
+          <p className="text-sm font-medium text-gray-800 dark:text-white/90">{product.name}</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">Код: {product.code}</p>
         </div>
 
         <div className="space-y-2">
@@ -85,12 +79,12 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
           </select>
         </div>
 
-        <div className="rounded-lg bg-gray-50 p-4 text-sm text-gray-500 dark:bg-white/[0.03] dark:text-gray-400">
-          <p className="mb-1">
+        <div className="space-y-1 text-xs text-gray-500 dark:text-gray-400">
+          <p>
             <strong className="text-gray-700 dark:text-gray-200">Активен:</strong> товар отображается
             в каталоге и доступен для заказа.
           </p>
-          <p className="mb-1">
+          <p>
             <strong className="text-gray-700 dark:text-gray-200">Неактивен:</strong> товар скрыт из каталога,
             но остаётся в базе.
           </p>
@@ -100,7 +94,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
           </p>
         </div>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-2">
           <Button size="sm" variant="outline" onClick={handleCancel}>
             Отмена
           </Button>
@@ -109,7 +103,7 @@ const EditProductModal: React.FC<EditProductModalProps> = ({
             onClick={handleSave}
             disabled={selectedStatus === resolveInitialStatus(product)}
           >
-            Сохранить изменения
+            Сохранить
           </Button>
         </div>
       </div>

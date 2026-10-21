@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import ComponentCard from "@/components/common/ComponentCard";
 import BalanceTopUpTable from "./BalanceTopUpTable";
 import FinanceStats from "./FinanceStats";
-import FinanceToolbar from "./FinanceToolbar";
 import ProcessRefundModal from "./ProcessRefundModal";
 import RefundHistoryTable from "./RefundHistoryTable";
 import RefundRequestsTable from "./RefundRequestsTable";
@@ -67,49 +66,35 @@ const FinanceManagement: React.FC = () => {
   };
 
   const tabs = [
-    { id: "topup", label: "Пополнение баланса", count: 12 },
-    { id: "requests", label: "Запросы на возврат", count: 8 },
-    { id: "history", label: "История возвратов", count: 156 },
+    { id: "topup", label: "Пополнение баланса" },
+    { id: "requests", label: "Запросы на возврат" },
+    { id: "history", label: "История возвратов" },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Statistics */}
+    <div className="space-y-4">
       <FinanceStats />
 
-      {/* Toolbar */}
-      <FinanceToolbar />
-
-      {/* Main Content */}
       <ComponentCard title="Финансовые операции">
-        {/* Tabs */}
         <div className="border-b border-gray-200 dark:border-gray-700">
-          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+          <nav className="-mb-px flex gap-6" aria-label="Разделы">
             {tabs.map((tab) => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
                   activeTab === tab.id
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                    ? "border-brand-500 text-brand-600 dark:text-brand-400"
                     : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
                 }`}
               >
                 <span>{tab.label}</span>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  activeTab === tab.id
-                    ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                    : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
-                }`}>
-                  {tab.count}
-                </span>
               </button>
             ))}
           </nav>
         </div>
 
-        {/* Tab Content */}
-        <div className="mt-6">
+        <div className="mt-4">
           {activeTab === "topup" && (
             <BalanceTopUpTable onTopUpBalance={handleTopUpBalance} />
           )}
@@ -130,7 +115,6 @@ const FinanceManagement: React.FC = () => {
         </div>
       </ComponentCard>
 
-      {/* Modals */}
       <TopUpBalanceModal
         isOpen={isTopUpModalOpen}
         mode={selectedTopUp ? "view" : "create"}

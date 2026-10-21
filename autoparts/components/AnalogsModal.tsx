@@ -300,7 +300,7 @@ function ensureAbsoluteUrl(url?: string | null): string {
     return url;
   }
   if (url.startsWith('/')) {
-    return `https://api.umapi.ru${url}`;
+    return url.startsWith("/IMAGE/") ? `https://image.umapi.ru${url}` : `https://image.umapi.ru/IMAGE${url}`;
   }
   return url;
 }

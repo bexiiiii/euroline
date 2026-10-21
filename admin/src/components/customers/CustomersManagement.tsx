@@ -106,8 +106,6 @@ const CustomersManagement: React.FC = () => {
 
       {/* Toolbar */}
       <CustomersToolbar
-        onAddCustomer={handleAddCustomer}
-        onExport={handleExport}
         onRefresh={handleRefresh}
         onSendNewsletter={handleSendNewsletter}
       />

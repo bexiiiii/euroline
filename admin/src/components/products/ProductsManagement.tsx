@@ -1,19 +1,16 @@
 "use client";
 import React, { useState } from "react";
-import ComponentCard from "@/components/common/ComponentCard";
 import ProductsStats from "@/components/products/ProductsStats";
 import ProductsToolbar from "@/components/products/ProductsToolbar";
 import ProductsTable from "@/components/products/ProductsTable";
 import ViewProductModal from "@/components/products/ViewProductModal";
-import EditProductModal from "@/components/products/EditProductModal";
-import { Product } from "@/lib/api/products";
+import { Product, productApi } from "@/lib/api/products";
 import { ExportDateRange } from "@/components/common/ExportWithDateRange";
 import { exportAdminData } from "@/lib/api/importExport";
 import { useToast } from "@/context/ToastContext";
 
 const ProductsManagement: React.FC = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const { success: showSuccess, error: showError } = useToast();
@@ -25,19 +22,18 @@ const ProductsManagement: React.FC = () => {
     setIsViewModalOpen(true);
   };
 
-  const handleEditProduct = (product: Product) => {
-    setSelectedProduct(product);
-    setIsEditModalOpen(true);
-  };
-
-  const handleDeleteProduct = (productId: number) => {
-    console.log("Удаление продукта:", productId);
-    // Здесь должна быть логика удаления продукта
-  };
-
-  const handleSaveProduct = (productId: number, newStatus: string) => {
-    console.log("Сохранение статуса продукта:", productId, newStatus);
-    setIsEditModalOpen(false);
+  const handleDeleteProduct = async (product: Product) => {
+    if (!window.confirm(`Удалить товар «${product.name}»? Это действие нельзя отменить.`)) {
+      return;
+    }
+    try {
+      await productApi.deleteProduct(product.id);
+      showSuccess("Товар удалён");
+      triggerRefresh();
+    } catch (error) {
+      console.error("Не удалось удалить товар", error);
+      showError(error instanceof Error && error.message ? error.message : "Не удалось удалить товар");
+    }
   };
 
   const buildFileName = (base: string, from?: string, to?: string) => {
@@ -55,57 +51,34 @@ const ProductsManagement: React.FC = () => {
         to: to || undefined,
         fileName: buildFileName("products", from, to),
       });
-      showSuccess("Экспорт продуктов сформирован");
+      showSuccess("Экспорт товаров сформирован");
     } catch (error) {
-      console.error("Не удалось экспортировать продукты", error);
-      showError("Не удалось экспортировать продукты");
+      console.error("Не удалось экспортировать товары", error);
+      showError("Не удалось экспортировать товары");
     }
   };
 
-  const handleImportProducts = () => {
-    console.log("Импорт продуктов");
-  };
-
-  const handleSyncWith1C = () => {
-    console.log("Синхронизация с 1С");
-  };
-
   return (
-    <div className="space-y-6">
-      {/* Статистика */}
+    <div className="space-y-4">
       <ProductsStats refreshKey={refreshKey} />
 
-      {/* Панель инструментов */}
       <ProductsToolbar
         onExport={handleExportProducts}
-        onImport={handleImportProducts}
-        onSyncWith1C={handleSyncWith1C}
         onProductCreated={triggerRefresh}
       />
 
-      {/* Таблица продуктов */}
-      <ComponentCard title="Список продуктов">
-        <ProductsTable
-          refreshKey={refreshKey}
-          onViewProduct={handleViewProduct}
-          onEditProduct={handleEditProduct}
-          onDeleteProduct={handleDeleteProduct}
-        />
-      </ComponentCard>
+      <ProductsTable
+        refreshKey={refreshKey}
+        onViewProduct={handleViewProduct}
+        onDeleteProduct={handleDeleteProduct}
+      />
 
-      {/* Модальные окна */}
       <ViewProductModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}
         product={selectedProduct}
       />
 
-      <EditProductModal
-        isOpen={isEditModalOpen}
-        onClose={() => setIsEditModalOpen(false)}
-        onSave={handleSaveProduct}
-        product={selectedProduct}
-      />
     </div>
   );
 };

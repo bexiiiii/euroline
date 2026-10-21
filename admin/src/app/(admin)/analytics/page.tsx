@@ -3,8 +3,7 @@ import React from "react";
 import AnalyticsDashboard from "@/components/analytics/AnalyticsDashboard";
 
 export const metadata: Metadata = {
-  title: "Аналитика | TailAdmin - Dashboard",
-  description: "Профессиональная страница аналитики с полной статистикой",
+  title: "Аналитика",
 };
 
 export default function AnalyticsPage() {

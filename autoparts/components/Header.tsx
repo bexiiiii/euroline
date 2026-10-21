@@ -17,8 +17,10 @@ const Header = () => {
       <div className="container mx-auto px-6">
         <nav className="flex items-center justify-between h-20 text-white">
           <div className="flex items-center space-x-8">
-            <Link href="/" className="text-xl font-medium hover:text-orange-500 transition-colors">
-              LOGO
+            <Link href="/" className="flex items-center gap-2 text-xl font-semibold hover:text-orange-500 transition-colors" aria-label="Euroline — на главную">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/euroline-logo.png" alt="" width={36} height={36} className="h-9 w-9" />
+              <span>Euroline</span>
             </Link>
             
             <div className="hidden md:flex items-center space-x-6">

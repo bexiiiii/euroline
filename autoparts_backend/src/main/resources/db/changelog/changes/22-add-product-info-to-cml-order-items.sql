@@ -15,7 +15,7 @@ COMMENT ON COLUMN cml_order_items.article IS 'Артикул товара для
 UPDATE cml_order_items coi
 SET 
     product_name = p.name,
-    article = p.sku
+    article = p.code
 FROM products p
 WHERE coi.product_guid = p.external_code
   AND (coi.product_name IS NULL OR coi.article IS NULL);

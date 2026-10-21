@@ -2,6 +2,8 @@ package autoparts.kz.modules.mainSearch.service;
 
 import autoparts.kz.modules.cml.dto.WarehouseStockDTO;
 import autoparts.kz.modules.cml.service.ProductEnrichmentService;
+import autoparts.kz.modules.manualProducts.entity.Product;
+import autoparts.kz.modules.manualProducts.repository.ProductRepository;
 import autoparts.kz.modules.mainSearch.dto.SearchResponse;
 import autoparts.kz.modules.stockOneC.dto.StockBulkResponse;
 import autoparts.kz.modules.vinLaximo.dto.DetailDto;
@@ -12,11 +14,13 @@ import autoparts.kz.modules.stockOneC.client.OneCClient;
 import autoparts.kz.integration.umapi.dto.BrandRefinementDto;
 import autoparts.kz.integration.umapi.dto.AnalogDto;
 import autoparts.kz.integration.umapi.service.UmapiIntegrationService;
+import autoparts.kz.integration.umapi.service.AutomaticAnalogService;
 import autoparts.kz.common.util.ArticleNormalizationUtil;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.util.*;
@@ -32,10 +36,17 @@ public class MainSearchService {
     private final OneCClient oneC;
     private final UmapiIntegrationService umapiService;
     private final ProductEnrichmentService productEnrichmentService;
+    private final ProductRepository productRepository;
+    private final JdbcTemplate jdbcTemplate;
+    private final AutomaticAnalogService automaticAnalogs;
 
     // VIN - точно 17 символов, без букв I, O, Q (расширенный паттерн)
     private static final Pattern VIN = Pattern.compile("^[A-HJ-NPR-Z0-9]{17}$", Pattern.CASE_INSENSITIVE);
     
+    // VIN, которых нет в Laximo: не повторяем платный запрос в течение TTL
+    private static final long VIN_MISS_TTL_MS = 6 * 60 * 60 * 1000L;
+    private final java.util.concurrent.ConcurrentHashMap<String, Long> vinMisses = new java.util.concurrent.ConcurrentHashMap<>();
+
     // Дополнительная проверка для потенциальных VIN (более мягкая)
     private static final Pattern POTENTIAL_VIN = Pattern.compile("^[A-Z0-9]{17}$", Pattern.CASE_INSENSITIVE);
     
@@ -44,12 +55,24 @@ private static final Pattern FRAME = Pattern.compile("^[A-Z]{2,4}-[0-9A-Z]{6,}$"
 
 // Более строгий паттерн для OEM - без пробелов, минимум 5 символов
 private static final Pattern STRICT_OEM = Pattern.compile("^[A-Z0-9\\-\\.\\/]{5,25}$", Pattern.CASE_INSENSITIVE);
-private static final int MAX_ANALOG_RESULTS = 30;
-
+// Cross-references are requested only after identifying a single article + brand.
     public SearchResponse search(String q, String catalog) {
-        String query = q.trim().toUpperCase();
+        return search(q, catalog, null);
+    }
+
+    public SearchResponse search(String q, String catalog, String brand) {
+        if (q == null || q.isBlank() || q.length() > 200) {
+            throw new IllegalArgumentException("Введите запрос длиной от 1 до 200 символов");
+        }
+        String query = q.trim().toUpperCase(Locale.ROOT);
         SearchResponse resp = new SearchResponse();
         resp.setQuery(query);
+
+        if (brand != null && !brand.isBlank()) {
+            if (brand.length() > 100) throw new IllegalArgumentException("Слишком длинное название бренда");
+            resp.setDetectedType(SearchResponse.DetectedType.OEM);
+            return searchByOem(ArticleNormalizationUtil.normalize(query), resp, brand.trim(), query);
+        }
 
         // 1. VIN - точно 17 символов без пробелов (расширенная проверка)
         if (query.length() == 17) {
@@ -57,6 +80,14 @@ private static final int MAX_ANALOG_RESULTS = 30;
             boolean isPotentialVin = POTENTIAL_VIN.matcher(query).matches();
             
             if (isStrictVin || isPotentialVin) {
+                // VIN-запрос не должен уходить в полнотекстовый поиск Laximo (10 команд на запрос),
+                // а повторный поиск ненайденного VIN не должен снова тратить лимит.
+                resp.setDetectedType(SearchResponse.DetectedType.VIN);
+                resp.setResults(List.of());
+                Long missUntil = vinMisses.get(query + "::" + catalog);
+                if (missUntil != null && missUntil > System.currentTimeMillis()) {
+                    return resp;
+                }
                 try {
                     VehicleDto v = cat.findByVin(query, catalog);
                     var sv = new SearchResponse.Vehicle();
@@ -69,8 +100,11 @@ private static final int MAX_ANALOG_RESULTS = 30;
                     resp.setDetectedType(SearchResponse.DetectedType.VIN);
                     return resp;
                 } catch (Exception e) {
-                    // Если поиск по VIN не удался, продолжаем как обычный поиск
                     System.out.println("VIN search failed for: " + query + " - " + e.getMessage());
+                    if (e instanceof jakarta.persistence.EntityNotFoundException) {
+                        vinMisses.put(query + "::" + catalog, System.currentTimeMillis() + VIN_MISS_TTL_MS);
+                    }
+                    return resp;
                 }
             }
         }
@@ -99,12 +133,32 @@ private static final int MAX_ANALOG_RESULTS = 30;
 
         
 
+        // A spaced numeric article is still an article, not a full-text query.
+        if (query.matches("[0-9][0-9 .-]+") && query.replaceAll("[^0-9]", "").length() >= 5) {
+            resp.setDetectedType(SearchResponse.DetectedType.OEM);
+            return searchByOem(ArticleNormalizationUtil.normalize(query), resp, null, query);
+        }
         boolean looksLikeOem = isLikelyOemNumber(query);
         resp.setDetectedType(looksLikeOem ? SearchResponse.DetectedType.OEM
                                           : SearchResponse.DetectedType.TEXT);
 
         if (looksLikeOem) {
-            return searchByOem(query, resp);
+            return searchByOem(query, resp, null, null);
+        }
+
+        // "WABCO 4410329212", "4410329212 WABCO", "WABCO 441 032 92 12": бренд + артикул.
+        // Explicit brand selects a part; it must never just reorder unrelated matches.
+        BrandArticle brandArticle = splitBrandAndArticle(query);
+        if (brandArticle != null) {
+            resp.setDetectedType(SearchResponse.DetectedType.OEM);
+            return searchByOem(brandArticle.article(), resp, brandArticle.brand(), query);
+        }
+
+        // Без выбранного каталога полнотекст Laximo уходит пачкой команд по всем каталогам
+        // (каждая списывается с лимита) и отвечает E_INVALIDPARAMETER — ищем только по своей базе.
+        if (catalog == null || catalog.isBlank()) {
+            resp.setResults(localProductResults(query));
+            return resp;
         }
 
         List<DetailDto> found;
@@ -112,7 +166,13 @@ private static final int MAX_ANALOG_RESULTS = 30;
             found = cat.searchDetails(query, catalog);
         } catch (Exception e) {
             System.out.println("[SEARCH] fulltext failed: " + e.getMessage());
-            resp.setResults(List.of());
+            // The local 1C catalogue must remain searchable when Laximo has no
+            // full-text match or is temporarily unavailable.
+            resp.setResults(localProductResults(query));
+            return resp;
+        }
+        if (found == null || found.isEmpty()) {
+            resp.setResults(localProductResults(query));
             return resp;
         }
 
@@ -175,13 +235,19 @@ private static final int MAX_ANALOG_RESULTS = 30;
         if (item.getImageUrl() == null && enrichment.getImageUrl() != null) {
             item.setImageUrl(enrichment.getImageUrl());
         }
-        if (item.getPrice() == null && enrichment.getPrice() != null) {
+        // Данные из вебхука 1С (onec_prices / onec_stocks) приоритетнее ответа bridge-запроса остатков.
+        boolean preferEnrichment = enrichment.isFromOneCEvents();
+        if ((preferEnrichment || item.getPrice() == null) && enrichment.getPrice() != null) {
             item.setPrice(BigDecimal.valueOf(enrichment.getPrice()));
+            if (item.getCurrency() == null) {
+                item.setCurrency("KZT");
+            }
         }
-        if (item.getQuantity() == null && enrichment.getStock() != null) {
+        if ((preferEnrichment || item.getQuantity() == null) && enrichment.getStock() != null) {
             item.setQuantity(enrichment.getStock());
         }
-        if ((item.getWarehouses() == null || item.getWarehouses().isEmpty()) && enrichment.getWarehouses() != null) {
+        if ((preferEnrichment || item.getWarehouses() == null || item.getWarehouses().isEmpty())
+                && enrichment.getWarehouses() != null && !enrichment.getWarehouses().isEmpty()) {
             item.setWarehouses(convertWarehouses(enrichment.getWarehouses()));
         }
     }
@@ -193,6 +259,7 @@ private static final int MAX_ANALOG_RESULTS = 30;
         List<SearchResponse.Warehouse> result = new ArrayList<>(warehouses.size());
         for (WarehouseStockDTO warehouse : warehouses) {
             SearchResponse.Warehouse dto = new SearchResponse.Warehouse();
+            dto.setRefKey(warehouse.getWarehouseGuid());
             dto.setCode(warehouse.getWarehouseCode() != null ? warehouse.getWarehouseCode() : warehouse.getWarehouseGuid());
             dto.setName(
                     warehouse.getWarehouseName() != null ? warehouse.getWarehouseName() : warehouse.getWarehouseGuid());
@@ -203,280 +270,276 @@ private static final int MAX_ANALOG_RESULTS = 30;
         return result;
     }
 
-    private SearchResponse searchByOem(String query, SearchResponse resp) {
-        List<BrandRefinementDto> brandMatches = Collections.emptyList();
+    /**
+     * @param brandHint     бренд из запроса "БРЕНД АРТИКУЛ" (null для чистого артикула)
+     * @param originalQuery полный запрос пользователя, для поиска по своей базе, если по артикулу ничего нет
+     */
+    private SearchResponse searchByOem(String query, SearchResponse resp, String brandHint, String originalQuery) {
+        String article = ArticleNormalizationUtil.normalize(query);
+        Map<String, SearchResponse.Item> candidates = new LinkedHashMap<>();
         try {
-            List<BrandRefinementDto> result = umapiService.searchByArticle(query);
-            if (result != null) {
-                brandMatches = result;
+            List<BrandRefinementDto> matches = umapiService.searchByArticle(article);
+            if (matches != null) for (BrandRefinementDto match : matches) {
+                if (match.getBrand() == null || match.getBrand().isBlank()) continue;
+                String number = match.getArticle() == null ? match.getArticleSearch() : match.getArticle();
+                if (!article.equals(ArticleNormalizationUtil.normalize(number))) continue;
+                SearchResponse.Item item = catalogItem(number, match.getBrand(), match.getTitle(), match.getImg(), "UMAPI");
+                candidates.putIfAbsent(partKey(number, match.getBrand()), item);
             }
         } catch (Exception e) {
-            log.warn("UMAPI search failed for article {}: {}", query, e.getMessage());
+            log.warn("Article catalogue unavailable for {}", article);
+            resp.getWarnings().add("Каталог временно недоступен. Показаны только доступные локальные данные.");
         }
 
-        Set<String> codesForBatch = new LinkedHashSet<>();
-        codesForBatch.add(query);
-
-        List<AnalogDto> analogMatches = new ArrayList<>();
-        Set<String> analogSeen = new HashSet<>();
-
-        for (BrandRefinementDto match : brandMatches) {
-            String primaryArticle = match.getArticle();
-            if (primaryArticle == null || primaryArticle.isBlank()) {
-                primaryArticle = match.getArticleSearch();
-            }
-            if (primaryArticle != null && !primaryArticle.isBlank()) {
-                codesForBatch.add(primaryArticle);
-                String normalizedPrimary = ArticleNormalizationUtil.normalize(primaryArticle);
-                if (normalizedPrimary != null && !normalizedPrimary.equalsIgnoreCase(primaryArticle)) {
-                    codesForBatch.add(normalizedPrimary);
-                }
-            }
-
-            if (match.getBrand() == null || match.getBrand().isBlank()) {
-                continue;
-            }
-
-            if (analogMatches.size() >= MAX_ANALOG_RESULTS) {
-                continue;
-            }
-
-            try {
-                List<AnalogDto> analogs = umapiService.getAnalogs(query, match.getBrand());
-                if (analogs != null) {
-                    for (AnalogDto analog : analogs) {
-                        String analogArticle = analog.getArticle();
-                        if (analogArticle == null || analogArticle.isBlank()) {
-                            analogArticle = analog.getArticleSearch();
-                        }
-                        if (analogArticle == null || analogArticle.isBlank()) {
-                            continue;
-                        }
-                        String normalizedAnalog = ArticleNormalizationUtil.normalize(analogArticle);
-                        if (normalizedAnalog == null || normalizedAnalog.isBlank()) {
-                            continue;
-                        }
-                        String dedupeKey = normalizedAnalog + "|" + (analog.getBrand() != null ? analog.getBrand().toUpperCase(Locale.ROOT) : "");
-                        if (!analogSeen.add(dedupeKey)) {
-                            continue;
-                        }
-                        analogMatches.add(analog);
-                        codesForBatch.add(analogArticle);
-                        if (!normalizedAnalog.equalsIgnoreCase(analogArticle)) {
-                            codesForBatch.add(normalizedAnalog);
-                        }
-                        if (analogMatches.size() >= MAX_ANALOG_RESULTS) {
-                            break;
-                        }
-                    }
-                }
-            } catch (Exception e) {
-                log.debug("UMAPI analog lookup failed for article {} brand {}: {}", query, match.getBrand(), e.getMessage());
-            }
+        // Match normalized SKU/code AND brand. Never borrow availability from another manufacturer.
+        List<Product> local = productRepository.findAllByNormalizedArticleIn(List.of(article.toLowerCase(Locale.ROOT)));
+        for (Product product : local) {
+            if (!matchesLocalArticle(product, article)) continue;
+            String productBrand = localProductBrand(product);
+            if (productBrand == null || productBrand.isBlank()) continue;
+            candidates.putIfAbsent(partKey(article, productBrand),
+                    catalogItem(article, productBrand, product.getName(), product.getImageUrl(), "LOCAL_1C"));
         }
 
-        List<String> codesList = new ArrayList<>(codesForBatch);
-        StockBulkResponse stock = codesList.isEmpty()
-                ? new StockBulkResponse()
-                : getStock(codesList);
-
-        Map<String, ProductEnrichmentService.EnrichmentData> enrichmentMap = codesList.isEmpty()
-                ? Map.of()
-                : productEnrichmentService.enrichByCodes(codesList);
-
-        List<SearchResponse.Item> items = new ArrayList<>();
-        Set<String> normalizedInResults = new HashSet<>();
-
-        for (BrandRefinementDto match : brandMatches) {
-            String oem = match.getArticle();
-            if (oem == null || oem.isBlank()) {
-                oem = match.getArticleSearch();
+        List<SearchResponse.Item> selected = candidates.values().stream()
+                .filter(item -> brandHint == null || brandMatchesHint(item.getBrand(), brandHint))
+                .toList();
+        if (selected.size() != 1) {
+            resp.setSelectionRequired(!candidates.isEmpty());
+            if (brandHint != null && selected.isEmpty()) {
+                resp.getWarnings().add("Указанный бренд не найден. Выберите деталь из доступных вариантов.");
             }
-            if (oem == null || oem.isBlank()) {
-                oem = query;
-            }
-
-            SearchResponse.Item item = new SearchResponse.Item();
-            item.setOem(oem);
-            item.setCatalog("UMAPI");
-            item.setName(match.getTitle() != null && !match.getTitle().isBlank() ? match.getTitle() : oem);
-            item.setBrand(match.getBrand());
-            item.setImageUrl(match.getImg());
-            item.setVehicleHints(Collections.emptyList());
-
-            StockBulkResponse.Item stockItem = stock.getByOem(oem);
-            if (stockItem == null) {
-                String normalizedOem = ArticleNormalizationUtil.normalize(oem);
-                if (normalizedOem != null) {
-                    stockItem = stock.getByOem(normalizedOem);
-                }
-            }
-            if (stockItem != null) {
-                item.setPrice(stockItem.getPrice());
-                item.setCurrency(stockItem.getCurrency());
-                item.setQuantity(stockItem.getTotalQty());
-                item.setWarehouses(StockBulkResponse.toWarehouses(stockItem));
-            }
-
-            SearchResponse.UmapiSupplier supplier = new SearchResponse.UmapiSupplier();
-            supplier.setId(null);
-            supplier.setName(match.getBrand());
-            supplier.setMatchType(match.getType());
-            supplier.setArticleCount(1);
-            item.setUmapiSuppliers(List.of(supplier));
-            if (match.getImg() != null && !match.getImg().isBlank()) {
-                item.setUmapiImages(List.of(match.getImg()));
-            }
-
-            ProductEnrichmentService.EnrichmentData enrichment =
-                    enrichmentMap.get(ArticleNormalizationUtil.normalize(oem));
-            applyEnrichment(item, enrichment);
-
-            if (stockItem != null) {
-                if (item.getCurrency() == null) {
-                    item.setCurrency(stockItem.getCurrency());
-                }
-                if (item.getWarehouses() == null || item.getWarehouses().isEmpty()) {
-                    item.setWarehouses(StockBulkResponse.toWarehouses(stockItem));
-                }
-                if (item.getPrice() == null && stockItem.getPrice() != null) {
-                    item.setPrice(stockItem.getPrice());
-                }
-                if (item.getQuantity() == null) {
-                    item.setQuantity(stockItem.getTotalQty());
-                }
-            }
-
-            items.add(item);
-            String normalizedItem = ArticleNormalizationUtil.normalize(oem);
-            if (normalizedItem != null) {
-                normalizedInResults.add(normalizedItem);
-            }
-        }
-
-        for (AnalogDto analog : analogMatches) {
-            String analogOem = analog.getArticle();
-            if (analogOem == null || analogOem.isBlank()) {
-                analogOem = analog.getArticleSearch();
-            }
-            if (analogOem == null || analogOem.isBlank()) {
-                continue;
-            }
-            String normalizedAnalog = ArticleNormalizationUtil.normalize(analogOem);
-            if (normalizedAnalog != null && normalizedInResults.contains(normalizedAnalog)) {
-                continue;
-            }
-
-            SearchResponse.Item item = new SearchResponse.Item();
-            item.setOem(analogOem);
-            item.setCatalog("UMAPI_ANALOG");
-            item.setName(analog.getTitle() != null && !analog.getTitle().isBlank() ? analog.getTitle() : analogOem);
-            item.setBrand(analog.getBrand());
-            item.setImageUrl(analog.getImg());
-            item.setVehicleHints(Collections.emptyList());
-
-            StockBulkResponse.Item stockItem = stock.getByOem(analogOem);
-            if (stockItem == null && normalizedAnalog != null) {
-                stockItem = stock.getByOem(normalizedAnalog);
-            }
-            if (stockItem != null) {
-                item.setPrice(stockItem.getPrice());
-                item.setCurrency(stockItem.getCurrency());
-                item.setQuantity(stockItem.getTotalQty());
-                item.setWarehouses(StockBulkResponse.toWarehouses(stockItem));
-            }
-
-            SearchResponse.UmapiSupplier supplier = new SearchResponse.UmapiSupplier();
-            supplier.setId(analog.getArtId());
-            supplier.setName(analog.getBrand());
-            supplier.setMatchType(analog.getType() != null ? analog.getType() : analog.getTarget());
-            supplier.setArticleCount(1);
-            item.setUmapiSuppliers(List.of(supplier));
-            if (analog.getImg() != null && !analog.getImg().isBlank()) {
-                item.setUmapiImages(List.of(analog.getImg()));
-            }
-
-            ProductEnrichmentService.EnrichmentData enrichment =
-                    enrichmentMap.get(ArticleNormalizationUtil.normalize(analogOem));
-            applyEnrichment(item, enrichment);
-
-            if (stockItem != null) {
-                if (item.getCurrency() == null) {
-                    item.setCurrency(stockItem.getCurrency());
-                }
-                if (item.getWarehouses() == null || item.getWarehouses().isEmpty()) {
-                    item.setWarehouses(StockBulkResponse.toWarehouses(stockItem));
-                }
-                if (item.getPrice() == null && stockItem.getPrice() != null) {
-                    item.setPrice(stockItem.getPrice());
-                }
-                if (item.getQuantity() == null) {
-                    item.setQuantity(stockItem.getTotalQty());
-                }
-            }
-
-            items.add(item);
-            if (normalizedAnalog != null) {
-                normalizedInResults.add(normalizedAnalog);
-            }
-        }
-
-        if (!items.isEmpty()) {
-            resp.setResults(items);
+            List<SearchResponse.Item> choices = new ArrayList<>(
+                    selected.isEmpty() ? candidates.values() : selected);
+            enrichIdentifiedParts(choices, local, resp);
+            resp.setResults(choices);
             return resp;
         }
 
-        String normalizedQuery = ArticleNormalizationUtil.normalize(query);
-        ProductEnrichmentService.EnrichmentData enrichment = enrichmentMap.get(normalizedQuery);
-        StockBulkResponse.Item stockItem = stock.getByOem(query);
-        if (stockItem == null && normalizedQuery != null) {
-            stockItem = stock.getByOem(normalizedQuery);
+        SearchResponse.Item primary = selected.get(0);
+        resp.setSelectedArticle(primary.getOem());
+        resp.setSelectedBrand(primary.getBrand());
+        Map<String, SearchResponse.Item> items = new LinkedHashMap<>();
+        items.put(partKey(primary.getOem(), primary.getBrand()), primary);
+        var automatic = automaticAnalogs.lookup(article, primary.getBrand());
+        if (automatic != null) {
+            resp.setAnalogsLoading(automatic.loading());
+            if (automatic.partial()) resp.getWarnings().add("Часть замен по OE пока недоступна. Повторите поиск позже.");
+            for (var match : automatic.matches()) {
+                SearchResponse.Item item = catalogItem(match.article(), match.brand(), match.name(), match.imageUrl(), "UMAPI_ANALOG");
+                item.setAnalogSource("UMAPI_SHARED_OE");
+                item.setCompatibilityStatus("UNVERIFIED");
+                item.setOeNumbers(match.oeReferences());
+                items.putIfAbsent(partKey(match.article(), match.brand()), item);
+            }
+        }
+        try {
+            List<AnalogDto> analogs = umapiService.getAnalogs(article, primary.getBrand());
+            if (analogs != null) for (AnalogDto analog : analogs) {
+                String number = analog.getArticle() == null ? analog.getArticleSearch() : analog.getArticle();
+                if (number == null || number.isBlank() || analog.getBrand() == null || analog.getBrand().isBlank()) continue;
+                SearchResponse.Item item = catalogItem(number, analog.getBrand(), analog.getTitle(), analog.getImg(), "UMAPI_ANALOG");
+                // Supplier cross-reference is not a technical guarantee of interchangeability.
+                item.setAnalogSource("UMAPI");
+                item.setCompatibilityStatus("UNVERIFIED");
+                items.putIfAbsent(partKey(number, analog.getBrand()), item);
+            }
+        } catch (Exception e) {
+            log.warn("Analog catalogue unavailable for {} / {}", primary.getBrand(), article);
+            resp.getWarnings().add("Не удалось загрузить возможные замены. Повторите поиск позже.");
         }
 
-        if (enrichment != null || stockItem != null) {
-            SearchResponse.Item item = new SearchResponse.Item();
-            item.setOem(query);
-            item.setCatalog("1C");
-            item.setVehicleHints(Collections.emptyList());
-
-            if (enrichment != null) {
-                item.setName(enrichment.getName() != null ? enrichment.getName() : query);
-                item.setBrand(enrichment.getBrand());
-                item.setImageUrl(enrichment.getImageUrl());
-            } else {
-                item.setName(query);
-            }
-
-            if (stockItem != null) {
-                item.setPrice(stockItem.getPrice());
-                item.setCurrency(stockItem.getCurrency());
-                item.setQuantity(stockItem.getTotalQty());
-                item.setWarehouses(StockBulkResponse.toWarehouses(stockItem));
-            }
-
-            applyEnrichment(item, enrichment);
-
-            if (stockItem != null) {
-                if (item.getCurrency() == null) {
-                    item.setCurrency(stockItem.getCurrency());
-                }
-                if (item.getWarehouses() == null || item.getWarehouses().isEmpty()) {
-                    item.setWarehouses(StockBulkResponse.toWarehouses(stockItem));
-                }
-                if (item.getPrice() == null && stockItem.getPrice() != null) {
-                    item.setPrice(stockItem.getPrice());
-                }
-                if (item.getQuantity() == null) {
-                    item.setQuantity(stockItem.getTotalQty());
-                }
-            }
-
-            resp.setResults(List.of(item));
-            return resp;
-        }
-
-        resp.setResults(List.of());
+        List<String> codes = items.values().stream().map(SearchResponse.Item::getOem)
+                .map(ArticleNormalizationUtil::normalize).map(s -> s.toLowerCase(Locale.ROOT)).distinct().toList();
+        List<Product> products = productRepository.findAllByNormalizedArticleIn(codes);
+        List<SearchResponse.Item> results = new ArrayList<>(items.values());
+        enrichIdentifiedParts(results, products, resp);
+        resp.setResults(results);
         return resp;
+    }
+
+    static String partKey(String article, String brand) {
+        return ArticleNormalizationUtil.normalize(article) + "|" + brandKey(brand);
+    }
+
+    private static String brandKey(String brand) {
+        // Deliberately conservative: punctuation is not proof that brands are aliases.
+        return brand == null ? "" : brand.trim().replaceAll("\\s+", " ").toUpperCase(Locale.ROOT);
+    }
+
+    private SearchResponse.Item catalogItem(String article, String brand, String name, String image, String catalog) {
+        SearchResponse.Item item = new SearchResponse.Item();
+        item.setOem(article);
+        item.setBrand(brand);
+        item.setName(name == null || name.isBlank() ? article : name);
+        item.setImageUrl(image);
+        item.setCatalog(catalog);
+        item.setVehicleHints(List.of());
+        return item;
+    }
+
+    private void enrichIdentifiedParts(List<SearchResponse.Item> items, List<Product> products, SearchResponse resp) {
+        Map<Long, ProductEnrichmentService.EnrichmentData> enriched = productEnrichmentService.enrichProducts(products);
+        List<SearchResponse.Warehouse> knownWarehouses = products.isEmpty() ? List.of() : knownWarehouses();
+        for (SearchResponse.Item item : items) {
+            String article = ArticleNormalizationUtil.normalize(item.getOem());
+            List<Product> matches = products.stream().filter(p -> matchesLocalArticle(p, article))
+                    .filter(p -> brandMatchesHint(localProductBrand(p), item.getBrand()))
+                    .toList();
+            // A legacy cart placeholder must not shadow the authoritative 1C product.
+            List<Product> onec = matches.stream().filter(p -> p.getOneCRefKey() != null && !p.getOneCRefKey().isBlank()).toList();
+            if (!onec.isEmpty()) matches = onec;
+            if (matches.size() == 1) {
+                Product product = matches.get(0);
+                item.setProductId(product.getId());
+                item.setOnecRefKey(product.getOneCRefKey());
+                applyEnrichment(item, enriched.get(product.getId()));
+                if (item.getWarehouses() == null || item.getWarehouses().isEmpty()) {
+                    item.setWarehouses(copyWarehousesWithUnknownQuantity(knownWarehouses));
+                }
+            } else if (matches.size() > 1) {
+                String warning = "Для части товаров найдено несколько локальных соответствий. Цена и остаток требуют уточнения.";
+                if (!resp.getWarnings().contains(warning)) resp.getWarnings().add(warning);
+            }
+        }
+    }
+
+    record BrandArticle(String brand, String article) {}
+
+    // Compatibility for existing 1C imports: only a leading "BRAND ARTICLE" pair,
+    // never arbitrary numbers in the description. Explicit SKU always takes precedence.
+    static String legacyNameArticle(Product product) {
+        if (product.getSku() != null && !product.getSku().isBlank()) return "";
+        if (!"1C".equalsIgnoreCase(product.getBrand()) || product.getName() == null) return "";
+        String[] words = product.getName().trim().split("\\s+", 3);
+        if (words.length < 2 || !words[0].matches("[A-Za-z][A-Za-z0-9-]*")
+                || !words[1].matches("[A-Za-z0-9./-]{5,25}")
+                || words[1].chars().noneMatch(Character::isDigit)) return "";
+        return ArticleNormalizationUtil.normalize(words[1]);
+    }
+
+    private boolean matchesLocalArticle(Product product, String article) {
+        return article.equals(ArticleNormalizationUtil.normalize(product.getSku()))
+                || article.equals(ArticleNormalizationUtil.normalize(product.getCode()))
+                || article.equals(legacyNameArticle(product));
+    }
+
+    /**
+     * Разбирает запрос "бренд + артикул". Слова без цифр — бренд (до 3 слов), слова с цифрами
+     * склеиваются в артикул. Null, если запрос на это не похож.
+     */
+    static BrandArticle splitBrandAndArticle(String query) {
+        String[] tokens = query.trim().split("\\s+");
+        if (tokens.length < 2) {
+            return null;
+        }
+        List<String> brandTokens = new ArrayList<>();
+        StringBuilder article = new StringBuilder();
+        for (String token : tokens) {
+            if (token.chars().anyMatch(Character::isDigit)) {
+                article.append(token);
+            } else {
+                brandTokens.add(token);
+            }
+        }
+        if (brandTokens.isEmpty() || brandTokens.size() > 3 || article.length() == 0) {
+            return null;
+        }
+        String articleValue = article.toString();
+        if (!STRICT_OEM.matcher(articleValue).matches() || articleValue.length() == 17) {
+            return null;
+        }
+        return new BrandArticle(String.join(" ", brandTokens), articleValue);
+    }
+
+    static boolean brandMatchesHint(String brand, String hint) {
+        if (brand == null || hint == null) {
+            return false;
+        }
+        return brandKey(brand).equals(brandKey(hint));
+    }
+
+    private List<SearchResponse.Item> localProductResults(String query) {
+        List<SearchResponse.Warehouse> knownWarehouses = knownWarehouses();
+        List<Product> products = productRepository.searchByQuery(query);
+        Map<Long, ProductEnrichmentService.EnrichmentData> enrichments = productEnrichmentService.enrichProducts(products);
+        return products.stream()
+                .limit(20)
+                .map(product -> toLocalProductItem(product, enrichments.get(product.getId()), knownWarehouses))
+                .toList();
+    }
+
+    private SearchResponse.Item toLocalProductItem(
+            Product product,
+            ProductEnrichmentService.EnrichmentData enrichment,
+            List<SearchResponse.Warehouse> knownWarehouses
+    ) {
+        SearchResponse.Item item = new SearchResponse.Item();
+        item.setProductId(product.getId());
+        item.setOnecRefKey(product.getOneCRefKey());
+        item.setOem(product.getSku() == null || product.getSku().isBlank() ? product.getCode() : product.getSku());
+        item.setName(product.getName());
+        item.setBrand(localProductBrand(product));
+        item.setCatalog("LOCAL_1C");
+        item.setImageUrl(product.getImageUrl());
+        item.setPrice(product.getPrice() == null ? null : BigDecimal.valueOf(product.getPrice()));
+        item.setCurrency(product.getPrice() == null ? null : "KZT");
+        item.setQuantity(product.getStock());
+        applyEnrichment(item, enrichment);
+        // Витрина должна показывать, на каких складах товар может находиться,
+        // даже если для него ещё не пришёл stock.updated или остаток равен нулю.
+        if (item.getWarehouses() == null || item.getWarehouses().isEmpty()) {
+            item.setWarehouses(copyWarehousesWithUnknownQuantity(knownWarehouses));
+        }
+        item.setVehicleHints(Collections.emptyList());
+        return item;
+    }
+
+    private String localProductBrand(Product product) {
+        if (product.getBrand() != null && !product.getBrand().isBlank()
+                && !"1C".equalsIgnoreCase(product.getBrand())) {
+            return product.getBrand().trim();
+        }
+        if (product.getName() == null || product.getName().isBlank()) {
+            return null;
+        }
+        String[] words = product.getName().trim().split("\\s+", 2);
+        return words.length == 0 || words[0].isBlank() ? null : words[0];
+    }
+
+    private List<SearchResponse.Warehouse> knownWarehouses() {
+        try {
+            return jdbcTemplate.query(
+                    "SELECT ref_key, name, code FROM onec_warehouses " +
+                            "WHERE deletion_mark = false ORDER BY name, ref_key",
+                    (rs, rowNum) -> {
+                        SearchResponse.Warehouse warehouse = new SearchResponse.Warehouse();
+                        warehouse.setRefKey(rs.getString("ref_key"));
+                        warehouse.setCode(rs.getString("code") != null ? rs.getString("code") : rs.getString("ref_key"));
+                        warehouse.setName(rs.getString("name"));
+                        warehouse.setQty(null);
+                        return warehouse;
+                    }
+            );
+        } catch (Exception exception) {
+            log.warn("Cannot load 1C warehouses for local search results: {}", exception.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<SearchResponse.Warehouse> copyWarehousesWithUnknownQuantity(List<SearchResponse.Warehouse> warehouses) {
+        if (warehouses == null || warehouses.isEmpty()) {
+            return List.of();
+        }
+        return warehouses.stream().map(source -> {
+            SearchResponse.Warehouse warehouse = new SearchResponse.Warehouse();
+            warehouse.setRefKey(source.getRefKey());
+            warehouse.setCode(source.getCode());
+            warehouse.setName(source.getName());
+            warehouse.setAddress(source.getAddress());
+            warehouse.setQty(null);
+            return warehouse;
+        }).toList();
     }
 
     public Optional<OemPartReferenceDto> findPartReferences(String oem, String catalog, String locale) {

@@ -29,6 +29,8 @@ public class OrderMapper {
             response.setUserId(user.getId());
             response.setCustomerName(resolveCustomerName(user));
             response.setCustomerPhone(user.getPhone());
+            response.setCustomerCity(user.getCity());
+            response.setCustomerAddress(user.getOfficeAddress());
         }
         response.setStatus(order.getStatus().name());
         response.setPaymentStatus(order.getPaymentStatus().name());
@@ -36,6 +38,9 @@ public class OrderMapper {
         response.setCode(order.getPublicCode());
         response.setDeliveryAddress(order.getDeliveryAddress());
         response.setTotalAmount(order.getTotalAmount());
+        response.setWarehouseRefKey(order.getOneCWarehouseRefKey());
+        response.setComment(order.getComment());
+        response.setOneCComment(order.getOneCComment());
 
         response.setItems(order.getItems() == null
                 ? List.of()
@@ -50,8 +55,11 @@ public class OrderMapper {
             dto.setProductId(item.getProduct().getId());
             dto.setProductName(item.getProduct().getName());
             dto.setProductCode(item.getProduct().getCode());
+            dto.setBrand(item.getProduct().getBrand());
         }
         dto.setSku(item.getSku());
+        dto.setWarehouseName(item.getWarehouseName());
+        dto.setWarehouseRefKey(item.getWarehouseRefKey());
         dto.setQuantity(item.getQuantity());
         BigDecimal price = item.getPrice();
         dto.setPrice(price);

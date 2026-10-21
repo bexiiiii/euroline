@@ -9,12 +9,12 @@ export function WorkWithUsComponent() {
       content: (
         <div>
           <p className="text-neutral-800 dark:text-neutral-200 text-xs md:text-sm font-normal mb-8">
-            После регистрации у вас будет выделенный менеджер, который проконсультирует по вопросу открытия бизнеса, формирования ассортимента, расскажет о доступных сервисах и финансовых инструментах ALATRADE.
+            После регистрации у вас будет выделенный менеджер, который проконсультирует по вопросу открытия бизнеса, формирования ассортимента, расскажет о доступных сервисах и финансовых инструментах Euroline.
           </p>
           <div className="grid  gap-4">
             <Image
-              src="https://alatrade.kz/wp-content/uploads/2024/11/frame-1984014389.png"
-              alt="startup template"
+              src="/images/site/timeline-manager.jpg"
+              alt="Персональный менеджер Euroline"
               width={500}
               height={500}
               className="rounded-lg object-cover h-20 md:h-44 lg:h-90 w-full shadow-[0_0_24px_rgba(34,_42,_53,_0.06),_0_1px_1px_rgba(0,_0,_0,_0.05),_0_0_0_1px_rgba(34,_42,_53,_0.04),_0_0_4px_rgba(34,_42,_53,_0.08),_0_16px_68px_rgba(47,_48,_55,_0.05),_0_1px_0_rgba(255,_255,_255,_0.1)_inset]"
@@ -34,8 +34,8 @@ export function WorkWithUsComponent() {
           
           <div className="grid  gap-4">
             <Image
-              src="https://alatrade.kz/wp-content/uploads/2024/11/frame-1984014389.png"
-              alt="startup template"
+              src="/images/site/timeline-parts-catalog.jpg"
+              alt="Подбор запчастей по оригинальным каталогам"
               width={500}
               height={500}
               className="rounded-lg object-cover h-20 md:h-44 lg:h-90 w-full shadow-[0_0_24px_rgba(34,_42,_53,_0.06),_0_1px_1px_rgba(0,_0,_0,_0.05),_0_0_0_1px_rgba(34,_42,_53,_0.04),_0_0_4px_rgba(34,_42,_53,_0.08),_0_16px_68px_rgba(47,_48,_55,_0.05),_0_1px_0_rgba(255,_255,_255,_0.1)_inset]"
@@ -55,8 +55,8 @@ export function WorkWithUsComponent() {
             
             <div className="grid  gap-4">
             <Image
-              src="https://alatrade.kz/wp-content/uploads/2024/11/frame-1984014389.png"
-              alt="startup template"
+              src="/images/site/timeline-supplier.jpg"
+              alt="Склад запчастей для грузовиков"
               width={500}
               height={500}
               className="rounded-lg object-cover h-20 md:h-44 lg:h-90 w-full shadow-[0_0_24px_rgba(34,_42,_53,_0.06),_0_1px_1px_rgba(0,_0,_0,_0.05),_0_0_0_1px_rgba(34,_42,_53,_0.04),_0_0_4px_rgba(34,_42,_53,_0.08),_0_16px_68px_rgba(47,_48,_55,_0.05),_0_1px_0_rgba(255,_255,_255,_0.1)_inset]"
@@ -76,8 +76,8 @@ export function WorkWithUsComponent() {
            
             <div className="grid  gap-4">
             <Image
-              src="https://alatrade.kz/wp-content/uploads/2024/11/frame-1984014389.png"
-              alt="startup template"
+              src="/images/site/home-hero.jpg"
+              alt="Запчасти и расходники для грузовиков"
               width={500}
               height={500}
               className="rounded-lg object-cover h-20 md:h-44 lg:h-90 w-full shadow-[0_0_24px_rgba(34,_42,_53,_0.06),_0_1px_1px_rgba(0,_0,_0,_0.05),_0_0_0_1px_rgba(34,_42,_53,_0.04),_0_0_4px_rgba(34,_42,_53,_0.08),_0_16px_68px_rgba(47,_48,_55,_0.05),_0_1px_0_rgba(255,_255,_255,_0.1)_inset]"
@@ -97,8 +97,8 @@ export function WorkWithUsComponent() {
             
             <div className="grid  gap-4">
             <Image
-              src="https://alatrade.kz/wp-content/uploads/2024/11/frame-1984014389.png"
-              alt="startup template"
+              src="/images/site/timeline-support.jpg"
+              alt="Поддержка клиентов Euroline"
               width={500}
               height={500}
               className="rounded-lg object-cover h-20 md:h-44 lg:h-90 w-full shadow-[0_0_24px_rgba(34,_42,_53,_0.06),_0_1px_1px_rgba(0,_0,_0,_0.05),_0_0_0_1px_rgba(34,_42,_53,_0.04),_0_0_4px_rgba(34,_42,_53,_0.08),_0_16px_68px_rgba(47,_48,_55,_0.05),_0_1px_0_rgba(255,_255,_255,_0.1)_inset]"

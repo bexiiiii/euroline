@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useState } from "react";
-import ComponentCard from "@/components/common/ComponentCard";
 import ReturnsStats from "./ReturnsStats";
 import ReturnsToolbar from "./ReturnsToolbar";
 import ReturnsTable, { ReturnTableItem, ReturnStatusLabel } from "./ReturnsTable";
@@ -52,17 +51,16 @@ const ReturnsManagement: React.FC = () => {
 
       return {
         id: item.id,
-        returnNumber: `RET-${item.id.toString().padStart(6, "0")}`,
-        originalOrderNumber: item.orderId ? `ORD-${item.orderId}` : "—",
+        returnNumber: `№ ${item.id}`,
+        originalOrderNumber: item.orderId ? `№ ${item.orderId}` : "—",
         customer: {
-          name: item.customerId ? `ID ${item.customerId}` : "—",
+          name: item.customerId ? `Клиент ${item.customerId}` : "—",
           email: "",
           phone: "",
         },
         totalRefund: typeof item.amount === "number" ? item.amount : Number(item.amount ?? 0),
         status: label,
         statusCode,
-        returnType: "Частичный возврат",
         requestDate: item.createdAt,
         reason: item.reason || "",
       };
@@ -131,8 +129,10 @@ const ReturnsManagement: React.FC = () => {
       await loadReturns(page);
       setStatsRefreshToken((prev) => prev + 1);
       setIsProcessModalOpen(false);
+      showSuccess("Статус возврата обновлён");
     } catch (e) {
       console.error("Не удалось обновить статус возврата", e);
+      throw e instanceof Error && e.message ? e : new Error("Не удалось обновить статус возврата");
     }
   };
 
@@ -190,23 +190,28 @@ const ReturnsManagement: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <ReturnsStats refreshToken={statsRefreshToken.toString()} />
       <ReturnsToolbar onExport={handleExportReturns} onRefresh={handleRefreshReturns} />
-      <ComponentCard title="Список возвратов и запросов на возврат">
-        {error && <div className="text-red-600 text-sm p-2">{error}</div>}
-        <ReturnsTable
-          data={items}
-          loading={loading}
-          page={page}
-          pageSize={pageSize}
-          totalItems={totalElements}
-          totalPages={totalPages}
-          onPageChange={setPage}
-          onViewReturn={handleViewReturn}
-          onProcessReturn={handleProcessReturn}
-        />
-      </ComponentCard>
+      {error && (
+        <div className="flex items-center justify-between gap-3 rounded-lg bg-error-50 px-4 py-2.5 text-sm text-error-600 dark:bg-error-500/15 dark:text-error-500">
+          <span>Не удалось загрузить данные</span>
+          <button type="button" onClick={handleRefreshReturns} className="font-medium underline">
+            Повторить
+          </button>
+        </div>
+      )}
+      <ReturnsTable
+        data={items}
+        loading={loading}
+        page={page}
+        pageSize={pageSize}
+        totalItems={totalElements}
+        totalPages={totalPages}
+        onPageChange={setPage}
+        onViewReturn={handleViewReturn}
+        onProcessReturn={handleProcessReturn}
+      />
       <ViewReturnModal
         isOpen={isViewModalOpen}
         onClose={() => setIsViewModalOpen(false)}

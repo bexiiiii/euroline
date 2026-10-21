@@ -78,6 +78,9 @@ databaseChangeLog:
       file: db/changelog/changes/18-enhance-api-keys.sql
       relativeToChangelogFile: false
   - include:
+      file: db/changelog/changes/18a-create-admin-notifications.sql
+      relativeToChangelogFile: false
+  - include:
       file: db/changelog/changes/19-add-notification-fields.sql
       relativeToChangelogFile: false
   - include:
@@ -100,4 +103,46 @@ databaseChangeLog:
       relativeToChangelogFile: false
   - include:
       file: db/changelog/changes/26-extend-cml-orders-customer-details.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/27-add-product-inventory-columns.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/28-create-onec-events-integration.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/29-add-onec-stock-price-documents.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/30-create-incoming-onec-events-log.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/31-add-onec-order-fields.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/32-create-order-items.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/33-align-orders-with-entity.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/34-create-notifications-and-search-history.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/kaspi-pay-topups.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/35-create-onec-warehouses.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/36-create-banners-settings-error-logs.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/37-add-cart-item-warehouse.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/38-create-order-outbox.sql
+      relativeToChangelogFile: false
+  - include:
+      file: db/changelog/changes/39-order-comment-and-item-warehouse.sql
       relativeToChangelogFile: false

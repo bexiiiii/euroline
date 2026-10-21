@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import {
   Table,
@@ -12,7 +11,7 @@ import {
 } from "@/components/ui/table";
 
 import { Button } from "@/components/ui/button";
-import { Trash2, Minus, Plus, ShoppingCart } from "lucide-react";
+import { Trash2, Minus, Plus, ShoppingCart, ImageIcon } from "lucide-react";
 import { useCartStore } from "@/lib/stores/cartStore";
 
 type Row = {
@@ -23,6 +22,7 @@ type Row = {
   name?: string;
   quantity: number;
   price: number;
+  warehouseName?: string;
 }
 
 export default function CartTable() {
@@ -81,13 +81,19 @@ export default function CartTable() {
           {rows.map((product) => (
             <TableRow key={product.id}>
               <TableCell>
-                <Image
-                  src={product.image || 'https://via.placeholder.com/64'}
-                  alt={product.name ?? 'Изображение товара'}
-                  width={64}
-                  height={64}
-                  className="rounded object-cover w-16 h-16"
-                />
+                {product.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={product.image}
+                    alt={product.name ?? 'Изображение товара'}
+                    className="rounded object-cover w-16 h-16 bg-white"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded bg-white border border-gray-200 flex items-center justify-center">
+                    <ImageIcon className="w-6 h-6 text-gray-300" />
+                  </div>
+                )}
               </TableCell>
               <TableCell>{product.brand}</TableCell>
               <TableCell>{product.article}</TableCell>
@@ -111,7 +117,7 @@ export default function CartTable() {
                   </Button>
                 </div>
               </TableCell>
-              <TableCell>-</TableCell>
+              <TableCell>{product.warehouseName || '-'}</TableCell>
               <TableCell>-</TableCell>
               <TableCell>{product.price.toLocaleString()} ₸</TableCell>
               <TableCell>{(product.price * product.quantity).toLocaleString()} ₸</TableCell>

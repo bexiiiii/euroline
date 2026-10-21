@@ -1,10 +1,9 @@
 "use client";
-import React, { useEffect, useState } from "react";
-// import Chart from "react-apexcharts";
+import React, { useCallback, useEffect, useState } from "react";
 import { ApexOptions } from "apexcharts";
-import ChartTab from "../common/ChartTab";
 import dynamic from "next/dynamic";
 import { analyticsApi } from "@/lib/api/analytics";
+import WidgetError from "@/components/analytics/WidgetError";
 
 // Dynamically import the ReactApexChart component
 const ReactApexChart = dynamic(() => import("react-apexcharts"), {
@@ -18,9 +17,11 @@ export default function StatisticsChart() {
     categories: [] as string[],
   });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = useCallback(async () => {
+      setLoading(true);
+      setError(null);
       try {
         const [salesData, revenueData] = await Promise.all([
           analyticsApi.getMonthlySales(),
@@ -65,19 +66,15 @@ export default function StatisticsChart() {
         setChartData({ sales, revenue, categories });
       } catch (error) {
         console.error("Failed to fetch statistics:", error);
-        // Fallback на пустые данные
-        const months = ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'];
-        setChartData({
-          sales: new Array(12).fill(0),
-          revenue: new Array(12).fill(0),
-          categories: months,
-        });
+        setError("Не удалось загрузить статистику");
       } finally {
         setLoading(false);
       }
-    };
-    fetchData();
   }, []);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const options: ApexOptions = {
     legend: {
@@ -88,7 +85,7 @@ export default function StatisticsChart() {
     colors: ["#465FFF", "#9CB9FF"], // Define line colors
     chart: {
       fontFamily: "Outfit, sans-serif",
-      height: 310,
+      height: 280,
       type: "line", // Set the chart type to 'line'
       toolbar: {
         show: false, // Hide chart toolbar
@@ -131,9 +128,6 @@ export default function StatisticsChart() {
     },
     tooltip: {
       enabled: true, // Enable tooltip
-      x: {
-        format: "dd MMM yyyy", // Format for x-axis tooltip
-      },
     },
     xaxis: {
       type: "category", // Category-based x-axis
@@ -175,33 +169,25 @@ export default function StatisticsChart() {
     },
   ];
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-5 pb-5 pt-5 dark:border-gray-800 dark:bg-white/[0.03] sm:px-6 sm:pt-6">
-      <div className="flex flex-col gap-5 mb-6 sm:flex-row sm:justify-between">
-                <div className="w-full">
-          <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            Статистика
-          </h3>
-          <p className="mt-1 text-gray-500 text-theme-sm dark:text-gray-400">
-            Целевые показатели за каждый месяц
-          </p>
-        </div>
-        <div className="flex items-start w-full gap-3 sm:justify-end">
-          <ChartTab />
-        </div>
-      </div>
+    <div className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-white/[0.03]">
+      <h3 className="text-base font-semibold text-gray-800 dark:text-white/90">
+        Продажи и выручка
+      </h3>
 
       <div className="max-w-full overflow-x-auto custom-scrollbar">
         {loading ? (
-          <div className="flex items-center justify-center h-[310px]">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+          <div className="flex items-center justify-center h-[280px]">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
           </div>
+        ) : error ? (
+          <WidgetError message={error} onRetry={fetchData} className="h-[280px] py-0" />
         ) : (
-          <div className="min-w-[1000px] xl:min-w-full">
+          <div className="min-w-[700px] xl:min-w-full">
             <ReactApexChart
               options={options}
               series={series}
               type="area"
-              height={310}
+              height={280}
             />
           </div>
         )}

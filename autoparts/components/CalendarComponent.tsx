@@ -9,10 +9,8 @@ import {
   CalendarHeading,
   RangeCalendar,
 } from "@/components/ui/calendar"
-import {
-  DatePickerContent,
-  DateRangePicker,
-} from "@/components/ui/date-range-picker"
+import { DateRangePicker } from "@/components/ui/date-range-picker"
+import { Dialog as AriaDialog, Popover as AriaPopover } from "react-aria-components"
 import { DateInput } from "@/components/ui/datefield"
 import { FieldGroup } from "@/components/ui/field"
 import { useState } from "react"
@@ -54,8 +52,14 @@ export function CalendarComponent({
         </Button>
       </FieldGroup>
 
-      {open && (
-         <DatePickerContent className="absolute z-50 mt-2 bg-white shadow-lg rounded-md border">
+      {/* Поповер react-aria рендерится в портал у body: внутри карточки с overflow
+          календарь больше не обрезается, позиция считается от поля дат. */}
+      <AriaPopover
+        placement="bottom start"
+        offset={8}
+        className="z-50 rounded-md border bg-white p-3 shadow-lg"
+      >
+        <AriaDialog className="outline-none">
           <RangeCalendar>
             <CalendarHeading />
             <CalendarGrid>
@@ -67,8 +71,8 @@ export function CalendarComponent({
               </CalendarGridBody>
             </CalendarGrid>
           </RangeCalendar>
-        </DatePickerContent>
-      )}
+        </AriaDialog>
+      </AriaPopover>
     </DateRangePicker>
   )
 }

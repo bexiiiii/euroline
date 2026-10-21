@@ -1,7 +1,6 @@
 "use client"
 
 import { cn } from "@/lib/utils"
-import Image from "next/image"
 
 interface AuthorCardProps {
   className?: string
@@ -24,31 +23,33 @@ export const AuthorCard = ({
   content
 }: AuthorCardProps) => {
   return (
-    <div className="max-w-xs w-full group/card">
+    <div className="w-full group/card">
       <div
         className={cn(
-          "cursor-pointer overflow-hidden relative card h-96 rounded-md  max-w-sm mx-auto flex flex-col justify-between p-4 bg-cover",
+          "cursor-pointer overflow-hidden relative h-96 rounded-xl flex flex-col justify-between p-5 bg-gray-900",
           className
         )}
-        style={{ backgroundImage: `url(${backgroundImage})` }}
       >
-        <div className="absolute w-full h-full top-0 left-0 transition duration-300 group-hover/card:bg-black opacity-60" />
-        <div className="flex flex-row items-center space-x-4 z-10">
-         
-          <div className="flex flex-col">
-            <p className="font-normal text-base text-gray-50 relative z-10">
-              {author.name}
-            </p>
-            {author.readTime && (
-              <p className="text-sm text-gray-400">{author.readTime}</p>
-            )}
-          </div>
+        {/* Фото масштабируется отдельно от текста, чтобы при наведении не дёргалась вёрстка. */}
+        <div
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover/card:scale-105"
+          style={{ backgroundImage: `url(${backgroundImage})` }}
+        />
+        {/* Постоянное затемнение: без него текст не читается на светлых фото. */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/40 to-black/85 transition-colors duration-300 group-hover/card:bg-black/20" />
+        <div className="relative z-10 flex flex-col">
+          <p className="font-medium text-sm text-white/90">
+            {author.name}
+          </p>
+          {author.readTime && (
+            <p className="text-xs text-white/70">{author.readTime}</p>
+          )}
         </div>
-        <div className="text content">
-          <h1 className="font-bold text-xl md:text-2xl text-gray-50 relative z-10">
+        <div className="relative z-10">
+          <h3 className="font-bold text-lg md:text-xl leading-snug text-white line-clamp-3">
             {content.title}
-          </h1>
-          <p className="font-normal text-sm text-gray-50 relative z-10 my-4">
+          </h3>
+          <p className="mt-2 font-normal text-sm leading-relaxed text-white/85 line-clamp-3">
             {content.description}
           </p>
         </div>

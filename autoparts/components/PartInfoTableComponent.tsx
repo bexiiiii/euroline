@@ -17,7 +17,7 @@ export function PartInfoTableComponent() {
     { label: "Длина", value: "320 мм" },
     { label: "Высота", value: "90 мм" },
     { label: "Ширина", value: "110 мм" },
-    { label: "Код Alatrade", value: "21707132_VO" },
+    { label: "Код Euroline", value: "21707132_VO" },
     { label: "Код аналога", value: "KA502664" },
     { label: "Заменена", value: "477556" },
     { label: "Применимость авто", value: "Volvo FH12., FORD Cargo" },
