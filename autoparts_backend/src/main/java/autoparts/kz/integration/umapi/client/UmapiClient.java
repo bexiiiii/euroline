@@ -40,16 +40,6 @@ public class UmapiClient {
                 new ParameterizedTypeReference<com.fasterxml.jackson.databind.JsonNode>() {}, "Failed to fetch article details");
     }
 
-    public com.fasterxml.jackson.databind.JsonNode getCommercialVehicleDetails(long id) {
-        return getAutocatalog("/CommercialVehicle/{id}", Map.of("id", id),
-                new ParameterizedTypeReference<com.fasterxml.jackson.databind.JsonNode>() {}, "Failed to fetch vehicle type");
-    }
-
-    public com.fasterxml.jackson.databind.JsonNode getAxleDetails(long id) {
-        return getAutocatalog("/Axle/{id}", Map.of("id", id),
-                new ParameterizedTypeReference<com.fasterxml.jackson.databind.JsonNode>() {}, "Failed to fetch axle type");
-    }
-
     public com.fasterxml.jackson.databind.JsonNode getOeCandidates(String number, int offset) {
         return getAutocatalog("/Analogs/{number}?OENumber=true&ArticleNumber=false&TradeNumber=false&EAN=false&IAMNumber=false&limit=100&offset={offset}&Products=true&Criterias=true",
                 Map.of("number", number, "offset", offset),

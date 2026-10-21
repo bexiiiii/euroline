@@ -188,7 +188,7 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
       return response.analogsLoading ?? false;
     } catch {
       if (revision === searchRevision) set({ analogsLoading: false,
-        warnings: [...get().warnings, 'Не удалось догрузить замены и применяемость. Повторите поиск позже.'] });
+        warnings: [...get().warnings, 'Не удалось догрузить замены по OE. Повторите поиск позже.'] });
       return false;
     }
   },

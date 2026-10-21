@@ -1,12 +1,5 @@
 import type { SearchItem } from './api/search';
 
-// Fail closed: older/unclassified payloads are never treated as confirmed trucks.
-export function segmentAnalogs(items: SearchItem[], unconfirmed = false): SearchItem[] {
-  return items.filter(item => item.catalog === 'UMAPI_ANALOG' && (unconfirmed
-    ? item.vehicleSegment !== 'TRUCK_TRAILER' && item.vehicleSegment !== 'NON_TARGET'
-    : item.vehicleSegment === 'TRUCK_TRAILER'));
-}
-
 export const partIdentity = (item: SearchItem) =>
   `${item.oem.replace(/[\s.\-/]/g, '').toUpperCase()}|${item.brand.trim().replace(/\s+/g, ' ').toUpperCase()}`;
 

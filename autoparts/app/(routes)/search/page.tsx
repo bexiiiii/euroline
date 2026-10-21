@@ -11,7 +11,7 @@ import PaginationButton from "@/components/PaginationWithPrimaryButton";
 import { searchKey, useSearchStore } from "@/lib/stores/searchStore";
 import { useCartStore } from "@/lib/stores/cartStore";
 import { SearchItem } from "@/lib/api/search";
-import { availableQuantity, partIdentity, sortParts, segmentAnalogs } from "@/lib/searchResults";
+import { availableQuantity, partIdentity, sortParts } from "@/lib/searchResults";
 import { resolveProductImageUrl } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
@@ -83,10 +83,6 @@ function PartCard({ item, primary = false }: { item: SearchItem; primary?: boole
         {!primary && <p className="mt-1 text-xs text-slate-500">{item.analogSource === "UMAPI_SHARED_OE"
           ? `Замена по общему OE: ${(item.oeNumbers ?? []).slice(0, 3).join(", ")}`
           : `Кросс каталога ${item.analogSource || "поставщика"}`} · применяемость требует проверки</p>}
-        {!primary && <p className={`mt-1 text-xs ${item.vehicleSegment === "TRUCK_TRAILER" ? "text-green-700" : "text-amber-700"}`}>
-          {item.vehicleSegment === "TRUCK_TRAILER" ? "Грузовики / прицепы — по данным каталога" : item.vehicleSegment === "PENDING" ? "Проверяем тип транспорта…" : "Тип транспорта не подтверждён"}
-          {item.vehicleSegmentReason && <span className="block text-slate-500">{item.vehicleSegmentReason}</span>}
-        </p>}
       </div>
       <span className={stock && stock > 0 ? "text-sm font-medium text-green-700" : "text-sm text-slate-500"}>{quantityLabel(stock)}</span>
     </div>
@@ -109,7 +105,6 @@ function SearchPage() {
   const analogBrand = params.get("analogBrand") ?? "";
   const sort = params.get("sort") === "price" ? "price" : "stock";
   const photoOnly = params.get("photo") === "1";
-  const unconfirmed = params.get("segment") === "unconfirmed";
 
   useEffect(() => {
     if (!q.trim()) { clearResults(); return; }
@@ -128,7 +123,7 @@ function SearchPage() {
       if (++attempts >= 60) {
         const state = useSearchStore.getState();
         if (state.lastSearchKey === requestKey) useSearchStore.setState({ analogsLoading: false,
-          warnings: [...state.warnings, 'Подбор замен и проверка применяемости продолжаются на сервере. Повторите поиск немного позже.'] });
+          warnings: [...state.warnings, 'Подбор OE продолжается на сервере. Повторите поиск немного позже.'] });
         return;
       }
       timer = setTimeout(poll, 2500);
@@ -144,13 +139,10 @@ function SearchPage() {
     router.replace(`/search?${next}`, { scroll: false });
   };
   const primary = sortParts(results.filter(item => item.catalog !== "UMAPI_ANALOG"), sort);
-  const inSegment = segmentAnalogs(results, unconfirmed);
-  const confirmedCount = segmentAnalogs(results).length;
-  const unconfirmedCount = segmentAnalogs(results, true).length;
-  const analogs = sortParts(inSegment
+  const analogs = sortParts(results.filter(item => item.catalog === "UMAPI_ANALOG")
     .filter(item => !analogBrand || item.brand === analogBrand)
     .filter(item => !photoOnly || !!item.imageUrl), sort);
-  const analogBrands = [...new Set([...inSegment.map(item => item.brand), ...(analogBrand ? [analogBrand] : [])])].sort();
+  const analogBrands = [...new Set(results.filter(item => item.catalog === "UMAPI_ANALOG").map(item => item.brand))].sort();
   const paged = selectionRequired ? primary : analogs;
   const totalPages = Math.max(1, Math.ceil(paged.length / PAGE_SIZE));
   const requestedPage = Number(params.get("page") ?? "1");
@@ -194,17 +186,9 @@ function SearchPage() {
             </section>}
             {selectedBrand && <section className="mt-8">
               <div className="rounded-xl border border-orange-200 bg-orange-50 p-5">
-                <h2 className="text-lg font-semibold">{unconfirmed ? "Неподтверждённые замены" : "Грузовики и прицепы"} ({analogs.length})</h2>
-                <div className="mt-3 flex flex-wrap gap-2" aria-label="Тип транспорта аналогов">
-                  <button type="button" aria-pressed={!unconfirmed} onClick={() => setFilter("segment", "")}
-                    className={`rounded-lg border px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-600 ${!unconfirmed ? "border-orange-500 bg-orange-500 text-white" : "border-slate-300 bg-white text-slate-700"}`}>Грузовики и прицепы ({confirmedCount})</button>
-                  <button type="button" aria-pressed={unconfirmed} onClick={() => setFilter("segment", "unconfirmed")}
-                    className={`rounded-lg border px-3 py-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-600 ${unconfirmed ? "border-orange-500 bg-orange-500 text-white" : "border-slate-300 bg-white text-slate-700"}`}>Неподтверждённые ({unconfirmedCount})</button>
-                </div>
-                {analogsLoading && <p role="status" className="mt-2 text-sm text-orange-700">Автоматически подбираем замены и проверяем тип транспорта…</p>}
-                <p className="mt-2 text-sm text-slate-600">Для {selectedBrand} {selectedArticle}. {unconfirmed
-                  ? "У этих деталей не хватает данных о типе транспорта. Они могут не подходить для грузовика — проверьте применяемость перед заказом."
-                  : "Показаны детали с подтверждённой в каталоге грузовой или прицепной применяемостью. Совместимость с вашей моделью и комплектацией проверяйте перед заказом."}</p>
+                <h2 className="text-lg font-semibold">Возможные замены ({analogs.length})</h2>
+                {analogsLoading && <p role="status" className="mt-2 text-sm text-orange-700">Автоматически подбираем дополнительные замены по OE…</p>}
+                <p className="mt-2 text-sm text-slate-600">Для {selectedBrand} {selectedArticle}. Проверьте применяемость и комплектацию перед заказом. Грузовая применяемость пока не подтверждена для всех позиций.</p>
                 <div className="mt-4 flex flex-wrap items-end gap-4">
                   <label className="grid gap-1 text-xs text-slate-600">Бренд замены<select className={fieldClass} value={analogBrand} onChange={e => setFilter("analogBrand", e.target.value)}>
                     <option value="">Все бренды</option>{analogBrands.map(value => <option key={value}>{value}</option>)}
@@ -216,7 +200,7 @@ function SearchPage() {
                 </div>
               </div>
               <div className="mt-4 space-y-3">{visible.map(item => <PartCard key={partIdentity(item)} item={item} />)}</div>
-              {!analogs.length && <p role="status" className="py-8 text-center text-slate-500">{analogBrand || photoOnly ? "Нет замен с выбранными фильтрами. Можно сменить бренд или открыть неподтверждённые." : analogsLoading ? "Проверка ещё идёт. Подтверждённые детали появятся автоматически." : unconfirmed ? "Неподтверждённых замен нет." : "Подтверждённые грузовые и прицепные замены не найдены. Посмотрите неподтверждённые — там позиции без достаточных данных каталога."}</p>}
+              {!analogs.length && <p className="py-8 text-center text-slate-500">{analogBrand || photoOnly ? "Нет замен с выбранными фильтрами." : "В загруженных данных замены не найдены. Можно уточнить подбор у менеджера."}</p>}
             </section>}
           </>}
           {!results.length && detectedType !== "VIN" && <p className="py-12 text-center text-slate-500">{q ? "Ничего не найдено. Проверьте артикул или попробуйте поиск по названию." : "Введите артикул для поиска."}</p>}

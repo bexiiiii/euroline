@@ -15,7 +15,6 @@ import autoparts.kz.integration.umapi.dto.BrandRefinementDto;
 import autoparts.kz.integration.umapi.dto.AnalogDto;
 import autoparts.kz.integration.umapi.service.UmapiIntegrationService;
 import autoparts.kz.integration.umapi.service.AutomaticAnalogService;
-import autoparts.kz.integration.umapi.service.TruckFitmentService;
 import autoparts.kz.common.util.ArticleNormalizationUtil;
 
 import lombok.RequiredArgsConstructor;
@@ -40,7 +39,6 @@ public class MainSearchService {
     private final ProductRepository productRepository;
     private final JdbcTemplate jdbcTemplate;
     private final AutomaticAnalogService automaticAnalogs;
-    private final TruckFitmentService truckFitment;
 
     // VIN - точно 17 символов, без букв I, O, Q (расширенный паттерн)
     private static final Pattern VIN = Pattern.compile("^[A-HJ-NPR-Z0-9]{17}$", Pattern.CASE_INSENSITIVE);
@@ -356,17 +354,6 @@ private static final Pattern STRICT_OEM = Pattern.compile("^[A-Z0-9\\-\\.\\/]{5,
         List<Product> products = productRepository.findAllByNormalizedArticleIn(codes);
         List<SearchResponse.Item> results = new ArrayList<>(items.values());
         enrichIdentifiedParts(results, products, resp);
-        for (SearchResponse.Item item : results) {
-            if (!"UMAPI_ANALOG".equals(item.getCatalog())) continue;
-            var fitment = truckFitment.lookup(item.getOem(), item.getBrand());
-            if (fitment == null) { item.setVehicleSegment("UNKNOWN"); continue; }
-            item.setVehicleSegment(fitment.status());
-            item.setVehicleSegmentReason(fitment.reason());
-            item.setVehicleSegmentEvidence(fitment.evidence());
-            if ("PENDING".equals(fitment.status())) resp.setAnalogsLoading(true);
-        }
-        // Unconfirmed candidates remain available separately. Known non-target analogs never leak into either tab.
-        results.removeIf(item -> "UMAPI_ANALOG".equals(item.getCatalog()) && "NON_TARGET".equals(item.getVehicleSegment()));
         resp.setResults(results);
         return resp;
     }

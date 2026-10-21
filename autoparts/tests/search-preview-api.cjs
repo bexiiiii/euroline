@@ -21,8 +21,6 @@ http.createServer((req, res) => {
       results: selected ? [primary(selected), ...Array.from({ length: 23 }, (_, i) => ({
         oem: `TEST-${i}`, brand: i % 2 ? 'TEST-B' : 'TEST-A', name: 'Тестовая возможная замена',
         catalog: 'UMAPI_ANALOG', analogSource: 'UMAPI', compatibilityStatus: 'UNVERIFIED', quantity: i,
-        vehicleSegment: i < 20 ? 'TRUCK_TRAILER' : 'UNKNOWN',
-        vehicleSegmentReason: 'Синтетический тест применяемости',
       }))] : [primary('AIC'), primary('AUGER')] };
     res.end(JSON.stringify(result)); return;
   }
