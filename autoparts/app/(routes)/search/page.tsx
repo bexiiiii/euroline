@@ -188,13 +188,13 @@ function SearchPage() {
               <div className="rounded-xl border border-orange-200 bg-orange-50 p-5">
                 <h2 className="text-lg font-semibold">Возможные замены ({analogs.length})</h2>
                 {analogsLoading && <p role="status" className="mt-2 text-sm text-orange-700">Автоматически подбираем дополнительные замены по OE…</p>}
-                <p className="mt-2 text-sm text-slate-600">Для {selectedBrand} {selectedArticle}. Проверьте применяемость и комплектацию перед заказом. Грузовая применяемость пока не подтверждена для всех позиций.</p>
+                <p className="mt-2 text-sm text-slate-600">Для {selectedBrand} {selectedArticle}. Проверьте применяемость и комплектацию перед заказом.</p>
                 <div className="mt-4 flex flex-wrap items-end gap-4">
                   <label className="grid gap-1 text-xs text-slate-600">Бренд замены<select className={fieldClass} value={analogBrand} onChange={e => setFilter("analogBrand", e.target.value)}>
                     <option value="">Все бренды</option>{analogBrands.map(value => <option key={value}>{value}</option>)}
                   </select></label>
                   <label className="grid gap-1 text-xs text-slate-600">Порядок<select className={fieldClass} value={sort} onChange={e => setFilter("sort", e.target.value)}>
-                    <option value="stock">Сначала больше в наличии</option><option value="price">Сначала дешевле</option>
+                    <option value="stock">В наличии, затем А–Я</option><option value="price">Сначала дешевле</option>
                   </select></label>
                   <label className="flex items-center gap-2 py-2 text-sm"><input type="checkbox" checked={photoOnly} onChange={e => setFilter("photo", e.target.checked ? "1" : "")} />С фотографиями</label>
                 </div>

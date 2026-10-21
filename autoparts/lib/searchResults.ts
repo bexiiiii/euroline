@@ -11,6 +11,7 @@ export function availableQuantity(item: SearchItem): number | null {
 }
 
 export function sortParts(items: SearchItem[], sort: string): SearchItem[] {
+  const alphabetical = new Intl.Collator('ru', { sensitivity: 'base', numeric: true });
   return [...items].sort((a, b) => {
     const aq = availableQuantity(a) ?? -1;
     const bq = availableQuantity(b) ?? -1;
@@ -20,7 +21,10 @@ export function sortParts(items: SearchItem[], sort: string): SearchItem[] {
       const ap = a.price != null && a.price > 0 ? a.price : Infinity;
       const bp = b.price != null && b.price > 0 ? b.price : Infinity;
       if (ap !== bp) return ap < bp ? -1 : 1;
-    } else if (aq !== bq) return bq - aq;
-    return partIdentity(a).localeCompare(partIdentity(b), 'ru');
+    }
+    // Stock is a yes/no priority. Quantity must not override alphabetical order within a group.
+    return alphabetical.compare(a.brand.trim(), b.brand.trim())
+      || alphabetical.compare(a.oem, b.oem)
+      || alphabetical.compare(a.name ?? '', b.name ?? '');
   });
 }
