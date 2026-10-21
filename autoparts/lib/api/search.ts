@@ -27,6 +27,9 @@ export interface SearchItem {
   onecRefKey?: string;
   analogSource?: string;
   compatibilityStatus?: 'UNVERIFIED' | 'VERIFIED';
+  vehicleSegment?: 'TRUCK_TRAILER' | 'NON_TARGET' | 'UNKNOWN' | 'PENDING';
+  vehicleSegmentReason?: string;
+  vehicleSegmentEvidence?: string[];
   imageUrl?: string;
   price?: number;
   currency?: string;

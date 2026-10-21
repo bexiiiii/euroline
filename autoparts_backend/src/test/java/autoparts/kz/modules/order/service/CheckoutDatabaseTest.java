@@ -143,7 +143,8 @@ class CheckoutDatabaseTest {
         var search = new autoparts.kz.modules.mainSearch.service.MainSearchService(
                 org.mockito.Mockito.mock(autoparts.kz.modules.vinLaximo.service.CatService.class),
                 org.mockito.Mockito.mock(autoparts.kz.modules.stockOneC.client.OneCClient.class), umapi, enrichment, products, jdbc,
-                org.mockito.Mockito.mock(autoparts.kz.integration.umapi.service.AutomaticAnalogService.class));
+                org.mockito.Mockito.mock(autoparts.kz.integration.umapi.service.AutomaticAnalogService.class),
+                org.mockito.Mockito.mock(autoparts.kz.integration.umapi.service.TruckFitmentService.class));
         var result = search.search("4410329212", null, "WABCO");
         assertEquals(productId, result.getResults().get(0).getProductId());
         assertEquals(1000, result.getResults().get(0).getQuantity());

@@ -20,8 +20,9 @@ class BrandSelectionSearchTest {
     final ProductRepository products = mock(ProductRepository.class);
     final ProductEnrichmentService enrichment = mock(ProductEnrichmentService.class);
     final AutomaticAnalogService automatic = mock(AutomaticAnalogService.class);
+    final autoparts.kz.integration.umapi.service.TruckFitmentService fitment = mock(autoparts.kz.integration.umapi.service.TruckFitmentService.class);
     final MainSearchService search = new MainSearchService(mock(CatService.class), mock(OneCClient.class),
-            umapi, enrichment, products, mock(JdbcTemplate.class), automatic);
+            umapi, enrichment, products, mock(JdbcTemplate.class), automatic, fitment);
 
     @BeforeEach void setup() {
         when(products.findAllByNormalizedArticleIn(anyList())).thenReturn(List.of());
@@ -40,6 +41,18 @@ class BrandSelectionSearchTest {
         assertEquals(2, result.getResults().size());
         verify(umapi, never()).getAnalogs(anyString(), anyString());
         verifyNoInteractions(automatic);
+    }
+    @Test void removesOnlyKnownNonTargetAnalogsAndRetainsUnknownSeparately() {
+        when(umapi.getAnalogs("71932", "AUGER")).thenReturn(List.of(cross("10001", "PC"), cross("10002", "TRUCK"), cross("10003", "MISSING")));
+        when(fitment.lookup("10001", "PC")).thenReturn(new autoparts.kz.integration.umapi.service.TruckFitmentService.Result("NON_TARGET", "passenger", List.of()));
+        when(fitment.lookup("10002", "TRUCK")).thenReturn(new autoparts.kz.integration.umapi.service.TruckFitmentService.Result("TRUCK_TRAILER", "truck", List.of("vehicle:1")));
+        when(fitment.lookup("10003", "MISSING")).thenReturn(new autoparts.kz.integration.umapi.service.TruckFitmentService.Result("PENDING", "checking", List.of()));
+        var result = search.search("71932", null, "AUGER");
+        assertTrue(result.isAnalogsLoading());
+        assertEquals(3, result.getResults().size());
+        assertTrue(result.getResults().stream().noneMatch(i -> "PC".equals(i.getBrand())));
+        assertEquals("TRUCK_TRAILER", result.getResults().stream().filter(i -> "TRUCK".equals(i.getBrand())).findFirst().orElseThrow().getVehicleSegment());
+        assertTrue(result.getResults().stream().anyMatch(i -> "AUGER".equals(i.getBrand())));
     }
     @Test void automaticOeMatchesMergeWithoutBorrowingPrimaryStockAndKeepEvidence() {
         when(automatic.lookup("71932", "AUGER")).thenReturn(new AutomaticAnalogService.Snapshot(List.of(

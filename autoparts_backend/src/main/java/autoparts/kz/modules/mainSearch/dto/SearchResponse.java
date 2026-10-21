@@ -37,6 +37,9 @@ public class SearchResponse {
         private String onecRefKey;
         private String analogSource;
         private String compatibilityStatus;
+        private String vehicleSegment;
+        private String vehicleSegmentReason;
+        private List<String> vehicleSegmentEvidence;
         private String oem;
         private String name;
         private String brand;

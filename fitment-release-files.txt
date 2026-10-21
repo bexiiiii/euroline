@@ -1,0 +1,14 @@
+autoparts_backend/src/main/java/autoparts/kz/integration/umapi/client/UmapiClient.java
+autoparts_backend/src/main/java/autoparts/kz/integration/umapi/service/TruckFitmentService.java
+autoparts_backend/src/main/java/autoparts/kz/modules/mainSearch/dto/SearchResponse.java
+autoparts_backend/src/main/java/autoparts/kz/modules/mainSearch/service/MainSearchService.java
+autoparts_backend/src/test/java/autoparts/kz/integration/umapi/service/TruckFitmentServiceTest.java
+autoparts_backend/src/test/java/autoparts/kz/integration/umapi/service/TruckFitmentLiveTest.java
+autoparts_backend/src/test/java/autoparts/kz/modules/mainSearch/service/BrandSelectionSearchTest.java
+autoparts_backend/src/test/java/autoparts/kz/modules/order/service/CheckoutDatabaseTest.java
+autoparts/lib/api/search.ts
+autoparts/lib/searchResults.ts
+autoparts/lib/stores/searchStore.ts
+autoparts/app/(routes)/search/page.tsx
+autoparts/tests/search-results.test.cjs
+autoparts/tests/search-preview-api.cjs
