@@ -10,6 +10,10 @@ public class AwsS3Properties {
 
     @NotBlank
     private String endpoint;
+    private String internalEndpoint;
+
+    public String getInternalEndpoint() { return internalEndpoint; }
+    public void setInternalEndpoint(String internalEndpoint) { this.internalEndpoint = internalEndpoint; }
 
     @NotBlank
     private String region;

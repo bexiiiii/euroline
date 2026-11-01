@@ -39,6 +39,8 @@ public class SearchResponse {
         private String compatibilityStatus;
         private String oem;
         private String name;
+        // Название из внешнего каталога (UMAPI), если наше название из 1С от него отличается.
+        private String catalogName;
         private String brand;
         private String catalog;
 

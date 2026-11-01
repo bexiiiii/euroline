@@ -37,7 +37,7 @@ type UiOrder = {
   comment: string
   routeLabel: string
   routeUrl: string | null
-  invoiceUrl: string
+  invoiceUrl: string | null
   status: string
 }
 
@@ -90,7 +90,8 @@ function mapOrder(o: OrderResponse): UiOrder {
     comment: o.comment || o.oneCComment || legacyComment(o.deliveryAddress) || '—',
     routeLabel: destination ? `${COMPANY.city} → ${o.customerCity?.trim() || destination}` : '—',
     routeUrl: destination ? routeUrl(destination) : null,
-    invoiceUrl: `/orders/${o.id}/invoice`,
+    // Накладная появляется только после подтверждения заказа
+    invoiceUrl: o.status === 'CONFIRMED' ? `/orders/${o.id}/invoice` : null,
     status: mapStatus(o.status),
   }
 }
@@ -290,6 +291,7 @@ const filteredOrders = useMemo(() => {
         )}
       </TableCell>
       <TableCell>
+        {order.invoiceUrl ? (
         <a
           href={order.invoiceUrl}
           target="_blank"
@@ -299,6 +301,11 @@ const filteredOrders = useMemo(() => {
         >
           <FileText size={18} />
         </a>
+        ) : (
+          <span className="flex items-center justify-center text-gray-300" title="Накладная будет доступна после подтверждения заказа">
+            <FileText size={18} />
+          </span>
+        )}
       </TableCell>
     </TableRow>
   ))}

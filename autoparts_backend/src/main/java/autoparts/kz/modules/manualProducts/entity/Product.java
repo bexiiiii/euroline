@@ -71,7 +71,16 @@ public class Product {
     @JsonIgnore
     private List<ProductProperty> properties = new ArrayList<>();
 
+    // Ленивую категорию не сериализуем: корзина/заказы отдают Product вне сессии Hibernate
+    // ("Could not initialize proxy ... no session"). Наружу — только categoryId.
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
+
+    /** id категории без загрузки прокси (getId у Hibernate-прокси не ходит в БД). */
+    @com.fasterxml.jackson.annotation.JsonProperty("categoryId")
+    public Long getCategoryIdForJson() {
+        return category == null ? null : category.getId();
+    }
 }

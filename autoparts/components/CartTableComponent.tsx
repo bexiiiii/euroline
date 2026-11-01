@@ -119,8 +119,9 @@ export default function CartTable() {
               </TableCell>
               <TableCell>{product.warehouseName || '-'}</TableCell>
               <TableCell>-</TableCell>
-              <TableCell>{product.price.toLocaleString()} ₸</TableCell>
-              <TableCell>{(product.price * product.quantity).toLocaleString()} ₸</TableCell>
+              {/* Цены нет (0 / не пришла из 1С) — «по запросу», а не «0 ₸» */}
+              <TableCell>{product.price > 0 ? `${product.price.toLocaleString()} ₸` : <span className="text-slate-500">по запросу</span>}</TableCell>
+              <TableCell>{product.price > 0 ? `${(product.price * product.quantity).toLocaleString()} ₸` : <span className="text-slate-500">—</span>}</TableCell>
               <TableCell>
                 <Button
                   variant="destructive"

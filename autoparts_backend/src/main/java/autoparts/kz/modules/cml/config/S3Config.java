@@ -19,11 +19,13 @@ public class S3Config {
 
     @Bean
     public S3Client s3Client(AwsS3Properties properties) {
-        log.info("Initializing S3 client for endpoint {}", properties.getEndpoint());
+        String endpoint = properties.getInternalEndpoint();
+        if (endpoint == null || endpoint.isBlank()) endpoint = properties.getEndpoint();
+        log.info("Initializing S3 client for endpoint {}", endpoint);
         return S3Client.builder()
                 .credentialsProvider(StaticCredentialsProvider.create(
                         AwsBasicCredentials.create(properties.getAccessKey(), properties.getSecretKey())))
-                .endpointOverride(URI.create(properties.getEndpoint()))
+                .endpointOverride(URI.create(endpoint))
                 .region(Region.of(properties.getRegion()))
                 .serviceConfiguration(S3Configuration.builder()
                         .pathStyleAccessEnabled(true)

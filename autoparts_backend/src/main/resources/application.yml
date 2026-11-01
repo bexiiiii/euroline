@@ -18,8 +18,8 @@ spring:
     lazy-initialization: false  
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 12MB
+      max-file-size: 100MB
+      max-request-size: 105MB
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://127.0.0.1:5432/eurolinecloud}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
@@ -161,6 +161,18 @@ security:
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 integration:
+  onec-orders:
+    enabled: ${ONEC_ORDERS_ENABLED:false}
+    url: ${ONEC_ORDERS_URL:}
+    username: ${ONEC_ORDERS_USERNAME:}
+    password: ${ONEC_ORDERS_PASSWORD:}
+    token: ${ONEC_EVENTS_TOKEN:}
+    ca-certificate: ${ONEC_ORDERS_CA_CERTIFICATE:}
+    organization-ref-key: ${ONEC_ORDER_ORGANIZATION_REF_KEY:}
+    warehouse-ref-key: ${ONEC_ORDER_WAREHOUSE_REF_KEY:}
+    odata-url: ${ONEC_ORDERS_ODATA_URL:}
+    currency-ref-key: ${ONEC_ORDER_CURRENCY_REF_KEY:}
+    created-after: ${ONEC_ORDERS_CREATED_AFTER:1970-01-01T00:00:00}
   kafka:
     enabled: false
   push:

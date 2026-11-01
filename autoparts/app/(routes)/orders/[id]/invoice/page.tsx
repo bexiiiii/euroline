@@ -86,6 +86,15 @@ export default function OrderInvoicePage() {
     return <div className="container mx-auto px-6 pt-32 pb-16 text-gray-500">Загрузка накладной...</div>
   }
 
+  if (order.status !== "CONFIRMED") {
+    return <div className="container mx-auto px-6 pt-32 pb-16">
+      <a href="/order-history" className="text-sm text-blue-600 hover:underline">← История заказов</a>
+      <p className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900">
+        Накладная будет доступна после подтверждения заказа менеджером.
+      </p>
+    </div>
+  }
+
   const number = (order.code || String(order.id)).toUpperCase()
   const receiver = order.customerName || order.customerEmail || ""
   const receiverAddress = customerAddressLine(order.customerCity, order.customerAddress)

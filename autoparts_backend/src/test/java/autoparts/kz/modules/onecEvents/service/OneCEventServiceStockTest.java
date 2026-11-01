@@ -39,7 +39,8 @@ class OneCEventServiceStockTest {
         jdbc = mock(JdbcTemplate.class);
         products = mock(ProductRepository.class);
         categories = mock(CategoryRepository.class);
-        service = new OneCEventService("token", jdbc, products, categories, mock(OrderRepository.class));
+        service = new OneCEventService("token", jdbc, products, categories, mock(OrderRepository.class), mapper,
+                mock(autoparts.kz.modules.pricing.CustomerPriceService.class));
         when(jdbc.update(anyString(), any(Object[].class))).thenReturn(1);
         when(jdbc.query(anyString(), any(PreparedStatementSetter.class), any(ResultSetExtractor.class)))
                 .thenReturn(new BigDecimal("93"));
@@ -91,9 +92,42 @@ class OneCEventServiceStockTest {
         service.accept(mapper.readValue(raw, OneCEventRequest.class), raw);
 
         verify(jdbc).update(contains("INSERT INTO onec_prices"),
-                eq(KNOWN), eq(PRICE_TYPE), eq(new BigDecimal("12500")), eq(ZERO), anyString());
+                eq(KNOWN), eq(PRICE_TYPE), eq(new BigDecimal("12500")), isNull(), anyString());
         assertEquals(12500, product.getPrice());
         verify(products).save(product);
+    }
+
+    @Test
+    void acceptsLegacyPriceRowsInsideRawString() throws Exception {
+        Product product = new Product();
+        when(products.findByOneCRefKey(KNOWN)).thenReturn(Optional.of(product));
+        String raw = """
+                {"eventId":"3390c33b-a645-41ec-b1cd-30c5d3804efb","eventType":"price.updated","entity":"price",
+                 "source":"ELP","data":{"raw":"[{\\\"НоменклатураRefKey\\\":\\\"%s\\\",\\\"ВидЦеныRefKey\\\":\\\"%s\\\",\\\"Цена\\\":4000,\\\"ВалютаRefKey\\\":\\\"%s\\\"}]"}}
+                """.formatted(KNOWN, PRICE_TYPE, ZERO);
+
+        service.accept(mapper.readValue(raw, OneCEventRequest.class), raw);
+
+        verify(jdbc).update(contains("INSERT INTO onec_prices"),
+                eq(KNOWN), eq(PRICE_TYPE), eq(new BigDecimal("4000")), isNull(), anyString());
+        assertEquals(4000, product.getPrice());
+        verify(products).save(product);
+    }
+
+    @Test
+    void storesCurrencyCodeInsteadOfOneCUuid() throws Exception {
+        Product product = new Product();
+        when(products.findByOneCRefKey(KNOWN)).thenReturn(Optional.of(product));
+        String raw = """
+                {"eventId":"a1a9f3af-bb1d-4a1c-b0d3-ec5248753551","eventType":"price.updated","entity":"price",
+                 "source":"ELP","data":[{"НоменклатураRefKey":"%s","ВидЦеныRefKey":"%s","Цена":4000,
+                 "ВалютаRefKey":"%s","currencyName":"KZT"}]}
+                """.formatted(KNOWN, PRICE_TYPE, ZERO);
+
+        service.accept(mapper.readValue(raw, OneCEventRequest.class), raw);
+
+        verify(jdbc).update(contains("INSERT INTO onec_prices"),
+                eq(KNOWN), eq(PRICE_TYPE), eq(new BigDecimal("4000")), eq("KZT"), anyString());
     }
 
     @Test
@@ -111,7 +145,7 @@ class OneCEventServiceStockTest {
         service.accept(mapper.readValue(raw, OneCEventRequest.class), raw);
 
         verify(jdbc).update(contains("INSERT INTO onec_prices"),
-                eq(KNOWN), eq(PRICE_TYPE), eq(new BigDecimal("12500")), eq(ZERO), anyString());
+                eq(KNOWN), eq(PRICE_TYPE), eq(new BigDecimal("12500")), isNull(), anyString());
         assertEquals(12500, product.getPrice());
         verify(products).save(product);
     }

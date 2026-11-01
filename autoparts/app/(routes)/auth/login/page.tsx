@@ -45,7 +45,9 @@ export default function LoginPage() {
       const success = await login(data.email, data.password)
       if (success) {
         toast.success("Вход выполнен успешно!")
-        router.push('/') // Перенаправляем на главную страницу
+        // Возврат туда, откуда пришли (например, к поиску после лимита гостя); только свои пути
+        const redirect = new URLSearchParams(window.location.search).get('redirect')
+        router.push(redirect && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/')
       } else {
         toast.error("Неверный email или пароль")
       }

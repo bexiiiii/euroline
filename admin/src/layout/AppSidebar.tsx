@@ -48,6 +48,7 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "Товары", path: "/products" },
       { name: "Категории и подкатегории", path: "/categories" },
+      { name: "Импорт PDF-каталога", path: "/catalog-import" },
     ],
   },
   {

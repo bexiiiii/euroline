@@ -8,22 +8,33 @@ import { RadixDropdownMenu } from "./ProfileDropDownComponent";
 import { ShoppingCart, ShoppingCartIcon } from "lucide-react";
 import { Customized } from "./PhoneHeader";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { useCartStore } from "@/lib/stores/cartStore";
+import { Suspense, useEffect } from "react";
+import { usePathname } from "next/navigation";
+import HeaderSearch from "./search/HeaderSearch";
 
 const Header = () => {
   const { isAuthenticated, user } = useAuthStore();
+  // На главной своя большая строка поиска (SearchSection), на остальных — поиск в шапке
+  const showSearch = usePathname() !== "/";
+  const cartCount = useCartStore((state) => state.items.length);
+  const loadCart = useCartStore((state) => state.load);
+  // Счётчик на иконке корзины: подтягиваем корзину после входа, дальше она обновляется при добавлении
+  useEffect(() => { if (isAuthenticated) void loadCart({ silent: true }); }, [isAuthenticated, loadCart]);
 
   return (
     <header className="fixed top-0 left-1/2 transform -translate-x-1/2 z-50 w-[100%] max-w-8xl bg-gray-900/95 backdrop-blur-sm  px-4">
-      <div className="container mx-auto px-6">
-        <nav className="flex items-center justify-between h-20 text-white">
-          <div className="flex items-center space-x-8">
+      <div className={showSearch ? "mx-auto w-full max-w-[1600px] md:px-6" : "container mx-auto px-6"}>
+        <nav className="flex items-center justify-between gap-3 md:gap-4 h-20 text-white">
+          <div className="flex shrink-0 items-center gap-8">
             <Link href="/" className="flex items-center gap-2 text-xl font-semibold hover:text-orange-500 transition-colors" aria-label="Euroline — на главную">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/euroline-logo.png" alt="" width={36} height={36} className="h-9 w-9" />
-              <span>Euroline</span>
+              <span className={showSearch ? "hidden sm:inline" : undefined}>Euroline</span>
             </Link>
             
-            <div className="hidden md:flex items-center space-x-6">
+            {/* С поиском в шапке ссылки помещаются только на широких экранах */}
+            <div className={`hidden items-center ${showSearch ? "xl:flex space-x-5" : "md:flex space-x-6"}`}>
               <Link href="/aboutus" className="hover:text-orange-500 transition-colors">
                 О нас
               </Link>
@@ -48,7 +59,15 @@ const Header = () => {
             </div>
           </div>
 
-          <div className="flex items-center space-x-4">
+          {showSearch && (
+            <div className="min-w-0 flex-1 xl:max-w-md">
+              <Suspense fallback={<div className="h-10" />}>
+                <HeaderSearch />
+              </Suspense>
+            </div>
+          )}
+
+          <div className={`flex shrink-0 items-center ${showSearch ? "space-x-1 md:space-x-4" : "space-x-4"}`}>
             {/* Показываем RadixDropdownMenu только если пользователь авторизован */}
             {isAuthenticated && user ? (
               <RadixDropdownMenu />
@@ -65,10 +84,15 @@ const Header = () => {
             
             <Link href="/cart">
               <button 
-                className="p-2 hover:text-orange-500 transition-colors"
-                aria-label="Корзина"
+                className="relative p-2 hover:text-orange-500 transition-colors"
+                aria-label={cartCount > 0 ? `Корзина, товаров: ${cartCount}` : "Корзина"}
               >
                 <ShoppingCartIcon />
+                {cartCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-bold leading-none text-white">
+                    {cartCount > 99 ? "99+" : cartCount}
+                  </span>
+                )}
               </button>
             </Link>
           </div>

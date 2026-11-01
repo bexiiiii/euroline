@@ -47,12 +47,15 @@ class CartOfferTest {
         assertThrows(IllegalArgumentException.class, () -> service.addOffer(1L, 9L, "main", 2));
         assertEquals(4, cart.getItems().get(0).getQuantity());
     }
-    @Test void missingPriceStockOrWrongWarehouseCannotBePurchased() {
+    @Test void missingStockOrWrongWarehouseCannotBePurchased() {
         assertThrows(IllegalArgumentException.class, () -> service.addOffer(1L, 9L, "unknown", 1));
-        data.setPrice(null);
-        assertThrows(IllegalArgumentException.class, () -> service.addOffer(1L, 9L, "main", 1));
         data.setPrice(10); data.setWarehouses(null);
         assertThrows(IllegalArgumentException.class, () -> service.addOffer(1L, 9L, "main", 1));
+    }
+    @Test void productWithoutPriceCanBeOrderedAndPriceIsLeftForManager() {
+        data.setPrice(null);
+        service.addOffer(1L, 9L, "main", 1);
+        assertNull(cart.getItems().get(0).getPrice());
     }
     @Test void updateIsScopedToOwnedCartLineAndRemovalDoesNotRequireAvailability() {
         service.addOffer(1L, 9L, "main", 2); cart.getItems().get(0).setId(123L);

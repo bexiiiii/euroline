@@ -76,9 +76,7 @@ public class CartService {
         }
         var data = enrichmentService.enrichProduct(item.getProduct())
                 .orElseThrow(() -> new IllegalArgumentException("Предложение больше недоступно. Повторите поиск."));
-        if (data.getPrice() == null || data.getPrice() <= 0) {
-            throw new IllegalArgumentException("Цена пока не подтверждена. Уточните её у менеджера.");
-        }
+        // Цена 0 / не пришла из 1С — заказывать можно, менеджер уточнит цену при подтверждении.
         if (item.getWarehouseRefKey() == null || item.getWarehouseRefKey().isBlank()) {
             throw new IllegalArgumentException("Выберите склад в результатах поиска");
         }
@@ -91,7 +89,7 @@ public class CartService {
         if (warehouse.getQuantity() == null || warehouse.getQuantity().compareTo(java.math.BigDecimal.valueOf(quantity)) < 0) {
             throw new IllegalArgumentException("Недостаточно товара на выбранном складе. Обновите поиск.");
         }
-        item.setPrice(java.math.BigDecimal.valueOf(data.getPrice()));
+        item.setPrice(data.getPrice() == null || data.getPrice() <= 0 ? null : java.math.BigDecimal.valueOf(data.getPrice()));
         item.setWarehouseName(warehouse.getWarehouseName() == null ? warehouse.getWarehouseGuid() : warehouse.getWarehouseName());
     }
 

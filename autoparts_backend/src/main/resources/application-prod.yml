@@ -20,8 +20,8 @@ spring:
       keepalive-time: 300000  # 5 минут keepalive
   servlet:
     multipart:
-      max-file-size: ${MULTIPART_MAX_FILE_SIZE:30MB}
-      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:32MB}
+      max-file-size: ${MULTIPART_MAX_FILE_SIZE:100MB} # PDF-каталоги поставщиков бывают 30+ МБ
+      max-request-size: ${MULTIPART_MAX_REQUEST_SIZE:105MB}
   jpa:
     hibernate:
       ddl-auto: none
@@ -161,6 +161,7 @@ app:
 aws:
   s3:
     endpoint: ${S3_ENDPOINT}
+    internal-endpoint: ${S3_INTERNAL_ENDPOINT:}
     region: ${S3_REGION:us-east-1}
     access-key: ${S3_ACCESS_KEY}
     secret-key: ${S3_SECRET_KEY}

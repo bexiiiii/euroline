@@ -7,8 +7,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 @Component
+@ConditionalOnProperty(prefix = "integration.onec-orders", name = "enabled", havingValue = "false", matchIfMissing = true)
 public class OrdersExportConsumer {
 
     private static final Logger log = LoggerFactory.getLogger(OrdersExportConsumer.class);

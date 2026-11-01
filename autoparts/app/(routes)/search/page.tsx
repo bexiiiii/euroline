@@ -1,97 +1,25 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ShoppingCart, ArrowRight, ArrowLeft } from "lucide-react";
-import { toast } from "sonner";
+import { ArrowRight, ArrowLeft } from "lucide-react";
 import { ActionSearchBar } from "@/components/ui/action-search-bar";
 import ProductPhoto from "@/components/ProductPhoto";
 import PaginationButton from "@/components/PaginationWithPrimaryButton";
 import { searchKey, useSearchStore } from "@/lib/stores/searchStore";
-import { useCartStore } from "@/lib/stores/cartStore";
+import GuestSearchLimitModal from "@/components/GuestSearchLimitModal";
+import SearchResultsGrid from "@/components/search/SearchResultsGrid";
+import PartHeader from "@/components/search/PartHeader";
+import SearchFilterBar, { type SearchFilters } from "@/components/search/SearchFilterBar";
 import { SearchItem } from "@/lib/api/search";
-import { availableQuantity, partIdentity, sortParts } from "@/lib/searchResults";
+import { availableQuantity, partIdentity, sortAnalogs, sortParts } from "@/lib/searchResults";
 import { resolveProductImageUrl } from "@/lib/utils";
 
 const PAGE_SIZE = 20;
-const fieldClass = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500";
 const partUrl = (item: SearchItem) => `/search?${new URLSearchParams({ q: item.oem, brand: item.brand })}`;
 const quantityLabel = (quantity: number | null) => quantity === null ? "Остаток не получен" : quantity > 0 ? `${quantity} шт` : "Нет в наличии";
-
-function Offers({ item }: { item: SearchItem }) {
-  const { addOffer } = useCartStore();
-  const [quantities, setQuantities] = useState<Record<string, string>>({});
-  const [pending, setPending] = useState<string | null>(null);
-  const warehouses = [...(item.warehouses ?? [])].sort((a, b) => (b.qty ?? -1) - (a.qty ?? -1));
-  const hasPrice = typeof item.price === "number" && item.price > 0;
-  const rows = warehouses.length ? warehouses : [{ code: "", name: "Склад не указан", address: "", qty: null, refKey: undefined }];
-
-  return <div className="overflow-x-auto">
-    <table className="w-full min-w-[650px] text-left text-sm">
-      <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-        <tr>{["Склад", "Доступно", "Цена", "Количество", "Действие"].map(label => <th key={label} className="px-4 py-3 font-medium">{label}</th>)}</tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100">
-        {rows.map((warehouse, index) => {
-          const key = warehouse.refKey ?? warehouse.code ?? String(index);
-          const stock = typeof warehouse.qty === "number" ? Math.max(0, warehouse.qty) : null;
-          const canOrder = !!item.productId && !!warehouse.refKey && stock !== null && stock > 0 && hasPrice;
-          const quantity = Number(quantities[key] ?? "1");
-          const validQuantity = Number.isInteger(quantity) && quantity > 0 && stock !== null && quantity <= stock;
-          const add = async () => {
-            if (!canOrder || !validQuantity || !item.productId || !warehouse.refKey) return;
-            setPending(key);
-            try {
-              await addOffer(item.productId, warehouse.refKey, quantity);
-              toast.success("Товар добавлен в корзину");
-            } catch (error) {
-              toast.error(error instanceof Error ? error.message : "Не удалось добавить товар");
-            } finally { setPending(null); }
-          };
-          return <tr key={key + index}>
-            <td className="px-4 py-3 text-slate-700">{warehouse.name || warehouse.code || "Склад не указан"}</td>
-            <td className="px-4 py-3"><span className={stock && stock > 0 ? "rounded bg-green-50 px-2 py-1 text-green-700" : "text-slate-500"}>{quantityLabel(stock)}</span></td>
-            <td className="px-4 py-3 whitespace-nowrap">{hasPrice ? `${new Intl.NumberFormat("ru-RU").format(item.price!)} ${item.currency || "₸"}` : "Цена по запросу"}</td>
-            <td className="px-4 py-3"><input aria-label={`Количество ${item.brand} ${item.oem}, ${warehouse.name}`}
-              className="w-20 rounded border border-slate-300 px-2 py-1.5 disabled:bg-slate-50" type="number"
-              min={1} max={stock ?? undefined} step={1} disabled={!canOrder || pending !== null}
-              value={quantities[key] ?? "1"} onChange={e => setQuantities(old => ({ ...old, [key]: e.target.value }))} /></td>
-            <td className="px-4 py-3">{canOrder
-              ? <button type="button" onClick={add} disabled={!validQuantity || pending !== null}
-                  className="inline-flex items-center gap-2 rounded-lg bg-orange-500 px-3 py-2 text-white hover:bg-orange-600 disabled:opacity-50">
-                  <ShoppingCart size={16} />{pending === key ? "Добавляем…" : "В корзину"}
-                </button>
-              : <Link href="/contacts" className="font-medium text-orange-600 hover:underline">{!hasPrice ? "Уточнить цену" : "Уточнить наличие"}</Link>}
-            </td>
-          </tr>;
-        })}
-      </tbody>
-    </table>
-  </div>;
-}
-
-function PartCard({ item, primary = false }: { item: SearchItem; primary?: boolean }) {
-  const stock = availableQuantity(item);
-  return <article className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-    <div className="flex items-start gap-4 px-4 py-4">
-      <ProductPhoto src={resolveProductImageUrl(item.imageUrl)} alt={item.name} />
-      <div className="min-w-0 flex-1">
-        {primary ? <h3 className="font-semibold text-slate-900">{item.brand} <span className="font-mono">{item.oem}</span></h3>
-          : <Link href={partUrl(item)} className="font-semibold text-slate-900 hover:text-orange-600">{item.brand} <span className="font-mono">{item.oem}</span></Link>}
-        <p className="mt-1 text-sm text-slate-600">{item.name}</p>
-        {!primary && <p className="mt-1 text-xs text-slate-500">{item.analogSource === "UMAPI_SHARED_OE"
-          ? `Замена по общему OE: ${(item.oeNumbers ?? []).slice(0, 3).join(", ")}`
-          : `Кросс каталога ${item.analogSource || "поставщика"}`} · применяемость требует проверки</p>}
-      </div>
-      <span className={stock && stock > 0 ? "text-sm font-medium text-green-700" : "text-sm text-slate-500"}>{quantityLabel(stock)}</span>
-    </div>
-    {primary ? <Offers item={item} /> : <details className="border-t border-slate-100">
-      <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-orange-600 hover:bg-orange-50">Склады и цены ({item.warehouses?.length || 0})</summary>
-      <Offers item={item} />
-    </details>}
-  </article>;
-}
 
 function SearchPage() {
   const params = useSearchParams();
@@ -102,9 +30,14 @@ function SearchPage() {
     selectedArticle, selectedBrand, warnings, detectedType, vehicle, analogsLoading, refreshAnalogs } = useSearchStore();
   const requestKey = searchKey(q, undefined, brand);
   const loading = isLoading || (!!q && requestKey !== lastSearchKey);
-  const analogBrand = params.get("analogBrand") ?? "";
-  const sort = params.get("sort") === "price" ? "price" : "stock";
-  const photoOnly = params.get("photo") === "1";
+  const filters: SearchFilters = {
+    brand: params.get("analogBrand") ?? "",
+    photo: params.get("photo") === "1",
+    inStock: params.get("stock") === "1",
+    minQty: params.get("minQty") ?? "",
+    sort: params.get("sort") === "price" ? "price" : "stock",
+  };
+  const { sort } = filters;
 
   useEffect(() => {
     if (!q.trim()) { clearResults(); return; }
@@ -132,17 +65,44 @@ function SearchPage() {
     return () => { cancelled = true; clearTimeout(timer); };
   }, [q, brand, requestKey, analogsLoading, loading, refreshAnalogs]);
 
-  const setFilter = (name: string, value: string) => {
+  // Предупреждения поиска — toast-уведомлением, а не плашкой; каждое один раз на запрос
+  const shownWarnings = useRef(new Set<string>());
+  useEffect(() => {
+    for (const message of warnings) {
+      const key = `${requestKey}::${message}`;
+      if (shownWarnings.current.has(key)) continue;
+      shownWarnings.current.add(key);
+      toast.warning(message);
+    }
+  }, [warnings, requestKey]);
+
+  const setFilters = (patch: Partial<SearchFilters>) => {
+    const merged = { ...filters, ...patch };
     const next = new URLSearchParams(params.toString());
-    if (value) next.set(name, value); else next.delete(name);
+    const put = (name: string, value: string) => { if (value) next.set(name, value); else next.delete(name); };
+    put("analogBrand", merged.brand);
+    put("photo", merged.photo ? "1" : "");
+    put("stock", merged.inStock ? "1" : "");
+    put("minQty", merged.minQty);
+    put("sort", merged.sort === "price" ? "price" : "");
     next.delete("page");
     router.replace(`/search?${next}`, { scroll: false });
   };
+  const minQty = Number(filters.minQty) || 0;
+  const passesStock = (item: SearchItem) => {
+    const qty = availableQuantity(item) ?? 0;
+    return (!filters.inStock || qty > 0) && qty >= minQty;
+  };
   const primary = sortParts(results.filter(item => item.catalog !== "UMAPI_ANALOG"), sort);
-  const analogs = sortParts(results.filter(item => item.catalog === "UMAPI_ANALOG")
-    .filter(item => !analogBrand || item.brand === analogBrand)
-    .filter(item => !photoOnly || !!item.imageUrl), sort);
-  const analogBrands = [...new Set(results.filter(item => item.catalog === "UMAPI_ANALOG").map(item => item.brand))].sort();
+  const allAnalogs = results.filter(item => item.catalog === "UMAPI_ANALOG");
+  const analogs = sortAnalogs(allAnalogs
+    .filter(item => !filters.brand || item.brand === filters.brand)
+    .filter(item => !filters.photo || !!item.imageUrl)
+    .filter(passesStock), sort);
+  const analogBrands = [...new Set(allAnalogs.map(item => item.brand))].sort();
+  const filtersActive = !!(filters.brand || filters.photo || filters.inStock || filters.minQty);
+  // Карточка сверху — именно выбранная деталь (бренд из запроса), а не первая строка списка
+  const headerItem = (selectedBrand && primary.find(item => item.brand.toUpperCase() === selectedBrand.toUpperCase())) || primary[0];
   const paged = selectionRequired ? primary : analogs;
   const totalPages = Math.max(1, Math.ceil(paged.length / PAGE_SIZE));
   const requestedPage = Number(params.get("page") ?? "1");
@@ -159,7 +119,6 @@ function SearchPage() {
         : error ? <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-5">
           <p>{error}</p><button className="mt-3 text-orange-700 underline" onClick={() => search(q, undefined, brand)}>Повторить поиск</button>
         </div> : <>
-          {warnings.map(message => <p role="status" key={message} className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">{message}</p>)}
           {detectedType === "VIN" && <div className="rounded-xl border p-6">{vehicle
             ? <Link href={`/catalogs/${vehicle.vehicleId}?${new URLSearchParams({ ssd: vehicle.ssd, catalog: vehicle.catalog, brand: vehicle.brand, name: vehicle.name })}`} className="text-orange-600">Открыть каталог {vehicle.brand} {vehicle.name}</Link>
             : <p>Автомобиль с VIN {q} не найден. Проверьте номер или выберите автомобиль в каталоге.</p>}</div>}
@@ -171,37 +130,17 @@ function SearchPage() {
               <tbody className="divide-y">{visible.map(item => <tr key={partIdentity(item)} className="hover:bg-slate-50">
                 <td className="px-4 py-3"><ProductPhoto src={resolveProductImageUrl(item.imageUrl)} alt={item.name} /></td>
                 <td className="px-4 py-3 font-semibold">{item.brand}</td><td className="px-4 py-3 font-mono">{item.oem}</td>
-                <td className="px-4 py-3">{item.name}</td><td className="px-4 py-3">{quantityLabel(availableQuantity(item))}</td>
+                <td className="px-4 py-3">{item.name}{item.catalogName && <span className="block text-xs text-slate-400">«{item.catalogName}»</span>}</td><td className="px-4 py-3">{quantityLabel(availableQuantity(item))}</td>
                 <td className="px-4 py-3"><Link href={partUrl(item)} className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg bg-orange-500 px-3 py-2 text-white hover:bg-orange-600">Цены и аналоги <ArrowRight size={16} /></Link></td>
               </tr>)}</tbody>
             </table></div>
-          </section> : <>
-            {selectedBrand && <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold">{selectedBrand} <span className="font-mono">{selectedArticle}</span></h2>
-              <Link href={`/search?q=${encodeURIComponent(selectedArticle || q)}`} className="inline-flex items-center gap-2 text-sm text-orange-600"><ArrowLeft size={16} />Выбрать другую деталь</Link>
-            </div>}
-            {!!primary.length && <section aria-label="Этот товар" className="space-y-3">
-              <h2 className="text-lg font-semibold">{selectedBrand ? "Этот товар" : "Найденные товары"}</h2>
-              {primary.map(item => <PartCard key={partIdentity(item)} item={item} primary />)}
-            </section>}
-            {selectedBrand && <section className="mt-8">
-              <div className="rounded-xl border border-orange-200 bg-orange-50 p-5">
-                <h2 className="text-lg font-semibold">Возможные замены ({analogs.length})</h2>
-                {analogsLoading && <p role="status" className="mt-2 text-sm text-orange-700">Автоматически подбираем дополнительные замены по OE…</p>}
-                <p className="mt-2 text-sm text-slate-600">Для {selectedBrand} {selectedArticle}. Проверьте применяемость и комплектацию перед заказом.</p>
-                <div className="mt-4 flex flex-wrap items-end gap-4">
-                  <label className="grid gap-1 text-xs text-slate-600">Бренд замены<select className={fieldClass} value={analogBrand} onChange={e => setFilter("analogBrand", e.target.value)}>
-                    <option value="">Все бренды</option>{analogBrands.map(value => <option key={value}>{value}</option>)}
-                  </select></label>
-                  <label className="grid gap-1 text-xs text-slate-600">Порядок<select className={fieldClass} value={sort} onChange={e => setFilter("sort", e.target.value)}>
-                    <option value="stock">В наличии, затем А–Я</option><option value="price">Сначала дешевле</option>
-                  </select></label>
-                  <label className="flex items-center gap-2 py-2 text-sm"><input type="checkbox" checked={photoOnly} onChange={e => setFilter("photo", e.target.checked ? "1" : "")} />С фотографиями</label>
-                </div>
-              </div>
-              <div className="mt-4 space-y-3">{visible.map(item => <PartCard key={partIdentity(item)} item={item} />)}</div>
-              {!analogs.length && <p className="py-8 text-center text-slate-500">{analogBrand || photoOnly ? "Нет замен с выбранными фильтрами." : "В загруженных данных замены не найдены. Можно уточнить подбор у менеджера."}</p>}
-            </section>}
+          </section> : !!results.length && <>
+            {headerItem && <PartHeader item={headerItem} brand={selectedBrand || headerItem.brand} article={selectedArticle || headerItem.oem}
+              backHref={selectedBrand ? `/search?q=${encodeURIComponent(selectedArticle || q)}` : undefined} />}
+            <SearchResultsGrid requested={primary} analogs={visible} analogsLoading={analogsLoading}
+              total={analogs.length}
+              toolbar={<SearchFilterBar filters={filters} brands={analogBrands} onChange={setFilters} />}
+              emptyAnalogsText={filtersActive ? "Нет аналогов с выбранными фильтрами." : "Аналоги не найдены. Можно уточнить подбор у менеджера."} />
           </>}
           {!results.length && detectedType !== "VIN" && <p className="py-12 text-center text-slate-500">{q ? "Ничего не найдено. Проверьте артикул или попробуйте поиск по названию." : "Введите артикул для поиска."}</p>}
           {totalPages > 1 && <div className="mt-6"><PaginationButton page={page} totalPages={totalPages} onPageChange={nextPage => {
@@ -215,5 +154,8 @@ function SearchPage() {
 }
 
 export default function SearchPageWrapper() {
-  return <Suspense fallback={<div className="py-16 text-center text-slate-500">Загрузка…</div>}><SearchPage /></Suspense>;
+  return <Suspense fallback={<div className="py-16 text-center text-slate-500">Загрузка…</div>}>
+    <SearchPage />
+    <GuestSearchLimitModal />
+  </Suspense>;
 }

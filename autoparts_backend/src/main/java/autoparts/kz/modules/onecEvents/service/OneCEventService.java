@@ -11,6 +11,7 @@ import autoparts.kz.modules.order.entity.OrderItem;
 import autoparts.kz.modules.order.orderStatus.OrderStatus;
 import autoparts.kz.modules.order.repository.OrderRepository;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,19 +49,25 @@ public class OneCEventService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
     private final OrderRepository orderRepository;
+    private final ObjectMapper objectMapper;
+    private final autoparts.kz.modules.pricing.CustomerPriceService customerPriceService;
 
     public OneCEventService(
             @Value("${onec.events.token:}") String bearerToken,
             JdbcTemplate jdbcTemplate,
             ProductRepository productRepository,
             CategoryRepository categoryRepository,
-            OrderRepository orderRepository
+            OrderRepository orderRepository,
+            ObjectMapper objectMapper,
+            autoparts.kz.modules.pricing.CustomerPriceService customerPriceService
     ) {
+        this.customerPriceService = customerPriceService;
         this.bearerToken = bearerToken;
         this.jdbcTemplate = jdbcTemplate;
         this.productRepository = productRepository;
         this.categoryRepository = categoryRepository;
         this.orderRepository = orderRepository;
+        this.objectMapper = objectMapper;
     }
 
     public void validateAuthorization(String authorization) {
@@ -313,6 +320,27 @@ public class OneCEventService {
         if (data == null || !(data.isObject() || data.isArray())) {
             throw badRequest("price.updated data must be an object or an array");
         }
+        // Older 1C extension builds send the register rows as a JSON string in
+        // data.raw. Accept that compatible representation as well as the native
+        // array contract, otherwise the prices arrive but are silently stored as
+        // a single empty "default" price row.
+        if (data.isObject() && data.path("raw").isTextual()) {
+            try {
+                JsonNode rawRows = objectMapper.readTree(data.path("raw").asText());
+                if (!rawRows.isArray()) {
+                    throw badRequest("price.updated data.raw must contain a JSON array");
+                }
+                for (JsonNode row : rawRows) {
+                    if (!row.isObject()) {
+                        throw badRequest("Each price.updated data.raw row must be an object");
+                    }
+                    applySinglePrice(row, event.refKey(), row.toString(), null);
+                }
+                return;
+            } catch (com.fasterxml.jackson.core.JsonProcessingException exception) {
+                throw badRequest("price.updated data.raw must contain valid JSON");
+            }
+        }
         if (data.isArray()) {
             for (JsonNode row : data) {
                 if (!row.isObject()) {
@@ -343,7 +371,9 @@ public class OneCEventService {
         String priceTypeRefKey = firstText(data, "default",
                 "priceTypeRefKey", "priceType", "price_type_ref_key", "ВидЦеныRefKey");
         BigDecimal amount = firstDecimal(data, "price", "amount", "value", "Цена");
-        String currency = firstText(data, null, "currencyRefKey", "currency", "currencyCode", "ВалютаRefKey");
+        // Store the display currency code (KZT), never its 36-character 1C UUID.
+        // The database column is intentionally short because it represents a code.
+        String currency = firstText(data, null, "currencyCode", "currencyName", "currency");
 
         jdbcTemplate.update(
                 "INSERT INTO onec_prices (product_ref_key, price_type_ref_key, amount, currency, payload, updated_at) " +
@@ -470,14 +500,16 @@ public class OneCEventService {
 
     private void applyStoredAvailability(Product product, String refKey) {
         BigDecimal price = jdbcTemplate.query(
-                "SELECT amount FROM onec_prices WHERE product_ref_key = ? AND amount IS NOT NULL " +
-                        "ORDER BY updated_at DESC LIMIT 1",
-                statement -> statement.setString(1, refKey),
+                "SELECT amount FROM onec_prices WHERE product_ref_key = ? AND price_type_ref_key = ? " +
+                        "AND amount > 0 ORDER BY updated_at DESC LIMIT 1",
+                statement -> {
+                    statement.setString(1, refKey);
+                    statement.setString(2, customerPriceService.retailPriceType());
+                },
                 resultSet -> resultSet.next() ? resultSet.getBigDecimal(1) : null
         );
-        if (price != null) {
-            product.setPrice(price.intValue());
-        }
+        // products.price — только розничная цена ("Прайс-лист"); нет её — цена по запросу.
+        product.setPrice(price == null ? null : price.intValue());
         BigDecimal stock = jdbcTemplate.query(
                 "SELECT COALESCE(SUM(quantity), 0) FROM onec_stocks WHERE product_ref_key = ?",
                 statement -> statement.setString(1, refKey),

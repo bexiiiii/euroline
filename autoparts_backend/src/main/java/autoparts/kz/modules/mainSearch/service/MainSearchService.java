@@ -226,7 +226,9 @@ private static final Pattern STRICT_OEM = Pattern.compile("^[A-Z0-9\\-\\.\\/]{5,
             return;
         }
 
-        if ((item.getName() == null || item.getName().isBlank()) && enrichment.getName() != null) {
+        if (enrichment.isOneCProduct()) {
+            preferLocalName(item, enrichment.getName());
+        } else if ((item.getName() == null || item.getName().isBlank()) && enrichment.getName() != null) {
             item.setName(enrichment.getName());
         }
         if ((item.getBrand() == null || item.getBrand().isBlank()) && enrichment.getBrand() != null) {
@@ -250,6 +252,21 @@ private static final Pattern STRICT_OEM = Pattern.compile("^[A-Z0-9\\-\\.\\/]{5,
                 && enrichment.getWarehouses() != null && !enrichment.getWarehouses().isEmpty()) {
             item.setWarehouses(convertWarehouses(enrichment.getWarehouses()));
         }
+    }
+
+    /**
+     * Товар из 1С показываем под нашим названием; название каталога (UMAPI) остаётся в catalogName,
+     * если оно есть и отличается.
+     */
+    static void preferLocalName(SearchResponse.Item item, String localName) {
+        if (localName == null || localName.isBlank()) return;
+        String external = item.getName();
+        String local = localName.trim();
+        if (external != null && !external.isBlank() && !external.trim().equalsIgnoreCase(local)
+                && !external.trim().equalsIgnoreCase(item.getOem())) {
+            item.setCatalogName(external.trim());
+        }
+        item.setName(local);
     }
 
     private List<SearchResponse.Warehouse> convertWarehouses(List<WarehouseStockDTO> warehouses) {

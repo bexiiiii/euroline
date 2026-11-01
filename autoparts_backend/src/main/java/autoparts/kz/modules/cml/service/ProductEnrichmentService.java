@@ -42,6 +42,7 @@ public class ProductEnrichmentService {
     private final CmlStockRepository cmlStockRepository;
     private final CmlPriceRepository cmlPriceRepository;
     private final NamedParameterJdbcTemplate namedJdbcTemplate;
+    private final autoparts.kz.modules.pricing.CustomerPriceService customerPriceService;
 
     /**
      * Обогатить данные о товаре по OEM.
@@ -121,7 +122,9 @@ public class ProductEnrichmentService {
             Integer price = product.getPrice();
             Integer stock = product.getStock();
 
-            String refKey = product.getOneCRefKey() == null ? null : product.getOneCRefKey().trim();
+            String refKey = product.getOneCRefKey() == null || product.getOneCRefKey().isBlank()
+                    ? null : product.getOneCRefKey().trim();
+            data.setOneCProduct(refKey != null);
             List<WarehouseStockDTO> oneCWarehouses = refKey == null
                     ? List.of()
                     : oneCStocksByRef.getOrDefault(refKey, List.of());
@@ -269,16 +272,18 @@ public class ProductEnrichmentService {
     }
 
     /**
-     * Последняя (по updated_at) ненулевая цена из onec_prices — так же, как OneCEventService.applyStoredAvailability.
+     * Цена из onec_prices по виду цены текущего клиента (опт / розница, см. CustomerPriceService).
+     * Раньше бралась последняя цена любого вида — так на витрину попадала приходная (закупочная).
      */
     private Map<String, BigDecimal> loadOneCPricesByRef(List<String> refKeys) {
         Map<String, BigDecimal> prices = new HashMap<>();
         try {
             namedJdbcTemplate.query(
                     "SELECT DISTINCT ON (product_ref_key) product_ref_key, amount FROM onec_prices " +
-                            "WHERE product_ref_key IN (:refKeys) AND amount IS NOT NULL " +
+                            "WHERE product_ref_key IN (:refKeys) AND price_type_ref_key = :priceType AND amount > 0 " +
                             "ORDER BY product_ref_key, updated_at DESC",
-                    new MapSqlParameterSource("refKeys", refKeys),
+                    new MapSqlParameterSource("refKeys", refKeys)
+                            .addValue("priceType", customerPriceService.currentPriceType()),
                     rs -> {
                         prices.put(rs.getString("product_ref_key"), rs.getBigDecimal("amount"));
                     }
@@ -346,5 +351,7 @@ public class ProductEnrichmentService {
         private String productCode;
         /** true, если цена/остатки взяты из onec_prices / onec_stocks (JSON-вебхук 1С). */
         private boolean fromOneCEvents;
+        /** true, если товар пришёл из 1С (есть onec_ref_key): его название главнее внешних каталогов. */
+        private boolean oneCProduct;
     }
 }

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { searchApi, SearchResponse, SearchItem, SearchVehicle, SearchApiError, OemApplicableVehicle, OemApplicabilityResponse } from '@/lib/api/search';
 import { toast } from 'sonner';
+import { addSearchHistory } from '@/lib/searchHistoryLocal';
 
 let inflightSearch: { key: string; promise: Promise<SearchResponse | null> } | null = null;
 let searchRevision = 0;
@@ -14,6 +15,9 @@ interface SearchState {
   results: SearchItem[];
   isLoading: boolean;
   error: string | null;
+  /** Гость исчерпал бесплатный поиск — показываем окно входа/регистрации */
+  guestLimitReached: boolean;
+  dismissGuestLimit: () => void;
   lastSearchKey: string | null;
   selectionRequired: boolean;
   selectedArticle: string | null;
@@ -55,6 +59,8 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
   query: '',
   isLoading: false,
   error: null,
+  guestLimitReached: false,
+  dismissGuestLimit: () => set({ guestLimitReached: false }),
   lastSearchKey: null,
   selectionRequired: false,
   selectedArticle: null,
@@ -117,6 +123,8 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
         const response = await searchApi.search(query.trim(), catalog, brand);
         if (revision !== searchRevision) return null;
 
+        // Любой выполненный поиск (строка поиска, шапка, ссылки, выбор бренда) — в историю
+        addSearchHistory(query);
         const newResults = response.results || []
         // cleanup selected brands that are not present in new results
         const presentBrands = new Set(newResults.map(r => r.brand).filter(Boolean))
@@ -156,15 +164,17 @@ export const useSearchStore = create<SearchState>()((set, get) => ({
         if (revision !== searchRevision) return null;
         console.error('Search failed:', error);
         const errorMessage = error instanceof SearchApiError ? error.message : 'Ошибка поиска';
+        const guestLimit = error instanceof SearchApiError && error.status === 429 && error.code === 'GUEST_SEARCH_LIMIT';
       
         set({
           error: errorMessage,
           isLoading: false,
           results: [],
-          vehicle: null
+          vehicle: null,
+          guestLimitReached: guestLimit,
         });
       
-        toast.error(errorMessage);
+        if (!guestLimit) toast.error(errorMessage);
         return null;
       }
     })();

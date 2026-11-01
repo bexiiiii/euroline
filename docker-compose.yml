@@ -69,7 +69,11 @@ services:
       REDIS_HOST: redis
       RABBIT_HOST: rabbitmq
       S3_ENDPOINT: ${S3_ENDPOINT}
+      # Signed S3 requests must retain their path; /storage rewrites it in nginx.
+      S3_INTERNAL_ENDPOINT: ${S3_INTERNAL_ENDPOINT:-http://rustfs:9000}
       KASPI_SIDECAR_URL: http://kaspi:3000
+    volumes:
+      - ./astra_ca.crt:/app/certs/astra_ca.crt:ro
     depends_on:
       postgres:
         condition: service_healthy

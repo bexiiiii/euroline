@@ -45,6 +45,7 @@ public class OrderService {
     private final autoparts.kz.modules.telegram.service.TelegramNotificationService telegramNotificationService;
     private final autoparts.kz.modules.cml.service.OneCBridgePublisher oneCBridgePublisher;
     private final UserRepository userRepository;
+    private final autoparts.kz.modules.cml.service.ProductEnrichmentService productEnrichmentService;
     
     // ✅ НОВОЕ: Конвертер для CommerceML интеграции
     private final autoparts.kz.modules.cml.service.OrderToCmlConverter orderToCmlConverter;
@@ -193,7 +194,16 @@ public class OrderService {
     }
 
     // Цена из CartItem (зафиксирована при добавлении), иначе из Product, иначе 0.
-    private static BigDecimal cartItemPrice(autoparts.kz.modules.cart.entity.CartItem cartItem) {
+    private BigDecimal cartItemPrice(autoparts.kz.modules.cart.entity.CartItem cartItem) {
+        // Товар из 1С: цена всегда с сервера по виду цены клиента (опт/розница) на момент заказа,
+        // а не та, что прислал браузер при добавлении в корзину.
+        var product = cartItem.getProduct();
+        if (product != null && product.getOneCRefKey() != null && !product.getOneCRefKey().isBlank()) {
+            Integer price = productEnrichmentService.enrichProduct(product)
+                    .map(autoparts.kz.modules.cml.service.ProductEnrichmentService.EnrichmentData::getPrice)
+                    .orElse(null);
+            return price == null || price <= 0 ? BigDecimal.ZERO : BigDecimal.valueOf(price.longValue());
+        }
         if (cartItem.getPrice() != null) {
             return cartItem.getPrice();
         }

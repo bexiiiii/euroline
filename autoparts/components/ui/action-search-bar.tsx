@@ -9,7 +9,7 @@ import {
     Clock,
     X,
 } from "lucide-react";
-import { v4 as uuidv4 } from "uuid";
+import { addSearchHistory, readSearchHistory, removeSearchHistory, subscribeSearchHistory } from "@/lib/searchHistoryLocal";
 import { useSearchStore } from "@/lib/stores/searchStore";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -69,27 +69,12 @@ function ActionSearchBar() {
         setQuery(urlQuery);
     }, [searchParams, setQuery]);
 
-    // Загрузка из localStorage при монтировании
+    // История общая для всего сайта (lib/searchHistoryLocal): читаем и следим за изменениями
     useEffect(() => {
-        const stored = localStorage.getItem("search-history");
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored);
-                const withDates = parsed.map((item: any) => ({
-                    ...item,
-                    timestamp: new Date(item.timestamp),
-                }));
-                setSearchHistory(withDates);
-            } catch (err) {
-                console.error("Ошибка при парсинге search-history", err);
-            }
-        }
+        const sync = () => setSearchHistory(readSearchHistory());
+        sync();
+        return subscribeSearchHistory(sync);
     }, []);
-
-    // Сохранение в localStorage при изменении истории
-    useEffect(() => {
-        localStorage.setItem("search-history", JSON.stringify(searchHistory));
-    }, [searchHistory]);
 
     // Professional debounced search - triggers only after user stops typing
     // Поиск только по Enter/выбору: авто-поиск при наборе тратил лимит запросов Laximo
@@ -174,7 +159,7 @@ function ActionSearchBar() {
 
     const removeFromHistory = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        setSearchHistory(prev => prev.filter(item => item.id !== id));
+        removeSearchHistory(id);
     };
 
     const formatTimestamp = (timestamp: Date) => {
@@ -192,26 +177,7 @@ function ActionSearchBar() {
         }
     };
 
-    const addToHistory = (query: string) => {
-        const normalized = query.trim();
-        if (!normalized) return;
-        setSearchHistory(prev => {
-            const existingIndex = prev.findIndex(item => item.query === normalized);
-            let updated = [...prev];
-
-            if (existingIndex !== -1) {
-                updated.splice(existingIndex, 1);
-            }
-
-            updated.unshift({
-                id: uuidv4(),
-                query: normalized,
-                timestamp: new Date(),
-            });
-
-            return updated.slice(0, 4);
-        });
-    };
+    const addToHistory = (query: string) => addSearchHistory(query);
 
     const handleFocus = () => {
         setSelectedItem(null);

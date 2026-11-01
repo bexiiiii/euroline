@@ -21,6 +21,8 @@ export interface SearchVehicle {
 export interface SearchItem {
   oem: string;
   name: string;
+  /** Название из каталога UMAPI, если у товара из 1С своё название */
+  catalogName?: string | null;
   brand: string;
   catalog: string;
   productId?: number;
@@ -72,7 +74,7 @@ export interface SearchWarehouse {
 const API_BASE_URL = `${API_BASE}/api`;
 
 class SearchApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public code?: string) {
     super(message);
     this.name = 'SearchApiError';
   }
@@ -106,8 +108,18 @@ async function apiRequest<T>(
     const response = await fetch(url, config);
     
     if (!response.ok) {
-      const errorMessage = await response.text();
-      throw new SearchApiError(response.status, errorMessage || 'Network error');
+      const errorText = await response.text();
+      // Бэкенд отдаёт JSON {code, message}; показываем message, а не сырой JSON
+      let code: string | undefined;
+      let errorMessage = errorText;
+      try {
+        const body = JSON.parse(errorText);
+        code = body?.code;
+        errorMessage = body?.message || errorText;
+      } catch {
+        // не JSON — оставляем текст как есть
+      }
+      throw new SearchApiError(response.status, errorMessage || 'Network error', code);
     }
 
     const text = await response.text();
